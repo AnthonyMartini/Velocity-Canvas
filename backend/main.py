@@ -138,6 +138,7 @@ RULE 4 — VALID CONTROL TYPES (use ONLY these):
   | Image               | Image@2.2.0               |
   | Icon                | Icon@2.4.0                |
   | Group / layout      | GroupContainer@1.4.0      |
+  | Gallery / list      | Gallery@2.15.0            |
 
 RULE 5 — YAML STRUCTURE:
   The root of every output must follow this skeleton:
@@ -160,6 +161,7 @@ RULE 5 — YAML STRUCTURE:
   - Labels must have: Text, FontSize, Color, FontWeight.
   - Buttons must have: Text, Fill, Color, BorderRadius, FontSize.
   - Dropdowns must have: Items, Default, Fill, Color.
+  - Galleries must have: Items, TemplateSize, TemplatePadding, WrapCount.
 
 RULE 6 — DROPDOWNS & LIST BOXES:
   For select-type inputs, use DropDown@2.3.1.
@@ -168,7 +170,15 @@ RULE 6 — DROPDOWNS & LIST BOXES:
   - InputTextPlaceholder: ="Select..."
   - Width/Height/X/Y: as per the design layout.
 
-RULE 6 — COLORS:
+RULE 7 — GALLERIES:
+  For repeating lists of data, use Gallery@2.15.0.
+  - You MUST include a `Variant` property:
+    - Vertical: `Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0`
+    - Horizontal: `Variant: BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0`
+  - `TemplateSize` defines the height of a vertical item, or width of a horizontal item.
+  - A Gallery's `Children` block represents its repeating item template. Design the children as if designing a single card.
+
+RULE 8 — COLORS:
   Always use RGBA() notation. Never use hex codes or named CSS colors.
   White = RGBA(255, 255, 255, 1)
   Black = RGBA(0, 0, 0, 1)
@@ -178,12 +188,12 @@ RULE 6 — COLORS:
   Surface card = RGBA(49, 50, 68, 1)
   Accent purple = RGBA(137, 180, 250, 1)
 
-RULE 7 — NO MARKDOWN WRAPPING:
+RULE 9 — NO MARKDOWN WRAPPING:
   Output ONLY the raw YAML. Do NOT wrap the output in ```yaml or ``` fences.
   Do NOT include any explanation, commentary, or prose before or after the YAML.
   The very first character of your response must be `-` (the start of the YAML list).
 
-RULE 8 — SELF-CONTAINED OUTPUT:
+RULE 10 — SELF-CONTAINED OUTPUT:
   Include every control needed to fully represent the user's requested UI.
   Position all elements with absolute X/Y coordinates. Design for a standard
   canvas width of 1366 pixels.
@@ -341,6 +351,21 @@ Defaults: x=100, y=100, width=320, height=200,
 
 Children inside a Container use x/y relative to the container's top-left corner.
 
+=== GALLERY ===
+type: "Gallery"  (control: Gallery@2.15.0)
+A list component that repeats its children for each data item.
+Properties:
+  x (number), y (number), width (number), height (number),
+  Items (string — a PowerFx formula returning a table),
+  Variant ("BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0" | "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"),
+  TemplateSize (number), TemplatePadding (number), WrapCount (number),
+  ShowNavigation (boolean), ShowScrollbar (boolean), visible (boolean),
+  children (array of component objects representing the item template)
+Defaults: x=20, y=20, width=600, height=500,
+  Items="SortByColumns(Search(...))", Variant="BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0",
+  TemplateSize=120, TemplatePadding=10, WrapCount=1,
+  ShowNavigation=false, ShowScrollbar=true, visible=true, children=[]
+
 === OUTPUT FORMAT (STRICT JSON) ===
 Respond ONLY with this JSON shape:
 {
@@ -355,10 +380,10 @@ Respond ONLY with this JSON shape:
   ],
   "components_to_add": [
     {
-      "type": "Button", // Or Label, TextInput, Container
-      "parentId": "<id string of container to insert into>", // Omit if adding to root canvas
+      "type": "Button", // Or Label, TextInput, Container, Gallery
+      "parentId": "<id string of container/gallery to insert into>", // Omit if adding to root canvas
       "text": "New Button", // Include ONLY properties that differ from defaults/user specs
-      "children": []   // only for Container
+      "children": []   // only for Container or Gallery
     }
   ]
 }
@@ -366,9 +391,9 @@ Respond ONLY with this JSON shape:
 RULES:
 - To modify an existing component, you MUST include its `id` in `components_to_update` along with only the properties to change.
 - To delete a component, include its `id` in `components_to_remove`.
-- To add a new component inside an existing Container, set `parentId` to the Container's `id`.
+- To add a new component inside an existing Container or Gallery, set `parentId` to the Container/Gallery's `id`.
 - Omit any property that matches its default value when adding.
-- Children inside containers must have x/y relative to the container origin, not the canvas.
+- Children inside containers or galleries must have x/y relative to the parent origin, not the canvas.
 - Colors must be hex strings like "#0078d4" or "transparent" or "rgba(0,0,0,0)".
 - fontWeight, align, and verticalAlign values MUST use the exact PA enum strings listed above.
 - Place components so they don't overlap each other. Use the canvas context provided.

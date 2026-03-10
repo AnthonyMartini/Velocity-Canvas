@@ -2,6 +2,7 @@ import { useState } from 'react'
 import GeneratorPage from './GeneratorPage'
 import RendererPage from './RendererPage'
 import ComponentLibraryPage from './ComponentLibraryPage'
+import LandingPage from './LandingPage'
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
 const GeneratorIcon = () => (
@@ -26,13 +27,18 @@ const LibraryIcon = () => (
 )
 
 const TABS = [
-  { id: 'generator', label: 'Generator', Icon: GeneratorIcon },
-  { id: 'renderer', label: 'Test Renderer', Icon: RendererIcon },
+  { id: 'generator', label: 'Component Generator', Icon: GeneratorIcon },
+  { id: 'renderer', label: 'Canvas Editor', Icon: RendererIcon },
   { id: 'library', label: 'Component Library', Icon: LibraryIcon },
 ]
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('generator')
+  const [hasStarted, setHasStarted] = useState(false)
+
+  if (!hasStarted) {
+    return <LandingPage onStart={() => setHasStarted(true)} />
+  }
 
   return (
     <div className="h-screen bg-base flex flex-col overflow-hidden">
@@ -81,14 +87,14 @@ export default function App() {
       </header>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className={`flex-1 flex flex-col ${activeTab === 'renderer' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {activeTab === 'generator' && <GeneratorPage />}
       {activeTab === 'renderer' && <RendererPage />}
       {activeTab === 'library' && <ComponentLibraryPage />}
 
       {/* ── Footer (Generator only) ──────────────────────────────────────────── */}
       {activeTab === 'generator' && (
-        <footer className="border-t border-surface/60 py-5 px-6 shrink-0">
+        <footer className="mt-auto border-t border-surface/60 py-5 px-6 shrink-0">
           <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-subtext/40">
             <span>Velocity Canvas — Power Apps YAML Generator</span>
             <span>Powered by Gemini 2.5 Pro · pa.yaml v3.0</span>

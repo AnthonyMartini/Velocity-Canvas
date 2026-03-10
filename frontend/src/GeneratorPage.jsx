@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { screenToYaml, ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, createFromSpec } from './RendererPage'
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const SparkleIcon = () => (
@@ -36,7 +37,7 @@ const EXAMPLE_PROMPTS = [
 
 export default function GeneratorPage() {
   const [prompt, setPrompt] = useState('')
-  const [yamlOutput, setYamlOutput] = useState('')
+  const [tree, setTree] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -52,14 +53,19 @@ export default function GeneratorPage() {
     if (!prompt.trim() || isLoading) return
     setIsLoading(true)
     setError(null)
-    setYamlOutput('')
+    setTree([])
     setCopied(false)
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/generate`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/renderer-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ 
+          message: prompt.trim(),
+          canvas_width: 1366,
+          canvas_height: 768,
+          canvas_components: []
+        }),
       })
 
       if (!response.ok) {
@@ -68,7 +74,8 @@ export default function GeneratorPage() {
       }
 
       const data = await response.json()
-      setYamlOutput(data.yaml_code)
+      const newTree = (data.components_to_add || []).map(createFromSpec).filter(Boolean)
+      setTree(newTree)
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.')
     } finally {
@@ -98,7 +105,7 @@ export default function GeneratorPage() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
     }
-  }, [yamlOutput])
+  }, [tree])
 
   const handleExampleClick = useCallback((ex) => {
     setPrompt(ex)
@@ -106,10 +113,11 @@ export default function GeneratorPage() {
     textareaRef.current?.focus()
   }, [])
 
+  const yamlOutput = tree.length > 0 ? screenToYaml(tree) : ''
   const lineCount = yamlOutput ? yamlOutput.split('\n').length : 0
 
   return (
-    <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 flex flex-col gap-8">
+    <main className="flex-1 max-w-[1600px] mx-auto w-full px-6 py-8 flex flex-col gap-8">
 
       {/* Hero Tagline */}
       <div className="text-center animate-fade-in">
@@ -202,17 +210,17 @@ export default function GeneratorPage() {
       )}
 
       {/* Output Section */}
-      {yamlOutput && (
-        <div className="animate-slide-up">
-          <div className="flex items-center justify-between mb-3">
+      {tree.length > 0 && (
+        <div className="animate-slide-up flex flex-col gap-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-text">Generated YAML</h3>
+              <h3 className="text-sm font-semibold text-text">Generation Complete</h3>
               <span className="text-xs text-subtext bg-surface/70 border border-overlay/40 px-2 py-0.5 rounded-full">
-                {lineCount} lines
+                {tree.length} components
               </span>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-green" />
-                <span className="text-xs text-green font-medium">Ready to paste</span>
+                <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
+                <span className="text-xs text-green font-medium">Ready</span>
               </div>
             </div>
 
@@ -225,45 +233,117 @@ export default function GeneratorPage() {
                 }`}
             >
               {copied ? <CheckIcon /> : <CopyIcon />}
-              {copied ? 'Copied!' : 'Copy to Power Apps'}
+              {copied ? 'Copied!' : 'Copy YAML to Power Apps'}
             </button>
           </div>
 
-          <div className="bg-accent/5 border border-accent/20 rounded-xl px-4 py-3 mb-3 flex items-center gap-3">
+          <div className="bg-accent/5 border border-accent/20 rounded-xl px-4 py-3 pb-[14px] flex items-center gap-3">
             <svg className="w-4 h-4 text-accent shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
             </svg>
             <p className="text-accent text-xs">
-              Copy the YAML above, then in Power Apps Canvas Studio press <strong>Ctrl+V</strong> on the canvas to paste the component directly.
+              Review the visual preview on the left. Once satisfied, copy the YAML string from the right and paste it directly into Canvas Studio (<kbd className="px-1 py-px rounded bg-white/20">Ctrl+V</kbd>).
             </p>
           </div>
 
-          <div className="relative bg-base border border-overlay/40 rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
-            <div className="flex items-center gap-1.5 px-4 py-3 border-b border-overlay/30 bg-surface/40">
-              <div className="w-3 h-3 rounded-full bg-red/70" />
-              <div className="w-3 h-3 rounded-full bg-yellow/70" />
-              <div className="w-3 h-3 rounded-full bg-green/70" />
-              <span className="ml-3 text-subtext/50 text-xs font-mono">component.pa.yaml</span>
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Visual Preview Window */}
+            <div className="flex-1 bg-surface border border-overlay/40 rounded-2xl overflow-hidden shadow-2xl shadow-black/30 flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5 px-4 py-3 border-b border-overlay/30 bg-surface/40">
+                <div className="w-2.5 h-2.5 rounded-full bg-red/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green/70" />
+                <span className="ml-2 text-subtext/60 text-[11px] font-medium tracking-wide uppercase">Visual Preview</span>
+              </div>
+              <div className="relative bg-[#f0f0f0] overflow-hidden flex-1 min-h-[500px] flex items-center justify-center relative overflow-hidden">
+                 <div 
+                   style={{ width: 1366, height: 768, transform: 'scale(auto)', zoom: 0.5 }}
+                   className="relative bg-white shadow-2xl origin-center"
+                 >
+                  {tree.map(comp => {
+                    const sharedProps = {
+                      comp, selected: false,
+                      onMouseDown: (e) => e.preventDefault(),
+                      onClick: (e) => e.preventDefault(),
+                    }
+                    if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Container') return (
+                      <ContainerRenderer key={comp.id} {...sharedProps}
+                        selectedIds={[]}
+                        onChildMouseDown={(e)=>e.preventDefault()}
+                        onChildClick={(e)=>e.preventDefault()}
+                        onDropInto={()=>{}}
+                        dragOverId={null}
+                        setDragOverId={()=>{}}
+                      />
+                    )
+                    return null
+                  })}
+                 </div>
+              </div>
             </div>
 
-            <div className="overflow-auto max-h-[520px] flex">
-              <div className="shrink-0 select-none border-r border-overlay/20 bg-surface/20 px-3 py-4 text-right">
-                {yamlOutput.split('\n').map((_, i) => (
-                  <div key={i} className="text-subtext/30 text-xs font-mono leading-[1.7]">
-                    {i + 1}
-                  </div>
-                ))}
+            {/* YAML Code Pane */}
+            <div className="w-full lg:w-[480px] shrink-0 bg-[#1a1b2e] border border-overlay/40 rounded-2xl overflow-hidden shadow-2xl shadow-black/30 flex flex-col">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-overlay/30 bg-surface/40">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-violet-300 text-[11px] font-mono whitespace-nowrap overflow-hidden text-ellipsis">pa.yaml</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-subtext/40">{lineCount} lines</span>
+                  <button
+                    onClick={handleCopy}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-colors cursor-pointer ${
+                      copied ? 'bg-green/20 text-green' : 'bg-overlay/20 text-subtext hover:bg-accent/20 hover:text-accent'
+                    }`}
+                  >
+                    {copied ? <CheckIcon /> : <CopyIcon />}
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
               </div>
-              <pre className="flex-1 p-4 code-output text-text overflow-x-auto whitespace-pre">
-                <code>{yamlOutput}</code>
-              </pre>
+
+              <div className="overflow-auto max-h-[500px] flex flex-1">
+                <div className="shrink-0 select-none border-r border-overlay/20 bg-surface/20 px-3 py-4 text-right">
+                  {yamlOutput.split('\n').map((_, i) => (
+                    <div key={i} className="text-subtext/30 text-[10px] font-mono leading-[1.7]">
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+                <pre className="flex-1 p-4 code-output text-text/90 overflow-x-auto whitespace-pre text-[11px] leading-[1.7]">
+                  <code>
+                    {yamlOutput.split('\n').map((line, i) => {
+                      let className = 'text-text/80'
+                      const trimmed = line.trimStart()
+                      if (trimmed.startsWith('-') && trimmed.endsWith(':')) className = 'text-violet-300 font-semibold'
+                      else if (/^Control:/.test(trimmed)) className = 'text-blue-300'
+                      else if (/^Properties:|^Children:/.test(trimmed)) className = 'text-accent/70 font-semibold'
+                      else if (/^[A-Z][A-Za-z]+:/.test(trimmed)) {
+                        const [, val] = line.split(/:\s*=?/)
+                        return (
+                          <div key={i}>
+                            <span className="text-blue-200/80">{line.split(':')[0]}</span>
+                            <span className="text-subtext/50">: </span>
+                            <span className="text-green-300/80">={val?.trim()}</span>
+                          </div>
+                        )
+                      }
+                      return <div key={i} className={className}>{line}</div>
+                    })}
+                  </code>
+                </pre>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Empty State */}
-      {!yamlOutput && !isLoading && !error && (
+      {tree.length === 0 && !isLoading && !error && (
         <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
           <div className="w-16 h-16 rounded-2xl bg-surface/50 border border-overlay/30 flex items-center justify-center mb-4 shadow-inner">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-subtext/40">

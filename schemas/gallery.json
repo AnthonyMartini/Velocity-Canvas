@@ -1,0 +1,32 @@
+{
+  "type": "Gallery",
+  "control": "Gallery@2.15.0",
+  "defaults": {
+    "Items": "SortByColumns(Search(Table({Title:\"Sample 1\", Subtitle:\"Details 1\"}), \"\", \"Title\"), \"Title\", SortOrder.Ascending)",
+    "x": 20,
+    "y": 20,
+    "width": 600,
+    "height": 500,
+    "TemplateSize": 120,
+    "TemplatePadding": 10,
+    "WrapCount": 1,
+    "ShowNavigation": false,
+    "ShowScrollbar": true,
+    "Visible": true,
+    "Variant": "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0"
+  },
+  "properties": [
+    { "key": "Items",             "label": "Items",             "type": "text" },
+    { "key": "Variant",           "label": "Variant",           "type": "select", "options": ["BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0", "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"] },
+    { "key": "x",                 "label": "X",                 "type": "number" },
+    { "key": "y",                 "label": "Y",                 "type": "number" },
+    { "key": "width",             "label": "Width",             "type": "number" },
+    { "key": "height",            "label": "Height",            "type": "number" },
+    { "key": "TemplateSize",      "label": "Template Size",     "type": "number" },
+    { "key": "TemplatePadding",   "label": "Template Padding",  "type": "number" },
+    { "key": "WrapCount",         "label": "Wrap Count",        "type": "number" },
+    { "key": "ShowNavigation",    "label": "Show Navigation",   "type": "boolean" },
+    { "key": "ShowScrollbar",     "label": "Show Scrollbar",    "type": "boolean" },
+    { "key": "Visible",           "label": "Visible",           "type": "boolean" }
+  ]
+}

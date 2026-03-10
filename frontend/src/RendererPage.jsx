@@ -1,16 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import PropTypes from 'prop-types'
 import buttonSchema from '@schemas/button.json'
 import labelSchema from '@schemas/label.json'
 import containerSchema from '@schemas/container.json'
 import textInputSchema from '@schemas/textInput.json'
 import dropdownSchema from '@schemas/dropdown.json'
+import gallerySchema from '@schemas/gallery.json'
 
 // ── Unique ID ─────────────────────────────────────────────────────────────────
 let _id = 0
 const uid = () => `comp_${++_id}`
 
 // ── Schema lookup ─────────────────────────────────────────────────────────────
-const SCHEMAS = { Button: buttonSchema, Label: labelSchema, Container: containerSchema, TextInput: textInputSchema, Dropdown: dropdownSchema }
+const SCHEMAS = { Button: buttonSchema, Label: labelSchema, Container: containerSchema, TextInput: textInputSchema, Dropdown: dropdownSchema, Gallery: gallerySchema }
 
 // ── Name counter per type ────────────────────────────────────────────────────
 const _typeCounts = {}
@@ -30,7 +32,7 @@ function createFromSpec(spec) {
   const schema = SCHEMAS[spec.type]
   if (!schema) return null
   const base = JSON.parse(JSON.stringify(schema.defaults))
-  const { type, children, ...rest } = spec
+  const { children, ...rest } = spec
   const processedChildren = (children || []).map(c => createFromSpec(c)).filter(Boolean)
   return { ...base, ...rest, id: uid(), type: schema.type, name: spec.name || nextName(schema.type), children: processedChildren }
 }
@@ -62,8 +64,6 @@ const CSS_VALIGN = { 'VerticalAlign.Top': 'flex-start', 'VerticalAlign.Middle': 
 
 const BORDER_MAP = { None: 'BorderStyle.None', Solid: 'BorderStyle.Solid', Dashed: 'BorderStyle.Dashed', Dotted: 'BorderStyle.Dotted' }
 
-function ind(n) { return '  '.repeat(n) }
-
 /** Recursively convert a component tree node to PA YAML string.
  *  col = the column where the leading `- Name:` dash sits (0 for root). */
 function componentToYaml(node, col = 0) {
@@ -89,6 +89,7 @@ function componentToYaml(node, col = 0) {
     Container: 'GroupContainer@1.4.0',
     TextInput: 'Classic/TextInput@2.3.2',
     Dropdown: 'Classic/DropDown@2.3.1',
+    Gallery:   'Gallery@2.15.0',
   }
 
   const lines = []
@@ -100,6 +101,8 @@ function componentToYaml(node, col = 0) {
   lines.push(`${sp(col + 4)}Control: ${controlMap[node.type]}`)
   if (node.type === 'Container') {
     lines.push(`${sp(col + 4)}Variant: ManualLayout`)
+  } else if (node.type === 'Gallery') {
+    lines.push(`${sp(col + 4)}Variant: ${node.Variant}`)
   }
   lines.push(`${sp(col + 4)}Properties:`)
 
@@ -186,10 +189,22 @@ function componentToYaml(node, col = 0) {
     p('BorderThickness', node.borderThickness)
     if (!node.visible) p('Visible', 'false')
     if (node.disabled) p('DisplayMode', 'DisplayMode.Disabled')
+  } else if (node.type === 'Gallery') {
+    p('X', node.x)
+    p('Y', node.y)
+    p('Width', node.width)
+    p('Height', node.height)
+    if (node.Items) p('Items', node.Items)
+    if (node.TemplateSize !== undefined) p('TemplateSize', node.TemplateSize)
+    if (node.TemplatePadding !== undefined) p('TemplatePadding', node.TemplatePadding)
+    if (node.WrapCount !== undefined) p('WrapCount', node.WrapCount)
+    if (node.ShowNavigation !== undefined) p('ShowNavigation', node.ShowNavigation ? 'true' : 'false')
+    if (node.ShowScrollbar !== undefined) p('ShowScrollbar', node.ShowScrollbar ? 'true' : 'false')
+    if (!node.visible) p('Visible', 'false')
   }
 
   // Children: dash at col+6, so child's "- Name:" starts at col+6
-  if (node.type === 'Container' && node.children?.length) {
+  if ((node.type === 'Container' || node.type === 'Gallery') && node.children?.length) {
     lines.push(`${sp(col + 4)}Children:`)
     for (const child of node.children) {
       lines.push(componentToYaml(child, col + 6))
@@ -200,16 +215,15 @@ function componentToYaml(node, col = 0) {
 }
 
 // ── Screen-level YAML renderer ───────────────────────────────────────────────
-function screenToYaml(tree, canvasW, canvasH) {
+function screenToYaml(tree) {
   if (!tree?.length) return '# Empty canvas — add components to get started'
   return tree.map(node => componentToYaml(node, 0)).join('\n')
 }
 
 // ── Code Pane ─────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, canvasW, canvasH, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode }) {
+function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode }) {
   const [copied, setCopied] = useState(false)
-  const yaml = node ? componentToYaml(node) : screenToYaml(tree, canvasW, canvasH)
-  const isScreenMode = !node
+  const yaml = node ? componentToYaml(node) : screenToYaml(tree)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(yaml).then(() => {
@@ -327,6 +341,18 @@ function CodePane({ node, tree, canvasW, canvasH, isTweaking, setIsTweaking, twe
       </div>
     </div>
   )
+}
+
+CodePane.propTypes = {
+  node: PropTypes.object, // Can be null for screen mode
+  tree: PropTypes.array.isRequired,
+  isTweaking: PropTypes.bool.isRequired,
+  setIsTweaking: PropTypes.func.isRequired,
+  tweakInput: PropTypes.string.isRequired,
+  setTweakInput: PropTypes.func.isRequired,
+  handleTweakSubmit: PropTypes.func.isRequired,
+  tweakLoading: PropTypes.bool.isRequired,
+  tweakOriginalNode: PropTypes.object,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -474,6 +500,30 @@ function ButtonRenderer({ comp, selected, onMouseDown, onClick }) {
   )
 }
 
+ButtonRenderer.propTypes = {
+  comp: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    color: PropTypes.string,
+    fontSize: PropTypes.number,
+    fontWeight: PropTypes.string,
+    italic: PropTypes.bool,
+    underline: PropTypes.bool,
+    borderRadius: PropTypes.number,
+    borderThickness: PropTypes.number,
+    borderColor: PropTypes.string,
+    visible: PropTypes.bool,
+    disabled: PropTypes.bool,
+    text: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+}
+
 function LabelRenderer({ comp, selected, onMouseDown, onClick }) {
   const style = {
     position: 'absolute',
@@ -503,6 +553,33 @@ function LabelRenderer({ comp, selected, onMouseDown, onClick }) {
   return (
     <div style={style} onMouseDown={onMouseDown} onClick={onClick}>{comp.text}</div>
   )
+}
+
+LabelRenderer.propTypes = {
+  comp: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    color: PropTypes.string,
+    fontSize: PropTypes.number,
+    fontWeight: PropTypes.string,
+    italic: PropTypes.bool,
+    underline: PropTypes.bool,
+    align: PropTypes.string,
+    verticalAlign: PropTypes.string,
+    visible: PropTypes.bool,
+    paddingLeft: PropTypes.number,
+    paddingRight: PropTypes.number,
+    paddingTop: PropTypes.number,
+    paddingBottom: PropTypes.number,
+    lineHeight: PropTypes.number,
+    text: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
 }
 
 // ── TextInput Renderer ────────────────────────────────────────────────────────
@@ -537,6 +614,27 @@ function TextInputRenderer({ comp, selected, onMouseDown, onClick }) {
   )
 }
 
+TextInputRenderer.propTypes = {
+  comp: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    color: PropTypes.string,
+    fontSize: PropTypes.number,
+    fontWeight: PropTypes.string,
+    borderThickness: PropTypes.number,
+    borderColor: PropTypes.string,
+    visible: PropTypes.bool,
+    value: PropTypes.string,
+    hint: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+}
+
 // ── Dropdown Renderer ────────────────────────────────────────────────────────
 function DropdownRenderer({ comp, selected, onMouseDown, onClick }) {
   const style = {
@@ -569,8 +667,29 @@ function DropdownRenderer({ comp, selected, onMouseDown, onClick }) {
   )
 }
 
+DropdownRenderer.propTypes = {
+  comp: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    color: PropTypes.string,
+    fontSize: PropTypes.number,
+    fontWeight: PropTypes.string,
+    borderThickness: PropTypes.number,
+    borderColor: PropTypes.string,
+    visible: PropTypes.bool,
+    defaultValue: PropTypes.string,
+    items: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+}
+
 // ── Recursive Container Renderer ─────────────────────────────────────────────
-function ContainerRenderer({ comp, selected, selectedId, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
+function ContainerRenderer({ comp, selected, selectedIds, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
   const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
   const isDragOver = dragOverId === comp.id
 
@@ -599,7 +718,7 @@ function ContainerRenderer({ comp, selected, selectedId, onMouseDown, onClick, o
     <div
       style={style}
       data-container-id={comp.id}
-      onMouseDown={onMouseDown}
+      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
       onClick={onClick}
       onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(comp.id) }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null) }}
@@ -625,13 +744,13 @@ function ContainerRenderer({ comp, selected, selectedId, onMouseDown, onClick, o
 
       {/* Children */}
       {comp.children?.map(child => {
-        const isChildSelected = child.id === selectedId
+        const isChildSelected = selectedIds.includes(child.id)
         const childProps = {
           comp: child,
           selected: isChildSelected,
-          selectedId,
+          selectedIds,
           onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
-          onClick: (e) => { e.stopPropagation(); onChildClick(child.id) },
+          onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
         }
         if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
         if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
@@ -647,10 +766,178 @@ function ContainerRenderer({ comp, selected, selectedId, onMouseDown, onClick, o
             setDragOverId={setDragOverId}
           />
         )
+        if (child.type === 'Gallery') return (
+          <GalleryRenderer
+            key={child.id} {...childProps}
+            onChildMouseDown={onChildMouseDown}
+            onChildClick={onChildClick}
+            onDropInto={onDropInto}
+            dragOverId={dragOverId}
+            setDragOverId={setDragOverId}
+          />
+        )
         return null
       })}
     </div>
   )
+}
+
+ContainerRenderer.propTypes = {
+  comp: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    borderStyle: PropTypes.string,
+    borderThickness: PropTypes.number,
+    borderColor: PropTypes.string,
+    visible: PropTypes.bool,
+    children: PropTypes.array,
+  }).isRequired,
+  selected: PropTypes.bool,
+  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+  onChildMouseDown: PropTypes.func.isRequired,
+  onChildClick: PropTypes.func.isRequired,
+  onDropInto: PropTypes.func.isRequired,
+  dragOverId: PropTypes.string,
+  setDragOverId: PropTypes.func.isRequired,
+}
+
+// ── Recursive Gallery Renderer ───────────────────────────────────────────────
+function GalleryRenderer({ comp, selected, selectedIds, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
+  const isDragOver = dragOverId === comp.id
+
+  const style = {
+    position: 'absolute',
+    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
+    backgroundColor: comp.fill === 'rgba(0,0,0,0)' || comp.fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.fill,
+    border: '2px dashed rgba(236, 72, 153, 0.4)', // Pink dashed border for Gallery
+    opacity: comp.visible ? 1 : 0.3,
+    cursor: 'move', userSelect: 'none',
+    boxSizing: 'border-box',
+    outline: selected ? '2px solid #ec4899' : 'none',
+    outlineOffset: selected ? '2px' : '0',
+    boxShadow: selected
+      ? '0 0 0 3px rgba(236, 72, 153, 0.25)'
+      : isDragOver
+        ? 'inset 0 0 0 2px #ec4899'
+        : 'none',
+    transition: 'box-shadow 0.12s',
+    zIndex: selected ? 10 : 1,
+    overflow: 'hidden'
+  }
+
+  // Determine if vertical or horizontal based on the selected Variant
+  const isVertical = comp.Variant ? comp.Variant.includes('Vertical') : comp.height > comp.width
+  const padding = comp.TemplatePadding || 0
+  const tSize = comp.TemplateSize || (isVertical ? 100 : 100)
+
+  return (
+    <div
+      style={style}
+      data-container-id={comp.id}
+      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
+      onClick={onClick}
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(comp.id) }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null) }}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); onDropInto(comp.id); setDragOverId(null) }}
+    >
+      <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: '#ec4899', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}>
+        Gallery Template
+      </div>
+
+      {isDragOver && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(236, 72, 153, 0.06)',
+          border: '2px dashed #ec4899', borderRadius: 2, pointerEvents: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
+        }}>
+          <span style={{ fontSize: 11, color: '#ec4899', fontWeight: 600 }}>Drop into Template</span>
+        </div>
+      )}
+
+      {/* Actual Template Wrapper */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
+        {comp.children?.map(child => {
+          const isChildSelected = selectedIds.includes(child.id)
+          const childProps = {
+            comp: child,
+            selected: isChildSelected,
+            selectedIds,
+            onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
+            onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
+          }
+          if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
+          if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
+          if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
+          if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
+          if (child.type === 'Container') return (
+            <ContainerRenderer
+              key={child.id} {...childProps}
+              onChildMouseDown={onChildMouseDown}
+              onChildClick={onChildClick}
+              onDropInto={onDropInto}
+              dragOverId={dragOverId}
+              setDragOverId={setDragOverId}
+            />
+          )
+          if (child.type === 'Gallery') return (
+            <GalleryRenderer
+              key={child.id} {...childProps}
+              onChildMouseDown={onChildMouseDown}
+              onChildClick={onChildClick}
+              onDropInto={onDropInto}
+              dragOverId={dragOverId}
+              setDragOverId={setDragOverId}
+            />
+          )
+          return null
+        })}
+      </div>
+
+      {/* Ghost repeating templates for visual effect only */}
+      <div style={{ position: 'absolute', top: isVertical ? tSize + padding : 0, left: isVertical ? 0 : tSize + padding, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
+        {comp.children?.map(child => {
+          const isChildSelected = selectedIds.includes(child.id)
+          const childProps = { comp: child, selected: isChildSelected, selectedIds, onMouseDown: () => {}, onClick: () => {} }
+          if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
+          if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
+          if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
+          if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
+          if (child.type === 'Container') return <ContainerRenderer key={child.id} {...childProps} onChildMouseDown={()=>{}} onChildClick={()=>{}} onDropInto={()=>{}} setDragOverId={()=>{}} />
+          return null
+        })}
+      </div>
+    </div>
+  )
+}
+
+GalleryRenderer.propTypes = {
+  comp: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+    fill: PropTypes.string,
+    TemplateSize: PropTypes.number,
+    TemplatePadding: PropTypes.number,
+    visible: PropTypes.bool,
+    children: PropTypes.array,
+  }).isRequired,
+  selected: PropTypes.bool,
+  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+  onChildMouseDown: PropTypes.func.isRequired,
+  onChildClick: PropTypes.func.isRequired,
+  onDropInto: PropTypes.func.isRequired,
+  dragOverId: PropTypes.string,
+  setDragOverId: PropTypes.func.isRequired,
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -731,6 +1018,15 @@ function PropField({ prop, value, onChange }) {
   )
 }
 
+PropField.propTypes = {
+  prop: PropTypes.shape({
+    type: PropTypes.string.isRequired,
+    label: PropTypes.string.isRequired,
+    options: PropTypes.arrayOf(PropTypes.string),
+  }).isRequired,
+  value: PropTypes.any,
+  onChange: PropTypes.func.isRequired,
+}
 // ── Chat Message ──────────────────────────────────────────────────────────────
 function ChatMessage({ msg }) {
   const isUser = msg.role === 'user'
@@ -761,6 +1057,16 @@ function ChatMessage({ msg }) {
   )
 }
 
+ChatMessage.propTypes = {
+  msg: PropTypes.shape({
+    role: PropTypes.string.isRequired,
+    content: PropTypes.string.isRequired,
+    added: PropTypes.number,
+    mods: PropTypes.number,
+    image: PropTypes.string,
+  }).isRequired,
+}
+
 // ── Layer Row ──────────────────────────────────────────────────────────────────
 const TYPE_COLORS = { Button: 'bg-[#0078d4]', Label: 'bg-subtext', Container: 'bg-violet-400', TextInput: 'bg-emerald-500', Dropdown: 'bg-amber-500' }
 const TYPE_ICONS = {
@@ -771,13 +1077,14 @@ const TYPE_ICONS = {
   Dropdown: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" /></svg>,
 }
 
-function LayerRow({ node, selectedId, onSelect, depth, isCollapsed, toggleCollapse }) {
+function LayerRow({ node, selectedIds, onSelect, depth, isCollapsed, toggleCollapse }) {
   const hasChildren = node.type === 'Container' && node.children?.length > 0
+  const isSelected = selectedIds.includes(node.id)
   
   return (
     <div 
       className={`flex items-center gap-1.5 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
-        selectedId === node.id
+        isSelected
           ? 'bg-accent/15 text-accent border border-accent/30'
           : 'text-subtext hover:bg-overlay/30 border border-transparent'
       }`}
@@ -801,7 +1108,7 @@ function LayerRow({ node, selectedId, onSelect, depth, isCollapsed, toggleCollap
       </div>
 
       <button 
-        onClick={() => onSelect(node.id)}
+        onClick={(e) => onSelect(e, node.id)}
         className="flex-1 flex items-center gap-1.5 truncate cursor-pointer"
       >
         <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-white ${TYPE_COLORS[node.type] || 'bg-overlay'}`}>
@@ -814,27 +1121,147 @@ function LayerRow({ node, selectedId, onSelect, depth, isCollapsed, toggleCollap
   )
 }
 
+LayerRow.propTypes = {
+  node: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    type: PropTypes.string.isRequired,
+    name: PropTypes.string,
+    text: PropTypes.string,
+    children: PropTypes.array,
+  }).isRequired,
+  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onSelect: PropTypes.func.isRequired,
+  depth: PropTypes.number.isRequired,
+  isCollapsed: PropTypes.bool.isRequired,
+  toggleCollapse: PropTypes.func.isRequired,
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
 export default function RendererPage() {
-  const [canvasW, setCanvasW] = useState(1300)
-  const [canvasH, setCanvasH] = useState(750)
-  const [canvasWInput, setCanvasWInput] = useState('1300')
-  const [canvasHInput, setCanvasHInput] = useState('750')
+  const [canvasW, setCanvasW] = useState(1366)
+  const [canvasH, setCanvasH] = useState(768)
+  const [canvasWInput, setCanvasWInput] = useState('1366')
+  const [canvasHInput, setCanvasHInput] = useState('768')
   const [tree, setTree] = useState([])           // component tree
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([]) // Array of selected component IDs
   const [dragOverId, setDragOverId] = useState(null)
   const [collapsedIds, setCollapsedIds] = useState(new Set()) // Container collapse state
   const [zoom, setZoom] = useState(1) // Canvas zoom level
   const [chatImage, setChatImage] = useState(null)
   const fileInputRef = useRef(null)
 
+  // Drag-to-select state
+  const [selectionBox, setSelectionBox] = useState(null)
+
   // AI Tweak state
   const [tweakOriginalNode, setTweakOriginalNode] = useState(null)
   const [isTweaking, setIsTweaking] = useState(false)
   const [tweakInput, setTweakInput] = useState('')
   const [tweakLoading, setTweakLoading] = useState(false)
+
+  // History state for Undo/Redo
+  const [history, setHistory] = useState([[]]) // Initialize with empty tree
+  const [historyIndex, setHistoryIndex] = useState(0)
+
+  // Function to save a new state to history
+  const saveHistory = useCallback((newTree) => {
+    setHistory(prev => {
+      // If we are not at the end of the history, slice off the future states
+      const newHistory = prev.slice(0, historyIndex + 1)
+      newHistory.push(newTree)
+      return newHistory
+    })
+    setHistoryIndex(prev => prev + 1)
+    setTree(newTree)
+  }, [historyIndex])
+
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const prevIndex = historyIndex - 1
+      setHistoryIndex(prevIndex)
+      setTree(history[prevIndex])
+      setSelectedIds([])
+      setDragOverId(null)
+    }
+  }, [history, historyIndex])
+
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1
+      setHistoryIndex(nextIndex)
+      setTree(history[nextIndex])
+      setSelectedIds([])
+      setDragOverId(null)
+    }
+  }, [history, historyIndex])
+
+  // ── Delete selected ─────────────────────────────────────────────────────────
+  const deleteSelected = useCallback(() => {
+    if (!selectedIds.length) return
+    setTree(prev => { 
+      let nextTree = prev
+      for (const id of selectedIds) {
+        nextTree = removeNode(nextTree, id)[0]
+      }
+      saveHistory(nextTree)
+      return nextTree 
+    })
+    setSelectedIds([])
+  }, [selectedIds, saveHistory])
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Zoom hotkeys
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault()
+          setZoom(z => Math.min(3, z + 0.1))
+          return
+        }
+        if (e.key === '-') {
+          e.preventDefault()
+          setZoom(z => Math.max(0.25, z - 0.1))
+          return
+        }
+      }
+
+      // Don't trigger if typing in an input/textarea
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+        return
+      }
+      
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z') {
+          if (e.shiftKey) {
+            e.preventDefault()
+            redo()
+          } else {
+            e.preventDefault()
+            undo()
+          }
+        } else if (e.key === 'y') {
+          e.preventDefault()
+          redo()
+        }
+      } else {
+        // Unmodified tool hotkeys
+        if (e.key.toLowerCase() === 'v') setActiveTool('cursor')
+        if (e.key.toLowerCase() === 'h') setActiveTool('pan')
+      }
+      
+      // Delete selected node when pressing Delete or Backspace
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0 && !isTweaking) {
+        e.preventDefault()
+        deleteSelected()
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undo, redo, selectedIds, saveHistory, isTweaking, deleteSelected])
 
   // Chat state
   const [chatOpen, setChatOpen] = useState(false)
@@ -843,15 +1270,36 @@ export default function RendererPage() {
     { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
   ])
   const [chatLoading, setChatLoading] = useState(false)
+  
+  // Grid State
+  const [showGrid, setShowGrid] = useState(false)
+  const [activeTool, setActiveTool] = useState('cursor') // 'cursor' | 'pan'
+  
   const chatEndRef = useRef(null)
   const chatInputRef = useRef(null)
 
   const dragRef = useRef(null)
   const resizeRef = useRef(null)
-  const canvasSizeRef = useRef({ w: 1300, h: 750 })
+  const selectionBoxRef = useRef(null)
+  const panRef = useRef(null)
+  const canvasSizeRef = useRef({ w: 1366, h: 768 })
+
+  // Auto-scroll to center of padded canvas on initial load
+  const [initialScrollDone, setInitialScrollDone] = useState(false)
+  useEffect(() => {
+    if (!initialScrollDone) {
+      const wrapper = document.getElementById('canvas-scroll-wrapper')
+      // Wait until the wrapper has actual scrollWidth (meaning content has rendered)
+      if (wrapper && wrapper.scrollWidth > wrapper.clientWidth) {
+        wrapper.scrollLeft = (wrapper.scrollWidth - wrapper.clientWidth) / 2
+        wrapper.scrollTop = (wrapper.scrollHeight - wrapper.clientHeight) / 2
+        setInitialScrollDone(true)
+      }
+    }
+  }, [initialScrollDone, canvasW, canvasH])
 
   // Derived
-  const selectedNode = selectedId ? findNode(tree, selectedId) : null
+  const selectedNode = selectedIds.length === 1 ? findNode(tree, selectedIds[0]) : null
   const schema = selectedNode ? SCHEMAS[selectedNode.type] : null
   const flatNodes = flattenTree(tree, collapsedIds)
   const totalCount = flattenTree(tree, new Set()).length // Total count shouldn't hide skipped nodes
@@ -877,34 +1325,58 @@ export default function RendererPage() {
       x: parentId ? 20 : 60 + offset,
       y: parentId ? 20 + offset : 60 + offset,
     })
-    setTree(prev => insertNode(prev, comp, parentId))
-    setSelectedId(comp.id)
-  }, [selectedNode, totalCount])
+    setTree(prev => {
+      const next = insertNode(prev, comp, parentId)
+      saveHistory(next)
+      return next
+    })
+    setSelectedIds([comp.id])
+  }, [selectedNode, totalCount, saveHistory])
 
   // ── Update a property on selected node ─────────────────────────────────────
   const updateProp = useCallback((id, key, val) => {
-    setTree(prev => updateNode(prev, id, n => ({ [key]: val })))
-  }, [])
-
-  // ── Delete selected ─────────────────────────────────────────────────────────
-  const deleteSelected = useCallback(() => {
-    if (!selectedId) return
-    setTree(prev => { const [t] = removeNode(prev, selectedId); return t })
-    setSelectedId(null)
-  }, [selectedId])
+    setTree(prev => {
+      const next = updateNode(prev, id, () => ({ [key]: val }))
+      // Debounce history saving for text inputs and numbers to avoid creating too many history states, but for now we'll just save every change
+      // Alternatively, we save after a short delay or blur, but let's just save.
+      saveHistory(next)
+      return next
+    })
+  }, [saveHistory])
 
   // ── Drag state ──────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e, id) => {
+    if (activeTool === 'pan' || e.button === 2) return // Don't interact with components while panning
+
     e.stopPropagation()
-    e.preventDefault()
-    setSelectedId(id)
-    const node = findNode(tree, id)
-    if (!node) return
-    dragRef.current = {
-      id, startMouseX: e.clientX, startMouseY: e.clientY,
-      startX: node.x, startY: node.y,
+    // Don't preventDefault here to allow text selection inside TextInput
+    
+    // Check if shift is held for multi-select
+    let newSelectedIds = [...selectedIds]
+    if (e.shiftKey) {
+      if (newSelectedIds.includes(id)) {
+        newSelectedIds = newSelectedIds.filter(i => i !== id)
+      } else {
+        newSelectedIds.push(id)
+      }
+    } else {
+      // If the clicked node is already part of the selection, do not clear selection.
+      // This allows dragging the whole group.
+      if (!newSelectedIds.includes(id)) {
+        newSelectedIds = [id]
+      }
     }
-  }, [tree])
+    setSelectedIds(newSelectedIds)
+    
+    dragRef.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      nodes: newSelectedIds.map(sid => {
+        const n = findNode(tree, sid)
+        return { id: sid, startX: n?.x || 0, startY: n?.y || 0 }
+      }).filter(n => n.startX !== undefined) // filter out nodes that might not immediately be found
+    }
+  }, [tree, selectedIds])
 
   // Keep canvas size ref in sync
   useEffect(() => { canvasSizeRef.current = { w: canvasW, h: canvasH } }, [canvasW, canvasH])
@@ -914,6 +1386,20 @@ export default function RendererPage() {
 
   useEffect(() => {
     const onMove = (e) => {
+      // ── Panning ─────────────────────────────────────────────────────────────
+      if (panRef.current) {
+        const { startMouseX, startMouseY, startScrollX, startScrollY } = panRef.current
+        const dx = e.clientX - startMouseX
+        const dy = e.clientY - startMouseY
+        
+        const wrapper = document.getElementById('canvas-scroll-wrapper')
+        if (wrapper) {
+          wrapper.scrollLeft = startScrollX - dx
+          wrapper.scrollTop = startScrollY - dy
+        }
+        return
+      }
+
       // ── Resize mode ──────────────────────────────────────────────────────────
       if (resizeRef.current) {
         const { id, dir, startMouseX, startMouseY, startX, startY, startW, startH } = resizeRef.current
@@ -932,38 +1418,63 @@ export default function RendererPage() {
       }
 
       // ── Drag move ────────────────────────────────────────────────────────────
-      if (!dragRef.current) return
-      const { id, startMouseX, startMouseY, startX, startY } = dragRef.current
-      
-      // Calculate scaled delta
-      const pxRatio = 1 / zoomRef.current
-      const dx = (e.clientX - startMouseX) * pxRatio
-      const dy = (e.clientY - startMouseY) * pxRatio
+      if (dragRef.current && dragRef.current.nodes?.length) {
+        const { startMouseX, startMouseY, nodes } = dragRef.current
+        
+        // Calculate scaled delta
+        const pxRatio = 1 / zoomRef.current
+        const dx = (e.clientX - startMouseX) * pxRatio
+        const dy = (e.clientY - startMouseY) * pxRatio
 
-      // Find drop container visual feedback
-      const elements = document.elementsFromPoint(e.clientX, e.clientY)
-      let hoveredContainerId = null
-      for (const el of elements) {
-        const cId = el.getAttribute('data-container-id')
-        if (cId && cId !== id) {
-          hoveredContainerId = cId
-          break
+        // Find drop container visual feedback (using the primary dragged node for drop logic check)
+        const elements = document.elementsFromPoint(e.clientX, e.clientY)
+        let hoveredContainerId = null
+        for (const el of elements) {
+          const cId = el.getAttribute('data-container-id')
+          if (cId && !nodes.find(n => n.id === cId)) {
+            hoveredContainerId = cId
+            break
+          }
+        }
+        setDragOverId(hoveredContainerId)
+
+        setTree(prev => {
+          let nextTree = prev
+          for (const draggedNode of nodes) {
+            nextTree = updateNode(nextTree, draggedNode.id, () => ({
+              x: draggedNode.startX + dx,
+              y: draggedNode.startY + dy,
+            }))
+          }
+          return nextTree
+        })
+        return
+      }
+
+      // ── Marquee Selection Move ──────────────────────────────────────────────
+      if (selectionBoxRef.current) {
+        const rootCanvas = document.getElementById('canvas-root')
+        if (rootCanvas) {
+          const rect = rootCanvas.getBoundingClientRect()
+          const pxRatio = 1 / zoomRef.current
+          const currentX = (e.clientX - rect.left) * pxRatio
+          const currentY = (e.clientY - rect.top) * pxRatio
+          // console.log('Marquee moving:', currentX, currentY)
+          selectionBoxRef.current.currentX = currentX
+          selectionBoxRef.current.currentY = currentY
+          setSelectionBox({ ...selectionBoxRef.current })
         }
       }
-      setDragOverId(hoveredContainerId)
-
-      setTree(prev => {
-        const node = findNode(prev, id)
-        if (!node) return prev
-        // Allow dragging outside parent bounds so it can be dropped elsewhere
-        return updateNode(prev, id, () => ({
-          x: startX + dx,
-          y: startY + dy,
-        }))
-      })
     }
     
     const onUp = (e) => { 
+      // ── Pan end ─────────────────────────────────────────────────────────────
+      if (panRef.current) {
+        panRef.current = null
+        document.body.style.cursor = ''
+        return
+      }
+
       // ── Resize end ──────────────────────────────────────────────────────────
       if (resizeRef.current) {
         resizeRef.current = null
@@ -971,16 +1482,68 @@ export default function RendererPage() {
         return
       }
 
+      // ── Marquee Selection End ───────────────────────────────────────────────
+      if (selectionBoxRef.current) {
+        // Calculate bounding box in canvas coordinates
+        const { startX, startY, currentX, currentY } = selectionBoxRef.current
+        const boxLeft = Math.min(startX, currentX)
+        const boxTop = Math.min(startY, currentY)
+        const boxRight = Math.max(startX, currentX)
+        const boxBottom = Math.max(startY, currentY)
+        
+        // Find all intersecting nodes
+        const intersectingIds = []
+        
+        // Helper to check intersection of two rects
+        const doIntersect = (r1, r2) => {
+          return !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top)
+        }
+
+        const selBoxRect = { left: boxLeft, top: boxTop, right: boxRight, bottom: boxBottom }
+
+        const findIntersectingNodes = (nodes) => {
+          for (const node of nodes) {
+            const nodeRect = { left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height }
+            if (doIntersect(selBoxRect, nodeRect)) {
+              intersectingIds.push(node.id)
+            }
+            if (node.children?.length) {
+              findIntersectingNodes(node.children)
+            }
+          }
+        }
+        
+        findIntersectingNodes(tree)
+        
+        // Update selection (don't clear if Shift is held)
+        if (e.shiftKey) {
+          const newSelected = new Set(selectedIds)
+          for (const id of intersectingIds) {
+            if (newSelected.has(id)) newSelected.delete(id)
+            else newSelected.add(id)
+          }
+          setSelectedIds(Array.from(newSelected))
+        } else {
+          setSelectedIds(intersectingIds)
+        }
+        
+        selectionBoxRef.current = null
+        setSelectionBox(null)
+        return
+      }
+
       // ── Drag end ────────────────────────────────────────────────────────────
-      if (!dragRef.current) return
-      const dragId = dragRef.current.id
+      if (!dragRef.current || !dragRef.current.nodes?.length) return
+      
+      const draggedNodes = dragRef.current.nodes
+      const primaryDragId = draggedNodes[0].id
       
       // Handle Drop Into Container
       const elements = document.elementsFromPoint(e.clientX, e.clientY)
       let targetContainerId = null
       for (const el of elements) {
         const cId = el.getAttribute('data-container-id')
-        if (cId && cId !== dragId) {
+        if (cId && !draggedNodes.find(n => n.id === cId)) {
           targetContainerId = cId
           break
         }
@@ -989,16 +1552,31 @@ export default function RendererPage() {
       dragRef.current = null 
       setDragOverId(null)
       
-      if (targetContainerId) {
-        // Call a function we'll define to handle dropping
-        setTree(prev => handleDropLogic(prev, dragId, targetContainerId))
+      if (targetContainerId && draggedNodes.length === 1) {
+        // Drop logic is safest when dragging a single node. 
+        // We only apply container dropping for single node drags to avoid complex nesting issues.
+        setTree(prev => {
+          const next = handleDropLogic(prev, primaryDragId, targetContainerId)
+          if (next !== prev) saveHistory(next)
+          return next
+        })
+      } else {
+        // Just dragged to empty space (or dragged multiple nodes), tree was updated during onMove.
+        // We need to trigger saveHistory with the current tree.
+        setTree(prev => {
+          saveHistory(prev)
+          return prev
+        })
       }
     }
     
-    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mousemove', onMove, { passive: false })
     window.addEventListener('mouseup', onUp)
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
-  }, [])
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [tree, saveHistory, selectedIds])
 
   // ── Drop logic ──────────────────────────────────────────────────────────────
   const handleDropInto = useCallback((targetContainerId) => {
@@ -1036,17 +1614,17 @@ export default function RendererPage() {
 
       // Copy: Ctrl+C / Cmd+C
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-        if (selectedId) {
-          const selectedNode = findNode(tree, selectedId)
-          if (selectedNode) {
-            clipboardRef.current = selectedNode
+        if (selectedIds.length > 0) {
+          const nodesToCopy = selectedIds.map(id => findNode(tree, id)).filter(Boolean)
+          if (nodesToCopy.length > 0) {
+            clipboardRef.current = nodesToCopy
           }
         }
       }
 
       // Paste: Ctrl+V / Cmd+V
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        if (clipboardRef.current) {
+        if (clipboardRef.current && clipboardRef.current.length > 0) {
           // Deep clone helper to ensure fresh IDs and names
           const cloneNode = (node) => {
             const newNode = { ...node, id: uid(), name: nextName(node.type), x: node.x + 20, y: node.y + 20 }
@@ -1056,30 +1634,35 @@ export default function RendererPage() {
             return newNode
           }
 
-          const pastedNode = cloneNode(clipboardRef.current)
-
           setTree(prev => {
-            // Find where to paste: if a Container is selected, inside it. Else, inside its parent.
-            const sNode = selectedId ? findNode(prev, selectedId) : null
-            const targetParentId = sNode?.type === 'Container' 
-              ? selectedId 
-              : (findParent(prev, selectedId)?.id || null)
+            let nextTree = prev
+            const newSelectedIds = []
+            
+            for (const copiedNode of clipboardRef.current) {
+              const pastedNode = cloneNode(copiedNode)
+              
+              const targetParentId = selectedIds.length === 1 
+              ? (findNode(prev, selectedIds[0])?.type === 'Container' ? selectedIds[0] : (findParent(prev, selectedIds[0])?.id || null))
+              : null
 
-            return insertNode(prev, pastedNode, targetParentId)
+              nextTree = insertNode(nextTree, pastedNode, targetParentId)
+              newSelectedIds.push(pastedNode.id)
+            }
+            
+            setTimeout(() => setSelectedIds(newSelectedIds), 10)
+            return nextTree
           })
-          setSelectedId(pastedNode.id)
         }
       }
 
-      // Delete/Backspace
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
-        deleteSelected()
+    // Delete/Backspace
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+      deleteSelected()
       }
     }
-    
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tree, selectedId, deleteSelected])
+  }, [tree, selectedIds, deleteSelected])
 
   // ── Canvas size commit ──────────────────────────────────────────────────────
   const commitCanvasSize = () => {
@@ -1091,8 +1674,9 @@ export default function RendererPage() {
   // ── AI Component Tweaking ───────────────────────────────────────────────────
   const handleTweakSubmit = useCallback(async () => {
     const msg = tweakInput.trim()
-    if (!msg || !selectedId || tweakLoading) return
+    if (!msg || selectedIds.length !== 1 || tweakLoading) return
     
+    const selectedId = selectedIds[0]
     // Save original state if not already saved (allows multiple sequential tweaks before confirming)
     const currentNode = findNode(tree, selectedId)
     if (!currentNode) return
@@ -1113,20 +1697,27 @@ export default function RendererPage() {
         }),
       })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `Error ${res.status}`) }
-      
+
       const modifiedComponent = await res.json()
-      
-      // Update the tree with the new component data (merge keeping children structure mostly intact unless AI changed it)
-      setTree(prev => updateNode(prev, selectedId, () => modifiedComponent))
-      setTweakInput('')
-      setIsTweaking(false)
-      
+
+      // Update the tree with the new component
+      if (modifiedComponent && modifiedComponent.id === selectedId) {
+        setTree(prev => {
+          const nextTree = updateNode(prev, selectedId, () => modifiedComponent)
+          saveHistory(nextTree)
+          return nextTree
+        })
+        setTweakInput('')
+        setIsTweaking(false)
+        setTweakOriginalNode(null)
+      }
+
     } catch (err) {
       alert(`Tweak failed: ${err.message}`)
     } finally {
       setTweakLoading(false)
     }
-  }, [tweakInput, selectedId, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode])
+  }, [tweakInput, selectedIds, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode, saveHistory])
 
   const confirmTweak = useCallback(() => {
     setTweakOriginalNode(null)
@@ -1136,19 +1727,25 @@ export default function RendererPage() {
 
   const undoTweak = useCallback(() => {
     if (tweakOriginalNode) {
-      setTree(prev => updateNode(prev, tweakOriginalNode.id, () => tweakOriginalNode))
+      setTree(prev => {
+        const nextTree = updateNode(prev, tweakOriginalNode.id, () => tweakOriginalNode)
+        saveHistory(nextTree)
+        return nextTree
+      })
       setTweakOriginalNode(null)
       setIsTweaking(false)
       setTweakInput('')
     }
-  }, [tweakOriginalNode])
+  }, [tweakOriginalNode, saveHistory])
 
   // Clear tweak state if selection changes
   useEffect(() => {
-    if (selectedId && tweakOriginalNode && selectedId !== tweakOriginalNode.id) {
+    if (selectedIds.length === 1 && tweakOriginalNode && selectedIds[0] !== tweakOriginalNode.id) {
       confirmTweak() // Auto-confirm if you click away
+    } else if (selectedIds.length !== 1 && tweakOriginalNode) {
+      confirmTweak() // Auto-confirm if multiple or no items are selected
     }
-  }, [selectedId, tweakOriginalNode, confirmTweak])
+  }, [selectedIds, tweakOriginalNode, confirmTweak])
 
   // ── Image compression helper ─────────────────────────────────────────────
   const compressImageDataUrl = (dataUrl, callback) => {
@@ -1173,7 +1770,7 @@ export default function RendererPage() {
     const msg = chatInput.trim()
     if ((!msg && !chatImage) || chatLoading) return
     setChatInput('')
-    
+
     const imagePayload = chatImage
     setChatImage(null)
 
@@ -1183,15 +1780,16 @@ export default function RendererPage() {
     const payload = {
       message: msg || "See attached image.",
       canvas_components: tree,
-      canvas_width: canvasW, canvas_height: canvasH,
+      canvas_width: canvasW,
+      canvas_height: canvasH,
     }
 
     if (imagePayload) {
       const [header, base64] = imagePayload.split(',')
       const mimeMatch = header.match(/:(.*?);/)
       if (mimeMatch) {
-         payload.image_mime_type = mimeMatch[1]
-         payload.image_data = base64
+        payload.image_mime_type = mimeMatch[1]
+        payload.image_data = base64
       }
     }
 
@@ -1203,48 +1801,57 @@ export default function RendererPage() {
       })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || `Error ${res.status}`) }
       const data = await res.json()
-      
-      let lastId = null
-      setTree(prev => {
-        let nextTree = [...prev]
-        
-        // 1. Removals
-        const removes = data.components_to_remove || []
-        for (const rId of removes) {
-          nextTree = removeNode(nextTree, rId)[0]
-        }
-        
-        // 2. Updates
-        const updates = data.components_to_update || []
-        for (const update of updates) {
-          if (!update.id) continue
-          const { id, ...changes } = update
-          nextTree = updateNode(nextTree, id, comp => ({ ...comp, ...changes }))
-          lastId = id
-        }
-        
-        // 3. Additions
-        const adds = data.components_to_add || []
-        for (const spec of adds) {
-          const { parentId, ...rest } = spec
-          const newComp = createFromSpec(rest)
-          if (newComp) {
-            nextTree = insertNode(nextTree, newComp, parentId)
-            lastId = newComp.id
-          }
-        }
-        
-        return nextTree
-      })
 
-      if (lastId) setTimeout(() => setSelectedId(lastId), 10)
+      setChatLoading(false)
+
+      if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length) {
+        setTree(prev => {
+          let nextTree = prev
+          // 1. Removals
+          if (data.components_to_remove?.length) {
+            data.components_to_remove.forEach(rId => {
+              const [t] = removeNode(nextTree, rId)
+              nextTree = t
+            })
+          }
+          // 2. Updates
+          if (data.components_to_update?.length) {
+            data.components_to_update.forEach(u => {
+              if (u.id) {
+                const { id, ...changes } = u
+                // prevent id changes
+                nextTree = updateNode(nextTree, id, () => changes)
+              }
+            })
+          }
+          // 3. Additions
+          if (data.components_to_add?.length) {
+            data.components_to_add.forEach(spec => {
+              const comp = createFromSpec(spec)
+              if (comp) nextTree = insertNode(nextTree, comp, spec.parentId)
+            })
+          }
+
+          saveHistory(nextTree)
+          return nextTree
+        })
+      }
+
+      let lastId = null // Re-initialize lastId for setting selection
+      if (data.components_to_add?.length) {
+        lastId = data.components_to_add[data.components_to_add.length - 1].id
+      } else if (data.components_to_update?.length) {
+        lastId = data.components_to_update[data.components_to_update.length - 1].id
+      }
+
+      if (lastId) setTimeout(() => setSelectedIds([lastId]), 10)
 
       const addsCount = (data.components_to_add || []).length
       const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length
-      
-      setChatMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: data.reply || 'Done!', 
+
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.reply || 'Done!',
         added: addsCount,
         mods: modsCount
       }])
@@ -1253,11 +1860,16 @@ export default function RendererPage() {
     } finally {
       setChatLoading(false)
     }
-  }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH])
+  }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH, saveHistory])
 
   // ── Shared child event handlers ─────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
-  const handleChildClick = useCallback((id) => setSelectedId(id), [])
+  
+  // Also need to handle click on children for selection when not dragging
+  const handleChildClick = useCallback((e) => {
+    e.stopPropagation()
+    // handleMouseDown already handles selection. We don't want to double trigger here.
+  }, [])
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -1282,7 +1894,80 @@ export default function RendererPage() {
           <div className="w-1.5 h-1.5 rounded-full bg-overlay" />
           <span className="text-xs text-subtext/50">{totalCount} component{totalCount !== 1 ? 's' : ''}</span>
         </div>
+        {/* Toolbar Left */}
+        <div className="flex items-center">
+          {/* Tool Selector */}
+          <div className="flex items-center bg-surface/50 border border-overlay/40 rounded-lg p-0.5 mr-3">
+            <button
+              onClick={() => setActiveTool('cursor')}
+              className={`p-1.5 px-2 rounded flex items-center justify-center transition-colors text-xs ${activeTool === 'cursor' ? 'bg-overlay/60 text-text' : 'text-subtext hover:text-text hover:bg-overlay/40'}`}
+              title="Cursor Tool (V)"
+            >
+              <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                <path d="M13 13l6 6" />
+              </svg>
+              Cursor
+            </button>
+            <button
+              onClick={() => setActiveTool('pan')}
+              className={`p-1.5 px-2 rounded flex items-center justify-center transition-colors text-xs ${activeTool === 'pan' ? 'bg-overlay/60 text-text' : 'text-subtext hover:text-text hover:bg-overlay/40'}`}
+              title="Pan Tool (H)"
+            >
+              <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5.42 9.42L8 12c-2.58 2.58-5.17 5.17-5.17 5.17M18.58 14.58L16 12c2.58-2.58 5.17-5.17 5.17-5.17M9.42 5.42L12 8c2.58-2.58 5.17-5.17 5.17-5.17M14.58 18.58L12 16c-2.58 2.58-5.17 5.17-5.17 5.17" />
+                <path d="M12 8v8M8 12h8" />
+              </svg>
+              Pan
+            </button>
+          </div>
 
+          <button
+            onClick={() => setShowGrid(!showGrid)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showGrid ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <span className="text-[13px]">#</span>
+            Grid
+          </button>
+          
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${chatOpen ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <span className="text-[13px]">{chatOpen ? '✨' : '🤖'}</span>
+            AI Assistant
+          </button>
+
+          {/* Undo / Redo Buttons */}
+          <div className="flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-lg p-0.5 divide-x divide-overlay/40 mr-4">
+            <button
+              onClick={undo}
+              disabled={historyIndex === 0}
+              title="Undo (Ctrl+Z)"
+              className={`p-1.5 rounded flex items-center justify-center transition-colors ${historyIndex > 0 ? 'text-subtext hover:text-text hover:bg-overlay/60' : 'text-subtext/30 cursor-not-allowed'}`}
+            >
+              <svg className="w-4 h-4 text-inherit" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7v6h6" />
+                <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" />
+              </svg>
+            </button>
+            <button
+              onClick={redo}
+              disabled={historyIndex >= history.length - 1}
+              title="Redo (Ctrl+Y)"
+              className={`p-1.5 rounded flex items-center justify-center transition-colors ${historyIndex < history.length - 1 ? 'text-subtext hover:text-text hover:bg-overlay/60' : 'text-subtext/30 cursor-not-allowed'}`}
+            >
+              <svg className="w-4 h-4 text-inherit" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 7v6h-6" />
+                <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-overlay/30 mr-4" />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => setChatOpen(o => !o)}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer
@@ -1293,7 +1978,7 @@ export default function RendererPage() {
             AI Chat
             {chatLoading && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />}
           </button>
-          {selectedId && (
+          {selectedIds.length > 0 && (
             <button onClick={deleteSelected}
               className="flex items-center gap-1.5 text-xs text-red/70 hover:text-red border border-red/20 hover:border-red/40 hover:bg-red/5 px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer">
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -1302,8 +1987,15 @@ export default function RendererPage() {
               Delete
             </button>
           )}
-          <button onClick={() => { setTree([]); setSelectedId(null) }}
-            className="text-xs text-subtext/60 hover:text-subtext border border-overlay/30 hover:border-overlay/60 px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer">
+          <button
+            onClick={() => {
+              setTree([])
+              setHistory([[]])
+              setHistoryIndex(0)
+              setSelectedIds([])
+            }}
+            className="px-3 py-1.5 rounded-lg bg-surface/50 border border-overlay/40 text-subtext/70 text-xs font-medium hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all ml-4"
+          >
             Clear All
           </button>
         </div>
@@ -1325,6 +2017,7 @@ export default function RendererPage() {
                 { schema: textInputSchema, color: 'bg-emerald-500', label: 'TextInput' },
                 { schema: dropdownSchema, color: 'bg-amber-500', label: 'Dropdown' },
                 { schema: containerSchema, color: 'bg-violet-500', label: 'Container' },
+                { schema: gallerySchema, color: 'bg-pink-500', label: 'Gallery' },
               ].map(({ schema: sch, color, label }) => (
                 <button key={label} onClick={() => addComponent(sch)}
                   className="flex items-center gap-2 w-full text-left bg-base/60 border border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext text-xs px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer">
@@ -1343,46 +2036,106 @@ export default function RendererPage() {
           </div>
 
           {/* Layers */}
-          <div className="flex-1 overflow-y-auto p-3">
-            <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest mb-2">Layers</p>
-            {flatNodes.length === 0 ? (
-              <p className="text-subtext/30 text-xs text-center mt-8">No components yet</p>
-            ) : (
-              <div className="flex flex-col gap-0.5">
-                {flatNodes.map(node => (
-                  <LayerRow 
-                    key={node.id} 
-                    node={node} 
-                    selectedId={selectedId} 
-                    onSelect={setSelectedId} 
-                    depth={node._depth} 
-                    isCollapsed={collapsedIds.has(node.id)}
-                    toggleCollapse={toggleCollapse}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <div className="p-2 border-b border-overlay/30 bg-surface flex items-center justify-between">
+          <span className="text-xs font-medium text-text px-2">Layers</span>
+          {tree.length > 0 && (
+            <button onClick={() => setCollapsedIds(new Set())} className="text-[10px] text-accent/80 hover:text-accent font-medium px-2 py-1 rounded hover:bg-accent/10 transition-colors">
+              Expand All
+            </button>
+          )}
         </div>
-
-        {/* Center: Canvas + Chat */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-
-          {/* Canvas */}
+        <div className="p-3 overflow-y-auto w-48 shrink-0 pb-16 space-y-0.5">
+          {flatNodes.map(({ _depth, ...node }) => (
+            <LayerRow
+              key={node.id}
+              node={node}
+              selectedIds={selectedIds}
+              onSelect={(e, id) => {
+                let newSelectedIds = [...selectedIds]
+                if (e.shiftKey) {
+                  if (newSelectedIds.includes(id)) {
+                    newSelectedIds = newSelectedIds.filter(i => i !== id)
+                  } else {
+                    newSelectedIds.push(id)
+                  }
+                } else {
+                  newSelectedIds = [id]
+                }
+                setSelectedIds(newSelectedIds)
+              }}
+              depth={_depth}
+              isCollapsed={collapsedIds.has(node.id)}
+              toggleCollapse={toggleCollapse}
+            />
+          ))}
+          {tree.length === 0 && <div className="text-xs text-subtext/40 italic px-2 py-4">Canvas is empty</div>}
+        </div>
+      </div>    {/* Center: Canvas + Chat */}
+        <div className="flex-1 bg-[#1e1e2e] relative overflow-hidden">
           <div
-            className="flex-1 overflow-auto bg-[#f0f0f0] relative"
+            id="canvas-scroll-wrapper"
+            className={`absolute inset-0 overflow-auto bg-[#f0f0f0] ${activeTool === 'pan' ? 'cursor-grab' : ''}`}
             style={{ backgroundImage: 'radial-gradient(circle, #bbb 1px, transparent 1px)', backgroundSize: '20px 20px' }}
-            onClick={() => setSelectedId(null)}
+            onContextMenu={(e) => {
+              // Prevent browser context menu so we can right-click pan smoothly
+              e.preventDefault()
+            }}
+            onMouseDown={(e) => {
+              const wrapper = e.currentTarget
+              
+              // Handle Panning (Right Click OR Pan Tool active)
+              if (activeTool === 'pan' || e.button === 2) {
+                e.preventDefault() // prevent text selection while panning
+                document.body.style.cursor = 'grabbing'
+                panRef.current = {
+                  startMouseX: e.clientX,
+                  startMouseY: e.clientY,
+                  startScrollX: wrapper.scrollLeft,
+                  startScrollY: wrapper.scrollTop
+                }
+                return
+              }
+
+              // Handle Marquee Selection (Left Click only)
+              if (e.button !== 0) return; // Only allow left-clicks for marquee selection
+              const isBg = e.target.id === 'canvas-scroll-wrapper' || e.target.id === 'canvas-padding-wrapper' || e.target.id === 'canvas-root'
+              if (isBg) {
+                // console.log('--- MOUSE DOWN ON bg ---', e.target.id)
+                if (!e.shiftKey) setSelectedIds([])
+                const canvasEl = document.getElementById('canvas-root')
+                if (!canvasEl) return
+                const rect = canvasEl.getBoundingClientRect()
+                const pxRatio = 1 / zoom
+                const startX = (e.clientX - rect.left) * pxRatio
+                const startY = (e.clientY - rect.top) * pxRatio
+                // console.log('Setting selectionBox start', { startX, startY })
+                const box = { startX, startY, currentX: startX, currentY: startY }
+                selectionBoxRef.current = box
+                setSelectionBox(box)
+              } else {
+                // console.log('--- MOUSE DOWN on NON-bg ---', e.target.id, e.target.className)
+              }
+            }}
           >
-            <div className="p-12 min-h-full min-w-full flex items-start justify-center transition-transform duration-200" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+            <div id="canvas-padding-wrapper" className="inline-block transition-transform duration-200" style={{ padding: '50vh 50vw', transform: `scale(${zoom})`, transformOrigin: 'center' }}>
               <div
-                className="relative bg-white shrink-0 origin-top"
+                className="relative bg-white shrink-0"
                 style={{ width: canvasW, height: canvasH, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
                 data-container-id="root"
-                onClick={() => setSelectedId(null)}
+                id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
                 onDrop={e => { e.preventDefault(); setDragOverId(null) }}
               >
+                {showGrid && (
+                  <svg className="absolute inset-0 pointer-events-none w-full h-full text-blue-400 opacity-20 z-0">
+                    {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                      <g key={i}>
+                        <line x1={0} y1={(canvasH / 8) * i} x2={canvasW} y2={(canvasH / 8) * i} stroke="currentColor" strokeWidth="1" strokeDasharray="4 2" />
+                        <line x1={(canvasW / 8) * i} y1={0} x2={(canvasW / 8) * i} y2={canvasH} stroke="currentColor" strokeWidth="1" strokeDasharray="4 2" />
+                      </g>
+                    ))}
+                  </svg>
+                )}
                 {tree.length === 0 && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
@@ -1395,11 +2148,11 @@ export default function RendererPage() {
                   </div>
                 )}
                 {tree.map(comp => {
-                  const isSelected = comp.id === selectedId
+                  const isSelected = selectedIds.includes(comp.id)
                   const sharedProps = {
                     comp, selected: isSelected,
                     onMouseDown: (e) => handleMouseDown(e, comp.id),
-                    onClick: (e) => { e.stopPropagation(); setSelectedId(comp.id) },
+                    onClick: (e) => { e.stopPropagation(); setSelectedIds([comp.id]) },
                   }
                   if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
                   if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
@@ -1407,7 +2160,17 @@ export default function RendererPage() {
                   if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
                   if (comp.type === 'Container') return (
                     <ContainerRenderer key={comp.id} {...sharedProps}
-                      selectedId={selectedId}
+                      selectedIds={selectedIds}
+                      onChildMouseDown={handleChildMouseDown}
+                      onChildClick={handleChildClick}
+                      onDropInto={handleDropInto}
+                      dragOverId={dragOverId}
+                      setDragOverId={setDragOverId}
+                    />
+                  )
+                  if (comp.type === 'Gallery') return (
+                    <GalleryRenderer key={comp.id} {...sharedProps}
+                      selectedIds={selectedIds}
                       onChildMouseDown={handleChildMouseDown}
                       onChildClick={handleChildClick}
                       onDropInto={handleDropInto}
@@ -1417,8 +2180,29 @@ export default function RendererPage() {
                   )
                   return null
                 })}
+
+                {/* Marquee Selection Box */}
+                {selectionBox && (() => {
+                  const left = Math.min(selectionBox.startX, selectionBox.currentX)
+                  const top = Math.min(selectionBox.startY, selectionBox.currentY)
+                  const width = Math.abs(selectionBox.startX - selectionBox.currentX)
+                  const height = Math.abs(selectionBox.startY - selectionBox.currentY)
+                  return (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left, top, width, height,
+                        border: '1px solid #0078d4',
+                        backgroundColor: 'rgba(0, 120, 212, 0.1)',
+                        zIndex: 10000,
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  )
+                })()}
+
                 {/* Resize handles for selected root-level component */}
-                {selectedNode && (() => {
+                {selectedNode && selectedIds.length === 1 && (() => {
                   const comp = tree.find(c => c.id === selectedNode.id)
                   if (!comp) return null
                   const { x, y, width: w, height: h } = comp
@@ -1444,9 +2228,10 @@ export default function RendererPage() {
                 })()}
               </div>
             </div>
+          </div>
 
-            {/* Zoom Controls */}
-            <div className="absolute bottom-6 right-6 flex items-center bg-surface/90 backdrop-blur-md border border-overlay/30 shadow-md shadow-black/10 rounded-lg overflow-hidden z-40">
+          {/* Zoom Controls */}
+          <div className={`absolute right-6 flex items-center bg-surface/90 backdrop-blur-md border border-overlay/30 shadow-md shadow-black/10 rounded-lg overflow-hidden z-40 transition-all duration-300 ${chatOpen ? 'bottom-[260px]' : 'bottom-6'}`}>
               <button 
                 onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.25, z - 0.1)); }}
                 className="p-2 text-subtext hover:bg-overlay/10 hover:text-text transition-colors"
@@ -1482,10 +2267,9 @@ export default function RendererPage() {
                 </div>
               </div>
             )}
-          </div>
 
           {/* AI Chat Panel */}
-          <div className={`shrink-0 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${chatOpen ? 'h-60' : 'h-0'}`}>
+          <div className={`absolute bottom-0 left-0 w-full z-50 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)] ${chatOpen ? 'h-60' : 'h-0'}`}>
             <div className="flex items-center justify-between px-4 py-2 border-b border-overlay/20 bg-surface/40 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center">
@@ -1559,7 +2343,7 @@ export default function RendererPage() {
                       }
                     }
                   }}
-                  placeholder='Describe what to build — or paste a screenshot'
+                  placeholder="Describe what to build — or paste a screenshot"
                   className="flex-1 bg-base border border-overlay/40 rounded-xl px-4 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
                 <button onClick={handleChatSubmit} disabled={(!chatInput.trim() && !chatImage) || chatLoading}
                   className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center shrink-0 shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer">
@@ -1610,7 +2394,7 @@ export default function RendererPage() {
                 {selectedNode.type === 'Container' && (
                   <p className="text-[10px] text-subtext/50 mb-2 bg-overlay/20 rounded-lg px-2 py-1.5">
                     {selectedNode.children?.length ?? 0} child component{(selectedNode.children?.length ?? 0) !== 1 ? 's' : ''}
-                    {' · '}Select this container then click "Add Component" to add children.
+                    {' · '}Select this container then click &quot;Add Component&quot; to add children.
                   </p>
                 )}
                 <div className="divide-y divide-overlay/20">
@@ -1635,4 +2419,16 @@ export default function RendererPage() {
       </div>
     </div>
   )
+}
+
+export {
+  screenToYaml,
+  componentToYaml,
+  ButtonRenderer,
+  LabelRenderer,
+  TextInputRenderer,
+  DropdownRenderer,
+  ContainerRenderer,
+  GalleryRenderer,
+  createFromSpec
 }
