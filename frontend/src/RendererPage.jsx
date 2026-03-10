@@ -1102,7 +1102,7 @@ export default function RendererPage() {
 
     setTweakLoading(true)
     try {
-      const res = await fetch('http://localhost:8000/tweak-component', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tweak-component`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1196,7 +1196,7 @@ export default function RendererPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:8000/renderer-chat', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/renderer-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
