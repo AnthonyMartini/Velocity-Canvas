@@ -1,0 +1,37 @@
+- Container:
+    Control: GroupContainer@1.4.0
+    Variant: ManualLayout
+    Properties:
+      X: =465
+      Y: =234
+      Width: =320
+      Height: =200
+    Children:
+      - ButtonButton:
+          Control: Button@0.0.45
+          Properties:
+            Text: ="Button"
+            X: =20
+            Y: =36
+            Width: =160
+            Height: =40
+            Fill: =RGBA(0, 120, 212, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            FontSize: =14
+            FontWeight: =FontWeight.Semibold
+            BorderRadius: =4  
+            BorderColor: =RGBA(0, 90, 158, 1)
+            BorderThickness: =1
+
+- Container2_2:
+    Control: GroupContainer@1.4.0
+    Variant: ManualLayout
+    Properties:
+      X: =507
+      Y: =167
+    Children:
+      - ButtonCanvas1_2:
+          Control: Button@0.0.45
+          Properties:
+            X: =193
+            Y: =108

@@ -1,0 +1,36 @@
+{
+  "type": "TextInput",
+  "control": "TextInput@2.3.3",
+  "defaults": {
+    "x": 100,
+    "y": 100,
+    "width": 200,
+    "height": 40,
+    "value": "",
+    "hint": "Enter text",
+    "fill": "#ffffff",
+    "color": "#201f1e",
+    "borderColor": "#8a8886",
+    "borderThickness": 1,
+    "fontSize": 14,
+    "fontWeight": "FontWeight.Normal",
+    "visible": true,
+    "disabled": false
+  },
+  "properties": [
+    { "key": "x",               "label": "X",              "type": "number" },
+    { "key": "y",               "label": "Y",              "type": "number" },
+    { "key": "width",           "label": "Width",          "type": "number" },
+    { "key": "height",          "label": "Height",         "type": "number" },
+    { "key": "value",           "label": "Default Value",  "type": "text" },
+    { "key": "hint",            "label": "Hint Text",      "type": "text" },
+    { "key": "fill",            "label": "Fill",           "type": "color" },
+    { "key": "color",           "label": "Text Color",     "type": "color" },
+    { "key": "fontSize",        "label": "Font Size",      "type": "number" },
+    { "key": "fontWeight",      "label": "Font Weight",    "type": "select", "options": ["FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold", "FontWeight.Bold"] },
+    { "key": "borderColor",     "label": "Border Color",   "type": "color" },
+    { "key": "borderThickness", "label": "Border Width",   "type": "number" },
+    { "key": "visible",         "label": "Visible",        "type": "boolean" },
+    { "key": "disabled",        "label": "Disabled",       "type": "boolean" }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "type": "Container",
+  "control": "GroupContainer@1.4.0",
+  "defaults": {
+    "x": 100,
+    "y": 100,
+    "width": 320,
+    "height": 200,
+    "fill": "rgba(0,0,0,0)",
+    "borderColor": "#cccccc",
+    "borderStyle": "None",
+    "borderThickness": 1,
+    "visible": true,
+    "children": []
+  },
+  "properties": [
+    { "key": "x",               "label": "X",               "type": "number" },
+    { "key": "y",               "label": "Y",               "type": "number" },
+    { "key": "width",           "label": "Width",           "type": "number" },
+    { "key": "height",          "label": "Height",          "type": "number" },
+    { "key": "fill",            "label": "Fill",            "type": "color"  },
+    { "key": "borderColor",     "label": "Border Color",    "type": "color"  },
+    { "key": "borderStyle",     "label": "Border Style",    "type": "select", "options": ["None", "Solid", "Dashed", "Dotted"] },
+    { "key": "borderThickness", "label": "Border Width",    "type": "number" },
+    { "key": "visible",         "label": "Visible",         "type": "boolean"}
+  ]
+}
