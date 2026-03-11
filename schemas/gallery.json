@@ -17,7 +17,7 @@
   },
   "properties": [
     { "key": "Items",             "label": "Items",             "type": "text" },
-    { "key": "Variant",           "label": "Variant",           "type": "select", "options": ["BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0", "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"] },
+    { "key": "Variant",           "label": "Variant",           "type": "select", "options": ["BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0", "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"], "optionLabels": ["Vertical", "Horizontal"] },
     { "key": "x",                 "label": "X",                 "type": "number" },
     { "key": "y",                 "label": "Y",                 "type": "number" },
     { "key": "width",             "label": "Width",             "type": "number" },

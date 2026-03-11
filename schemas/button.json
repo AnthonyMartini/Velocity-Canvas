@@ -2,7 +2,7 @@
   "type": "Button",
   "control": "Classic/Button@2.2.0",
   "defaults": {
-    "text": "Button",
+    "text": "\"Button\"",
     "x": 100,
     "y": 100,
     "width": 160,
@@ -17,7 +17,8 @@
     "visible": true,
     "disabled": false,
     "italic": false,
-    "underline": false
+    "underline": false,
+    "OnSelect": "Notify(\"Clicked\")"
   },
   "properties": [
     { "key": "text",            "label": "Text",          "type": "text" },
@@ -28,13 +29,14 @@
     { "key": "fill",           "label": "Fill",          "type": "color" },
     { "key": "color",          "label": "Text Color",    "type": "color" },
     { "key": "fontSize",       "label": "Font Size",     "type": "number" },
-    { "key": "fontWeight",     "label": "Font Weight",   "type": "select", "options": ["FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold", "FontWeight.Bold"] },
+    { "key": "fontWeight",     "label": "Font Weight",   "type": "select", "options": ["FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold", "FontWeight.Bold"], "optionLabels": ["Lighter", "Normal", "Semibold", "Bold"] },
     { "key": "borderRadius",   "label": "Border Radius", "type": "number" },
     { "key": "borderColor",    "label": "Border Color",  "type": "color" },
     { "key": "borderThickness","label": "Border Width",  "type": "number" },
     { "key": "visible",        "label": "Visible",       "type": "boolean" },
     { "key": "disabled",       "label": "Disabled",      "type": "boolean" },
     { "key": "italic",         "label": "Italic",        "type": "boolean" },
-    { "key": "underline",      "label": "Underline",     "type": "boolean" }
+    { "key": "underline",      "label": "Underline",     "type": "boolean" },
+    { "key": "OnSelect",       "label": "OnSelect",      "type": "text" }
   ]
 }

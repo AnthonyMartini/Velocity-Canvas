@@ -1,0 +1,42 @@
+{
+  "type": "Rectangle",
+  "control": "Rectangle@2.3.0",
+  "defaults": {
+    "x": 40,
+    "y": 40,
+    "width": 100,
+    "height": 100,
+    "fill": "#0078d4",
+    "borderColor": "transparent",
+    "borderStyle": "BorderStyle.None",
+    "borderThickness": 0,
+    "visible": true,
+    "disabled": false
+  },
+  "properties": [
+    { "key": "x", "label": "X", "type": "number" },
+    { "key": "y", "label": "Y", "type": "number" },
+    { "key": "width", "label": "Width", "type": "number" },
+    { "key": "height", "label": "Height", "type": "number" },
+    { "key": "fill", "label": "Fill", "type": "color" },
+    { "key": "borderColor", "label": "Border Color", "type": "color" },
+    { "key": "borderStyle", "label": "Border Style", "type": "select", "options": ["BorderStyle.None", "BorderStyle.Solid", "BorderStyle.Dashed", "BorderStyle.Dotted"], "optionLabels": ["None", "Solid", "Dashed", "Dotted"] },
+    { "key": "borderThickness", "label": "Border Thickness", "type": "number" },
+    { "key": "visible", "label": "Visible", "type": "boolean" },
+    { "key": "disabled", "label": "Disabled", "type": "boolean" }
+  ],
+  "keyProperties": {
+    "Fill": "The background color of a control."
+  },
+  "additionalProperties": {
+    "BorderColor": "The color of a control's border.",
+    "BorderStyle": "Whether a control's border is Solid, Dashed, Dotted, or None.",
+    "BorderThickness": "The thickness of a control's border.",
+    "DisplayMode": "Whether the control allows user input (Edit), only displays data (View), or is disabled (Disabled).",
+    "Height": "The distance between a control's top and bottom edges.",
+    "Visible": "Whether a control appears or is hidden.",
+    "Width": "The distance between a control's left and right edges.",
+    "X": "The distance between the left edge of a control and its parent container.",
+    "Y": "The distance between the top edge of a control and its parent container."
+  }
+}

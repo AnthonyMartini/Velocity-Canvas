@@ -6,8 +6,8 @@
     "y": 100,
     "width": 200,
     "height": 40,
-    "value": "",
-    "hint": "Enter text",
+    "value": "\"\"",
+    "hint": "\"Enter text\"",
     "fill": "#ffffff",
     "color": "#201f1e",
     "borderColor": "#8a8886",
@@ -15,7 +15,8 @@
     "fontSize": 14,
     "fontWeight": "FontWeight.Normal",
     "visible": true,
-    "disabled": false
+    "disabled": false,
+    "OnChange": ""
   },
   "properties": [
     { "key": "x",               "label": "X",              "type": "number" },
@@ -27,10 +28,11 @@
     { "key": "fill",            "label": "Fill",           "type": "color" },
     { "key": "color",           "label": "Text Color",     "type": "color" },
     { "key": "fontSize",        "label": "Font Size",      "type": "number" },
-    { "key": "fontWeight",      "label": "Font Weight",    "type": "select", "options": ["FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold", "FontWeight.Bold"] },
+    { "key": "fontWeight",      "label": "Font Weight",    "type": "select", "options": ["FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold", "FontWeight.Bold"], "optionLabels": ["Lighter", "Normal", "Semibold", "Bold"] },
     { "key": "borderColor",     "label": "Border Color",   "type": "color" },
     { "key": "borderThickness", "label": "Border Width",   "type": "number" },
     { "key": "visible",         "label": "Visible",        "type": "boolean" },
-    { "key": "disabled",        "label": "Disabled",       "type": "boolean" }
+    { "key": "disabled",        "label": "Disabled",       "type": "boolean" },
+    { "key": "OnChange",        "label": "OnChange",       "type": "text" }
   ]
 }
