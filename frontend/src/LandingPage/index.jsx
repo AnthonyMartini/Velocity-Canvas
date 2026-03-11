@@ -1,4 +1,5 @@
 import React from 'react';
+import logo from '../assets/logo.png';
 
 export default function LandingPage({ onStart }) {
   return (
@@ -12,12 +13,11 @@ export default function LandingPage({ onStart }) {
       <div className="relative z-10 text-center px-6 pt-32 pb-20 max-w-5xl mx-auto flex flex-col items-center animate-slide-up">
         
         {/* Logo Float */}
-        <div className="w-20 h-20 mb-8 rounded-3xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-2xl shadow-accent/40 animate-pulse-slow">
-            <svg viewBox="0 0 24 24" fill="none" className="w-10 h-10" stroke="white" strokeWidth="2.2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1M4.22 4.22l.707.707M18.364 18.364l.707.707M3 12h1m16 0h1M4.927 19.073l.707-.707M18.364 5.636l.707-.707" />
-              <circle cx="12" cy="12" r="4" strokeLinecap="round" />
-            </svg>
-        </div>
+        <img
+          src={logo}
+          alt="Velocity Canvas Logo"
+          className="w-20 h-20 mb-8 rounded-3xl object-cover shadow-2xl shadow-accent/40 animate-pulse-slow"
+        />
 
         {/* Hero Typography */}
         <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-text to-subtext mb-6 tracking-tight leading-tight">

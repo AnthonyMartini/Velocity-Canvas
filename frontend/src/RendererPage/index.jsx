@@ -1,231 +1,38 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import buttonSchema from '@schemas/button.json'
-import labelSchema from '@schemas/label.json'
-import containerSchema from '@schemas/container.json'
-import textInputSchema from '@schemas/textInput.json'
-import dropdownSchema from '@schemas/dropdown.json'
-import gallerySchema from '@schemas/gallery.json'
-
-// ── Unique ID ─────────────────────────────────────────────────────────────────
-let _id = 0
-const uid = () => `comp_${++_id}`
-
-// ── Schema lookup ─────────────────────────────────────────────────────────────
-const SCHEMAS = { Button: buttonSchema, Label: labelSchema, Container: containerSchema, TextInput: textInputSchema, Dropdown: dropdownSchema, Gallery: gallerySchema }
-
-// ── Name counter per type ────────────────────────────────────────────────────
-const _typeCounts = {}
-function nextName(type) {
-  _typeCounts[type] = (_typeCounts[type] || 0) + 1
-  return `${type}${_typeCounts[type]}`
-}
-
-// ── Create a fresh component from schema ─────────────────────────────────────
-function createComponent(schema, overrides = {}) {
-  const base = JSON.parse(JSON.stringify(schema.defaults))
-  return { id: uid(), type: schema.type, name: nextName(schema.type), ...base, ...overrides }
-}
-
-// ── Create from LLM spec (merge with defaults) ────────────────────────────────
-function createFromSpec(spec) {
-  const schema = SCHEMAS[spec.type]
-  if (!schema) return null
-  const base = JSON.parse(JSON.stringify(schema.defaults))
-  const { children, ...rest } = spec
-  const processedChildren = (children || []).map(c => createFromSpec(c)).filter(Boolean)
-  return { ...base, ...rest, id: uid(), type: schema.type, name: spec.name || nextName(schema.type), children: processedChildren }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// YAML Generation
-// ──────────────────────────────────────────────────────────────────────────────
-
-/** Convert a hex color string to PA RGBA notation */
-function toRgba(hex) {
-  if (!hex || hex === 'transparent') return 'RGBA(0, 0, 0, 0)'
-  if (hex.startsWith('rgba') || hex.startsWith('RGBA')) return hex
-  const clean = hex.replace('#', '')
-  if (clean.length === 3) {
-    const [r, g, b] = clean.split('').map(c => parseInt(c + c, 16))
-    return `RGBA(${r}, ${g}, ${b}, 1)`
-  }
-  const r = parseInt(clean.slice(0, 2), 16)
-  const g = parseInt(clean.slice(2, 4), 16)
-  const b = parseInt(clean.slice(4, 6), 16)
-  return `RGBA(${r}, ${g}, ${b}, 1)`
-}
-
-// PA enum → CSS value maps (for live canvas rendering)
-const CSS_FW  = { 'FontWeight.Lighter': '300', 'FontWeight.Normal': '400', 'FontWeight.Semibold': '600', 'FontWeight.Bold': '700' }
-const CSS_ALIGN = { 'Align.Left': 'left', 'Align.Center': 'center', 'Align.Right': 'right', 'Align.Justify': 'justify' }
-const CSS_JUSTIFY = { 'Align.Left': 'flex-start', 'Align.Center': 'center', 'Align.Right': 'flex-end', 'Align.Justify': 'space-between' }
-const CSS_VALIGN = { 'VerticalAlign.Top': 'flex-start', 'VerticalAlign.Middle': 'center', 'VerticalAlign.Bottom': 'flex-end' }
-
-const BORDER_MAP = { None: 'BorderStyle.None', Solid: 'BorderStyle.Solid', Dashed: 'BorderStyle.Dashed', Dotted: 'BorderStyle.Dotted' }
-
-/** Recursively convert a component tree node to PA YAML string.
- *  col = the column where the leading `- Name:` dash sits (0 for root). */
-function componentToYaml(node, col = 0) {
-  const sp = (n) => ' '.repeat(n)   // exact column indent
-  const safeName = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').replace(/^\d+/, '') || 'Ctrl'
-
-  // Use explicit name if set, otherwise derive from text
-  const name = node.name
-    ? node.name
-    : node.type === 'Container'
-      ? 'Container'
-      : node.type === 'Button'
-        ? (safeName(node.text) || 'Button') + 'Button'
-        : node.type === 'TextInput'
-          ? (safeName(node.hint) || 'TextInput') + 'Input'
-          : node.type === 'Dropdown'
-            ? (safeName(node.defaultValue) || 'Dropdown') + 'Dropdown'
-            : (safeName(node.text) || 'Label')  + 'Label'
-
-  const controlMap = {
-    Button:    'Classic/Button@2.2.0',
-    Label:     'Label@2.5.1',
-    Container: 'GroupContainer@1.4.0',
-    TextInput: 'Classic/TextInput@2.3.2',
-    Dropdown: 'Classic/DropDown@2.3.1',
-    Gallery:   'Gallery@2.15.0',
-  }
-
-  const lines = []
-
-  // Header  ── col 0: "- Name:"
-  //           ── col+4: Control / Variant / Properties / Children
-  //           ── col+6: property values
-  lines.push(`${sp(col)}- ${name}:`)
-  lines.push(`${sp(col + 4)}Control: ${controlMap[node.type]}`)
-  if (node.type === 'Container') {
-    lines.push(`${sp(col + 4)}Variant: ManualLayout`)
-  } else if (node.type === 'Gallery') {
-    lines.push(`${sp(col + 4)}Variant: ${node.Variant}`)
-  }
-  lines.push(`${sp(col + 4)}Properties:`)
-
-  const p = (k, v) => lines.push(`${sp(col + 6)}${k}: =${v}`)
-
-  if (node.type === 'Button') {
-    p('Text', `"${node.text || 'Button'}"`)
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    p('Fill', toRgba(node.fill))
-    p('Color', toRgba(node.color))
-    p('Size', node.fontSize)
-    p('FontWeight', node.fontWeight)
-    p('RadiusTopLeft', node.borderRadius)
-    p('RadiusTopRight', node.borderRadius)
-    p('RadiusBottomLeft', node.borderRadius)
-    p('RadiusBottomRight', node.borderRadius)
-    p('BorderColor', toRgba(node.borderColor))
-    p('BorderThickness', node.borderThickness)
-    if (node.italic)   p('Italic', 'true')
-    if (node.underline) p('Underline', 'true')
-    if (!node.visible) p('Visible', 'false')
-    if (node.disabled) p('DisplayMode', 'DisplayMode.Disabled')
-  } else if (node.type === 'Label') {
-    p('Text', `"${node.text || 'Label'}"`)
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    p('Color', toRgba(node.color))
-    if (node.fill && node.fill !== 'transparent') p('Fill', toRgba(node.fill))
-    p('Size', node.fontSize)
-    p('FontWeight', node.fontWeight)
-    p('Align', node.align)
-    p('VerticalAlign', node.verticalAlign)
-    if (node.italic)    p('Italic', 'true')
-    if (node.underline) p('Underline', 'true')
-    if (!node.visible)  p('Visible', 'false')
-    if (node.paddingLeft)   p('PaddingLeft', node.paddingLeft)
-    if (node.paddingRight)  p('PaddingRight', node.paddingRight)
-    if (node.paddingTop)    p('PaddingTop', node.paddingTop)
-    if (node.paddingBottom) p('PaddingBottom', node.paddingBottom)
-  } else if (node.type === 'Container') {
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    if (node.fill && node.fill !== 'rgba(0,0,0,0)') p('Fill', toRgba(node.fill))
-    if (node.borderStyle && node.borderStyle !== 'None') {
-      p('BorderStyle', BORDER_MAP[node.borderStyle])
-      p('BorderColor', toRgba(node.borderColor))
-      p('BorderThickness', node.borderThickness)
-    }
-    if (!node.visible) p('Visible', 'false')
-  } else if (node.type === 'TextInput') {
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    if (node.value) p('Default', `"${node.value}"`)
-    if (node.hint)  p('HintText', `"${node.hint}"`)
-    p('Fill', toRgba(node.fill))
-    p('Color', toRgba(node.color))
-    p('Size', node.fontSize)
-    p('FontWeight', node.fontWeight)
-    p('BorderColor', toRgba(node.borderColor))
-    p('BorderThickness', node.borderThickness)
-    if (!node.visible) p('Visible', 'false')
-    if (node.disabled) p('DisplayMode', 'DisplayMode.Disabled')
-  } else if (node.type === 'Dropdown') {
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    if (node.defaultValue) p('Default', `"${node.defaultValue}"`)
-    if (node.items) p('Items', node.items)
-    p('Fill', toRgba(node.fill))
-    p('Color', toRgba(node.color))
-    p('Size', node.fontSize)
-    p('FontWeight', node.fontWeight)
-    p('BorderColor', toRgba(node.borderColor))
-    p('BorderThickness', node.borderThickness)
-    if (!node.visible) p('Visible', 'false')
-    if (node.disabled) p('DisplayMode', 'DisplayMode.Disabled')
-  } else if (node.type === 'Gallery') {
-    p('X', node.x)
-    p('Y', node.y)
-    p('Width', node.width)
-    p('Height', node.height)
-    if (node.Items) p('Items', node.Items)
-    if (node.TemplateSize !== undefined) p('TemplateSize', node.TemplateSize)
-    if (node.TemplatePadding !== undefined) p('TemplatePadding', node.TemplatePadding)
-    if (node.WrapCount !== undefined) p('WrapCount', node.WrapCount)
-    if (node.ShowNavigation !== undefined) p('ShowNavigation', node.ShowNavigation ? 'true' : 'false')
-    if (node.ShowScrollbar !== undefined) p('ShowScrollbar', node.ShowScrollbar ? 'true' : 'false')
-    if (!node.visible) p('Visible', 'false')
-  }
-
-  // Children: dash at col+6, so child's "- Name:" starts at col+6
-  if ((node.type === 'Container' || node.type === 'Gallery') && node.children?.length) {
-    lines.push(`${sp(col + 4)}Children:`)
-    for (const child of node.children) {
-      lines.push(componentToYaml(child, col + 6))
-    }
-  }
-
-  return lines.join('\n')
-}
-
-// ── Screen-level YAML renderer ───────────────────────────────────────────────
-function screenToYaml(tree) {
-  if (!tree?.length) return '# Empty canvas — add components to get started'
-  return tree.map(node => componentToYaml(node, 0)).join('\n')
-}
+import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
+  RectangleRenderer,
+  IconRenderer,
+  HtmlTextRenderer,
+  DatePickerRenderer,
+  ComboBoxRenderer,
+} from '../components/controls/index.jsx'
+import { SCHEMAS } from './constants.jsx'
+import PropField from './components/PropField.jsx'
+import ChatMessage from './components/ChatMessage.jsx'
+import LayerRow from './components/LayerRow.jsx'
+import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml } from './helpers.jsx'
+import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine } from '../common/helpers.jsx'
+import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
 
 // ── Code Pane ─────────────────────────────────────────────────────────────────
 function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode }) {
   const [copied, setCopied] = useState(false)
-  const yaml = node ? componentToYaml(node) : screenToYaml(tree)
+  
+  // App nodes have no YAML preview. Screen nodes show a full Screens: document.
+  const yaml = (() => {
+    if (!node) return screenToYaml(tree)
+    if (node.type === 'App') return null // No YAML for the App node
+    if (node.type === 'Screen') {
+      // Wrap the single screen as a full Screens: document
+      const screenBody = componentToYaml(node, 2)
+      return `Screens:\n${screenBody}`
+    }
+    return componentToYaml(node)
+  })()
 
   const handleCopy = () => {
+    if (!yaml) return
     navigator.clipboard.writeText(yaml).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
@@ -234,25 +41,8 @@ function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakI
 
   // Basic token coloring
   const highlighted = yaml
-    .split('\n')
-    .map((line, i) => {
-      let className = 'text-text/80'
-      const trimmed = line.trimStart()
-      if (trimmed.startsWith('-') && trimmed.endsWith(':')) className = 'text-violet-300 font-semibold'
-      else if (/^Control:/.test(trimmed)) className = 'text-blue-300'
-      else if (/^Properties:|^Children:/.test(trimmed)) className = 'text-accent/70 font-semibold'
-      else if (/^[A-Z][A-Za-z]+:/.test(trimmed)) {
-        const [, val] = line.split(/:\s*=?/)
-        return (
-          <div key={i} className="leading-5">
-            <span className="text-blue-200/80">{line.split(':')[0]}</span>
-            <span className="text-subtext/50">: </span>
-            <span className="text-green-300/80">={val?.trim()}</span>
-          </div>
-        )
-      }
-      return <div key={i} className={`leading-5 ${className}`}>{line}</div>
-    })
+    ? yaml.split('\n').map((line, i) => highlightYamlLine(line, i))
+    : null
 
   return (
     <div className="w-72 shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden">
@@ -265,16 +55,6 @@ function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakI
             ? <span className="text-[10px] text-subtext/50 bg-overlay/30 px-1.5 py-0.5 rounded-full">{node.type}</span>
             : <span className="text-[10px] text-violet-300/80 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded-full">Screen</span>
           }
-          {node && (
-            <button 
-              onClick={() => setIsTweaking(!isTweaking)}
-              className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors border ml-1 ${
-                isTweaking || tweakOriginalNode ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-surface/50 text-subtext/70 border-overlay/40 hover:text-accent hover:border-accent/40'
-              }`}
-            >
-              ✨ Tweak
-            </button>
-          )}
         </div>
         <button
           onClick={handleCopy}
@@ -303,41 +83,11 @@ function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakI
         </button>
       </div>
 
-      {/* AI Tweak Input Box */}
-      {isTweaking && node && (
-        <div className="flex flex-col gap-2 p-2.5 mx-3 mt-3 bg-violet-500/10 border border-violet-500/20 rounded-lg animate-in fade-in zoom-in-95 duration-200 shrink-0">
-          <p className="text-[10px] text-violet-300/80 font-medium">What should AI change about this component?</p>
-          <div className="flex gap-1.5">
-            <input 
-              type="text" 
-              value={tweakInput}
-              onChange={e => setTweakInput(e.target.value)}
-              onKeyDown={e => {
-                e.stopPropagation() // prevent delete/copy hotkeys while typing
-                if (e.key === 'Enter') handleTweakSubmit()
-              }}
-              autoFocus
-              placeholder="e.g. make text red and bold"
-              className="flex-1 min-w-0 bg-base border border-violet-500/30 rounded px-2 py-1 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500"
-            />
-            <button 
-              onClick={handleTweakSubmit}
-              disabled={tweakLoading || !tweakInput.trim()}
-              className="w-6 h-6 rounded bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-50"
-            >
-              {tweakLoading ? (
-                <div className="w-2.5 h-2.5 rounded-full border border-white border-t-transparent animate-spin" />
-              ) : (
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Code area */}
       <div className="flex-1 overflow-auto p-4 font-mono text-[11px] whitespace-pre">
-        {highlighted}
+        {highlighted ?? (
+          <span className="text-subtext/30 italic">Select a Screen or component to view YAML</span>
+        )}
       </div>
     </div>
   )
@@ -356,787 +106,6 @@ CodePane.propTypes = {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Tree helpers
-// ──────────────────────────────────────────────────────────────────────────────
-
-/** Find a node anywhere in the tree by id */
-function findNode(nodes, id) {
-  for (const n of nodes) {
-    if (n.id === id) return n
-    if (n.children?.length) {
-      const found = findNode(n.children, id)
-      if (found) return found
-    }
-  }
-  return null
-}
-
-/** Update a node in the tree, returning a new tree */
-function updateNode(nodes, id, updater) {
-  return nodes.map(n => {
-    if (n.id === id) return { ...n, ...updater(n) }
-    if (n.children?.length) return { ...n, children: updateNode(n.children, id, updater) }
-    return n
-  })
-}
-
-/** Remove a node from the tree, return [newTree, removedNode] */
-function removeNode(nodes, id) {
-  let removed = null
-  const next = []
-  for (const n of nodes) {
-    if (n.id === id) { removed = n; continue }
-    if (n.children?.length) {
-      const [newChildren, r] = removeNode(n.children, id)
-      if (r) removed = r
-      next.push({ ...n, children: newChildren })
-    } else {
-      next.push(n)
-    }
-  }
-  return [next, removed]
-}
-
-/** Insert a node as a child of parentId (or at root if parentId is null) */
-function insertNode(nodes, node, parentId) {
-  if (!parentId) return [...nodes, node]
-  return nodes.map(n => {
-    if (n.id === parentId) return { ...n, children: [...(n.children || []), node] }
-    if (n.children?.length) return { ...n, children: insertNode(n.children, node, parentId) }
-    return n
-  })
-}
-
-/** Flatten tree to a list (for layers panel) with depth info */
-function flattenTree(nodes, collapsedIds = new Set(), depth = 0) {
-  const result = []
-  for (const n of nodes) {
-    result.push({ ...n, _depth: depth })
-    if (n.children?.length && !collapsedIds.has(n.id)) {
-      result.push(...flattenTree(n.children, collapsedIds, depth + 1))
-    }
-  }
-  return result
-}
-
-/** Find the direct parent container of a node, or null if at root */
-function findParent(nodes, id, parent = null) {
-  for (const n of nodes) {
-    if (n.id === id) return parent
-    if (n.children?.length) {
-      const found = findParent(n.children, id, n)
-      if (found !== undefined) return found
-    }
-  }
-  return undefined // not found in this branch
-}
-
-/** Check if targetId is inside ancestorId's tree */
-function isDescendant(nodes, targetId, ancestorId) {
-  const ancestor = findNode(nodes, ancestorId)
-  if (!ancestor) return false
-  const check = (node) => {
-    if (node.id === targetId) return true
-    if (node.children) return node.children.some(check)
-    return false
-  }
-  return check(ancestor)
-}
-
-/** Performs the logical tree update for dropping a node into a new container */
-function handleDropLogic(prevTree, dragId, targetContainerId) {
-  if (dragId === targetContainerId) return prevTree
-  // Block dragging a container into itself or its own children
-  if (targetContainerId !== 'root' && isDescendant(prevTree, targetContainerId, dragId)) {
-    return prevTree
-  }
-  // Check if it's already in this container natively
-  const currentParentId = findParent(prevTree, dragId)?.id || 'root'
-  if (currentParentId === targetContainerId) return prevTree
-
-  const [without, removed] = removeNode(prevTree, dragId)
-  if (!removed) return prevTree
-  
-  if (targetContainerId === 'root') {
-    const placed = { ...removed, x: Math.max(0, removed.x), y: Math.max(0, removed.y) }
-    return insertNode(without, placed, null)
-  } else {
-    // Place slightly offset inside the new container
-    const placed = { ...removed, x: 10, y: 10 }
-    return insertNode(without, placed, targetContainerId)
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Sub-renderers
-// ──────────────────────────────────────────────────────────────────────────────
-
-function ButtonRenderer({ comp, selected, onMouseDown, onClick }) {
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill,
-    color: comp.color,
-    fontSize: comp.fontSize,
-    fontWeight: CSS_FW[comp.fontWeight] || comp.fontWeight,
-    fontStyle: comp.italic ? 'italic' : 'normal',
-    textDecoration: comp.underline ? 'underline' : 'none',
-    borderRadius: comp.borderRadius,
-    border: `${comp.borderThickness}px solid ${comp.borderColor}`,
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxSizing: 'border-box',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : '0 1px 3px rgba(0,0,0,0.15)',
-    transition: 'box-shadow 0.1s, outline 0.1s',
-    zIndex: selected ? 10 : 1,
-  }
-  return (
-    <button style={style} onMouseDown={onMouseDown} onClick={onClick} disabled={comp.disabled}>
-      {comp.text}
-    </button>
-  )
-}
-
-ButtonRenderer.propTypes = {
-  comp: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    color: PropTypes.string,
-    fontSize: PropTypes.number,
-    fontWeight: PropTypes.string,
-    italic: PropTypes.bool,
-    underline: PropTypes.bool,
-    borderRadius: PropTypes.number,
-    borderThickness: PropTypes.number,
-    borderColor: PropTypes.string,
-    visible: PropTypes.bool,
-    disabled: PropTypes.bool,
-    text: PropTypes.string,
-  }).isRequired,
-  selected: PropTypes.bool,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-}
-
-function LabelRenderer({ comp, selected, onMouseDown, onClick }) {
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill === 'transparent' ? 'transparent' : comp.fill,
-    color: comp.color,
-    fontSize: comp.fontSize,
-    fontWeight: CSS_FW[comp.fontWeight] || comp.fontWeight,
-    fontStyle: comp.italic ? 'italic' : 'normal',
-    textDecoration: comp.underline ? 'underline' : 'none',
-    textAlign: CSS_ALIGN[comp.align] || comp.align,
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    display: 'flex', 
-    alignItems: CSS_VALIGN[comp.verticalAlign] || 'center',
-    justifyContent: CSS_JUSTIFY[comp.align] || 'flex-start',
-    boxSizing: 'border-box',
-    paddingLeft: comp.paddingLeft, paddingRight: comp.paddingRight,
-    paddingTop: comp.paddingTop, paddingBottom: comp.paddingBottom,
-    outline: selected ? '2px solid #0078d4' : '1px dashed rgba(0,0,0,0.15)',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    overflow: 'hidden', zIndex: selected ? 10 : 1,
-    lineHeight: comp.lineHeight,
-    transition: 'box-shadow 0.1s, outline 0.1s',
-  }
-  return (
-    <div style={style} onMouseDown={onMouseDown} onClick={onClick}>{comp.text}</div>
-  )
-}
-
-LabelRenderer.propTypes = {
-  comp: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    color: PropTypes.string,
-    fontSize: PropTypes.number,
-    fontWeight: PropTypes.string,
-    italic: PropTypes.bool,
-    underline: PropTypes.bool,
-    align: PropTypes.string,
-    verticalAlign: PropTypes.string,
-    visible: PropTypes.bool,
-    paddingLeft: PropTypes.number,
-    paddingRight: PropTypes.number,
-    paddingTop: PropTypes.number,
-    paddingBottom: PropTypes.number,
-    lineHeight: PropTypes.number,
-    text: PropTypes.string,
-  }).isRequired,
-  selected: PropTypes.bool,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-}
-
-// ── TextInput Renderer ────────────────────────────────────────────────────────
-function TextInputRenderer({ comp, selected, onMouseDown, onClick }) {
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill,
-    color: comp.color,
-    fontSize: comp.fontSize,
-    fontWeight: CSS_FW[comp.fontWeight] || comp.fontWeight,
-    border: `${comp.borderThickness}px solid ${comp.borderColor}`,
-    borderRadius: 2,
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    display: 'flex', alignItems: 'center',
-    paddingLeft: 8, paddingRight: 8,
-    boxSizing: 'border-box',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    zIndex: selected ? 10 : 1,
-    transition: 'box-shadow 0.1s, outline 0.1s',
-  }
-  return (
-    <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
-      {comp.value
-        ? <span>{comp.value}</span>
-        : <span style={{ color: '#aaa', fontStyle: 'italic' }}>{comp.hint}</span>
-      }
-    </div>
-  )
-}
-
-TextInputRenderer.propTypes = {
-  comp: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    color: PropTypes.string,
-    fontSize: PropTypes.number,
-    fontWeight: PropTypes.string,
-    borderThickness: PropTypes.number,
-    borderColor: PropTypes.string,
-    visible: PropTypes.bool,
-    value: PropTypes.string,
-    hint: PropTypes.string,
-  }).isRequired,
-  selected: PropTypes.bool,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-}
-
-// ── Dropdown Renderer ────────────────────────────────────────────────────────
-function DropdownRenderer({ comp, selected, onMouseDown, onClick }) {
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill,
-    color: comp.color,
-    fontSize: comp.fontSize,
-    fontWeight: CSS_FW[comp.fontWeight] || comp.fontWeight,
-    border: `${comp.borderThickness}px solid ${comp.borderColor}`,
-    borderRadius: 2,
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    paddingLeft: 10, paddingRight: 8,
-    boxSizing: 'border-box',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    zIndex: selected ? 10 : 1,
-    transition: 'box-shadow 0.1s, outline 0.1s',
-  }
-  return (
-    <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
-      <span className="truncate">{comp.defaultValue || (comp.items?.includes('[') ? JSON.parse(comp.items)[0] : 'Dropdown')}</span>
-      <svg className="w-4 h-4 text-subtext/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="6 9 12 15 18 9"></polyline>
-      </svg>
-    </div>
-  )
-}
-
-DropdownRenderer.propTypes = {
-  comp: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    color: PropTypes.string,
-    fontSize: PropTypes.number,
-    fontWeight: PropTypes.string,
-    borderThickness: PropTypes.number,
-    borderColor: PropTypes.string,
-    visible: PropTypes.bool,
-    defaultValue: PropTypes.string,
-    items: PropTypes.string,
-  }).isRequired,
-  selected: PropTypes.bool,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-}
-
-// ── Recursive Container Renderer ─────────────────────────────────────────────
-function ContainerRenderer({ comp, selected, selectedIds, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
-  const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
-  const isDragOver = dragOverId === comp.id
-
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill === 'rgba(0,0,0,0)' || comp.fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.fill,
-    border: comp.borderStyle === 'None'
-      ? '1px dashed rgba(0,0,0,0.12)'
-      : `${comp.borderThickness}px ${borderMap[comp.borderStyle] || 'solid'} ${comp.borderColor}`,
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    boxSizing: 'border-box',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected
-      ? '0 0 0 3px rgba(0,120,212,0.25)'
-      : isDragOver
-        ? 'inset 0 0 0 2px #0078d4'
-        : 'none',
-    transition: 'box-shadow 0.12s',
-    zIndex: selected ? 10 : 1,
-  }
-
-  return (
-    <div
-      style={style}
-      data-container-id={comp.id}
-      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
-      onClick={onClick}
-      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(comp.id) }}
-      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null) }}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); onDropInto(comp.id); setDragOverId(null) }}
-    >
-      {/* Container label badge */}
-      {!comp.children?.length && (
-        <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: 'rgba(0,0,0,0.25)', pointerEvents: 'none', userSelect: 'none' }}>
-          Container
-        </div>
-      )}
-
-      {/* Drag-over highlight overlay */}
-      {isDragOver && (
-        <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,120,212,0.06)',
-          border: '2px dashed #0078d4', borderRadius: 2, pointerEvents: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontSize: 11, color: '#0078d4', fontWeight: 600 }}>Drop here</span>
-        </div>
-      )}
-
-      {/* Children */}
-      {comp.children?.map(child => {
-        const isChildSelected = selectedIds.includes(child.id)
-        const childProps = {
-          comp: child,
-          selected: isChildSelected,
-          selectedIds,
-          onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
-          onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
-        }
-        if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
-        if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
-        if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
-        if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
-        if (child.type === 'Container') return (
-          <ContainerRenderer
-            key={child.id} {...childProps}
-            onChildMouseDown={onChildMouseDown}
-            onChildClick={onChildClick}
-            onDropInto={onDropInto}
-            dragOverId={dragOverId}
-            setDragOverId={setDragOverId}
-          />
-        )
-        if (child.type === 'Gallery') return (
-          <GalleryRenderer
-            key={child.id} {...childProps}
-            onChildMouseDown={onChildMouseDown}
-            onChildClick={onChildClick}
-            onDropInto={onDropInto}
-            dragOverId={dragOverId}
-            setDragOverId={setDragOverId}
-          />
-        )
-        return null
-      })}
-    </div>
-  )
-}
-
-ContainerRenderer.propTypes = {
-  comp: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    borderStyle: PropTypes.string,
-    borderThickness: PropTypes.number,
-    borderColor: PropTypes.string,
-    visible: PropTypes.bool,
-    children: PropTypes.array,
-  }).isRequired,
-  selected: PropTypes.bool,
-  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-  onChildMouseDown: PropTypes.func.isRequired,
-  onChildClick: PropTypes.func.isRequired,
-  onDropInto: PropTypes.func.isRequired,
-  dragOverId: PropTypes.string,
-  setDragOverId: PropTypes.func.isRequired,
-}
-
-// ── Recursive Gallery Renderer ───────────────────────────────────────────────
-function GalleryRenderer({ comp, selected, selectedIds, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
-  const isDragOver = dragOverId === comp.id
-
-  const style = {
-    position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill === 'rgba(0,0,0,0)' || comp.fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.fill,
-    border: '2px dashed rgba(236, 72, 153, 0.4)', // Pink dashed border for Gallery
-    opacity: comp.visible ? 1 : 0.3,
-    cursor: 'move', userSelect: 'none',
-    boxSizing: 'border-box',
-    outline: selected ? '2px solid #ec4899' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected
-      ? '0 0 0 3px rgba(236, 72, 153, 0.25)'
-      : isDragOver
-        ? 'inset 0 0 0 2px #ec4899'
-        : 'none',
-    transition: 'box-shadow 0.12s',
-    zIndex: selected ? 10 : 1,
-    overflow: 'hidden'
-  }
-
-  // Determine if vertical or horizontal based on the selected Variant
-  const isVertical = comp.Variant ? comp.Variant.includes('Vertical') : comp.height > comp.width
-  const padding = comp.TemplatePadding || 0
-  const tSize = comp.TemplateSize || (isVertical ? 100 : 100)
-
-  return (
-    <div
-      style={style}
-      data-container-id={comp.id}
-      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
-      onClick={onClick}
-      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(comp.id) }}
-      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null) }}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); onDropInto(comp.id); setDragOverId(null) }}
-    >
-      <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: '#ec4899', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}>
-        Gallery Template
-      </div>
-
-      {isDragOver && (
-        <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(236, 72, 153, 0.06)',
-          border: '2px dashed #ec4899', borderRadius: 2, pointerEvents: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100
-        }}>
-          <span style={{ fontSize: 11, color: '#ec4899', fontWeight: 600 }}>Drop into Template</span>
-        </div>
-      )}
-
-      {/* Actual Template Wrapper */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
-        {comp.children?.map(child => {
-          const isChildSelected = selectedIds.includes(child.id)
-          const childProps = {
-            comp: child,
-            selected: isChildSelected,
-            selectedIds,
-            onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
-            onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
-          }
-          if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
-          if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
-          if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
-          if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
-          if (child.type === 'Container') return (
-            <ContainerRenderer
-              key={child.id} {...childProps}
-              onChildMouseDown={onChildMouseDown}
-              onChildClick={onChildClick}
-              onDropInto={onDropInto}
-              dragOverId={dragOverId}
-              setDragOverId={setDragOverId}
-            />
-          )
-          if (child.type === 'Gallery') return (
-            <GalleryRenderer
-              key={child.id} {...childProps}
-              onChildMouseDown={onChildMouseDown}
-              onChildClick={onChildClick}
-              onDropInto={onDropInto}
-              dragOverId={dragOverId}
-              setDragOverId={setDragOverId}
-            />
-          )
-          return null
-        })}
-      </div>
-
-      {/* Ghost repeating templates for visual effect only */}
-      <div style={{ position: 'absolute', top: isVertical ? tSize + padding : 0, left: isVertical ? 0 : tSize + padding, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
-        {comp.children?.map(child => {
-          const isChildSelected = selectedIds.includes(child.id)
-          const childProps = { comp: child, selected: isChildSelected, selectedIds, onMouseDown: () => {}, onClick: () => {} }
-          if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
-          if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
-          if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
-          if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
-          if (child.type === 'Container') return <ContainerRenderer key={child.id} {...childProps} onChildMouseDown={()=>{}} onChildClick={()=>{}} onDropInto={()=>{}} setDragOverId={()=>{}} />
-          return null
-        })}
-      </div>
-    </div>
-  )
-}
-
-GalleryRenderer.propTypes = {
-  comp: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    TemplateSize: PropTypes.number,
-    TemplatePadding: PropTypes.number,
-    visible: PropTypes.bool,
-    children: PropTypes.array,
-  }).isRequired,
-  selected: PropTypes.bool,
-  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
-  onMouseDown: PropTypes.func.isRequired,
-  onClick: PropTypes.func.isRequired,
-  onChildMouseDown: PropTypes.func.isRequired,
-  onChildClick: PropTypes.func.isRequired,
-  onDropInto: PropTypes.func.isRequired,
-  dragOverId: PropTypes.string,
-  setDragOverId: PropTypes.func.isRequired,
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Property Field
-// ──────────────────────────────────────────────────────────────────────────────
-function PropField({ prop, value, onChange }) {
-  if (prop.type === 'boolean') {
-    return (
-      <div className="flex items-center justify-between py-1.5">
-        <label className="text-xs text-subtext">{prop.label}</label>
-        <button onClick={() => onChange(!value)}
-          className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${value ? 'bg-accent' : 'bg-overlay'}`}>
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${value ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
-    )
-  }
-  if (prop.type === 'color') {
-    // Determine the hex value for the color picker (it requires #RRGGBB)
-    // If it's transparent, we default the picker itself to #ffffff, but keep the input value as 'transparent'
-    const isTransparent = value === 'transparent' || value === 'rgba(0,0,0,0)'
-    let hexValue = '#ffffff'
-    if (!isTransparent && value && value.startsWith('#')) {
-      hexValue = value.slice(0, 7) // Ensure 6-char hex with #
-    }
-
-    return (
-      <div className="flex items-center justify-between py-1.5 gap-2">
-        <label className="text-xs text-subtext shrink-0">{prop.label}</label>
-        <div className="flex items-center gap-1.5">
-          <div className="relative w-5 h-5 rounded border border-overlay/50 shrink-0 overflow-hidden"
-            style={{ 
-              backgroundColor: isTransparent ? 'transparent' : value, 
-              backgroundImage: isTransparent ? 'repeating-conic-gradient(#aaa 0% 25%, white 0% 50%) 0 0 / 8px 8px' : 'none' 
-            }}
-          >
-            <input 
-              type="color" 
-              value={hexValue} 
-              onChange={e => onChange(e.target.value)}
-              className="absolute -inset-2 w-[200%] h-[200%] opacity-0 cursor-pointer"
-              title="Pick a color"
-            />
-          </div>
-          <input type="text" value={value} onChange={e => onChange(e.target.value)}
-            className="w-24 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right" 
-          />
-        </div>
-      </div>
-    )
-  }
-  if (prop.type === 'select') {
-    return (
-      <div className="flex items-center justify-between py-1.5 gap-2">
-        <label className="text-xs text-subtext shrink-0">{prop.label}</label>
-        <select value={value} onChange={e => onChange(e.target.value)}
-          className="bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 cursor-pointer">
-          {prop.options.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      </div>
-    )
-  }
-  if (prop.type === 'number') {
-    return (
-      <div className="flex items-center justify-between py-1.5 gap-2">
-        <label className="text-xs text-subtext shrink-0">{prop.label}</label>
-        <input type="number" value={value} onChange={e => onChange(Number(e.target.value))}
-          className="w-20 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right" />
-      </div>
-    )
-  }
-  return (
-    <div className="flex items-center justify-between py-1.5 gap-2">
-      <label className="text-xs text-subtext shrink-0">{prop.label}</label>
-      <input type="text" value={value} onChange={e => onChange(e.target.value)}
-        className="flex-1 min-w-0 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60" />
-    </div>
-  )
-}
-
-PropField.propTypes = {
-  prop: PropTypes.shape({
-    type: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired,
-    options: PropTypes.arrayOf(PropTypes.string),
-  }).isRequired,
-  value: PropTypes.any,
-  onChange: PropTypes.func.isRequired,
-}
-// ── Chat Message ──────────────────────────────────────────────────────────────
-function ChatMessage({ msg }) {
-  const isUser = msg.role === 'user'
-  return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs leading-relaxed
-        ${isUser ? 'bg-accent/20 text-text border border-accent/20' : 'bg-surface border border-overlay/40 text-text'}`}>
-        {msg.image && (
-          <div className="mb-2 w-full flex justify-end">
-            <img src={msg.image} alt="User upload" className="max-h-32 rounded-lg border border-overlay/30 object-contain bg-base/50 shadow-sm" />
-          </div>
-        )}
-        {msg.content}
-        <div className="flex gap-2 mt-1">
-          {msg.added > 0 && (
-            <span className="text-[10px] text-green/80 font-medium tracking-wide">
-              +{msg.added} added
-            </span>
-          )}
-          {msg.mods > 0 && (
-            <span className="text-[10px] text-blue-400 font-medium tracking-wide">
-              ~{msg.mods} modified
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-ChatMessage.propTypes = {
-  msg: PropTypes.shape({
-    role: PropTypes.string.isRequired,
-    content: PropTypes.string.isRequired,
-    added: PropTypes.number,
-    mods: PropTypes.number,
-    image: PropTypes.string,
-  }).isRequired,
-}
-
-// ── Layer Row ──────────────────────────────────────────────────────────────────
-const TYPE_COLORS = { Button: 'bg-[#0078d4]', Label: 'bg-subtext', Container: 'bg-violet-400', TextInput: 'bg-emerald-500', Dropdown: 'bg-amber-500' }
-const TYPE_ICONS = {
-  Button: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V12.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" /></svg>,
-  Label: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527Z" clipRule="evenodd" /></svg>,
-  Container: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path d="M2 3a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm0 9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8Zm11-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-6Z" /></svg>,
-  TextInput: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" /></svg>,
-  Dropdown: <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" /></svg>,
-}
-
-function LayerRow({ node, selectedIds, onSelect, depth, isCollapsed, toggleCollapse }) {
-  const hasChildren = node.type === 'Container' && node.children?.length > 0
-  const isSelected = selectedIds.includes(node.id)
-  
-  return (
-    <div 
-      className={`flex items-center gap-1.5 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
-        isSelected
-          ? 'bg-accent/15 text-accent border border-accent/30'
-          : 'text-subtext hover:bg-overlay/30 border border-transparent'
-      }`}
-      style={{ paddingLeft: `${8 + depth * 14}px` }}
-    >
-      {/* Collapse/Expand Toggle */}
-      <div className="w-4 h-4 flex items-center justify-center shrink-0">
-        {hasChildren && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); toggleCollapse(node.id); }}
-            className="w-full h-full flex items-center justify-center rounded hover:bg-overlay/40 text-subtext/40 hover:text-subtext transition-colors"
-          >
-            <svg 
-              className={`w-3 h-3 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} 
-              viewBox="0 0 24 24" fill="currentColor"
-            >
-              <path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      <button 
-        onClick={(e) => onSelect(e, node.id)}
-        className="flex-1 flex items-center gap-1.5 truncate cursor-pointer"
-      >
-        <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-white ${TYPE_COLORS[node.type] || 'bg-overlay'}`}>
-          {TYPE_ICONS[node.type]}
-        </span>
-        <span className="truncate">{node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type))}</span>
-        <span className="ml-auto text-subtext/30 text-[10px] shrink-0">{node.type}</span>
-      </button>
-    </div>
-  )
-}
-
-LayerRow.propTypes = {
-  node: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    type: PropTypes.string.isRequired,
-    name: PropTypes.string,
-    text: PropTypes.string,
-    children: PropTypes.array,
-  }).isRequired,
-  selectedIds: PropTypes.arrayOf(PropTypes.string).isRequired,
-  onSelect: PropTypes.func.isRequired,
-  depth: PropTypes.number.isRequired,
-  isCollapsed: PropTypes.bool.isRequired,
-  toggleCollapse: PropTypes.func.isRequired,
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
 export default function RendererPage() {
@@ -1144,11 +113,27 @@ export default function RendererPage() {
   const [canvasH, setCanvasH] = useState(768)
   const [canvasWInput, setCanvasWInput] = useState('1366')
   const [canvasHInput, setCanvasHInput] = useState('768')
-  const [tree, setTree] = useState([])           // component tree
+  const [tree, setTree] = useState([
+    {
+      id: 'app_root',
+      type: 'App',
+      name: 'App',
+      children: [
+        {
+          id: 'screen_1',
+          type: 'Screen',
+          name: 'Screen1',
+          fill: 'RGBA(255, 255, 255, 1)',
+          children: []
+        }
+      ]
+    }
+  ])           // component tree
   const [selectedIds, setSelectedIds] = useState([]) // Array of selected component IDs
   const [dragOverId, setDragOverId] = useState(null)
   const [collapsedIds, setCollapsedIds] = useState(new Set()) // Container collapse state
   const [zoom, setZoom] = useState(1) // Canvas zoom level
+  const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
   const [chatImage, setChatImage] = useState(null)
   const fileInputRef = useRef(null)
 
@@ -1162,7 +147,7 @@ export default function RendererPage() {
   const [tweakLoading, setTweakLoading] = useState(false)
 
   // History state for Undo/Redo
-  const [history, setHistory] = useState([[]]) // Initialize with empty tree
+  const [history, setHistory] = useState([[...tree]]) // Initialize with default tree
   const [historyIndex, setHistoryIndex] = useState(0)
 
   // Function to save a new state to history
@@ -1211,6 +196,9 @@ export default function RendererPage() {
     setSelectedIds([])
   }, [selectedIds, saveHistory])
 
+  // Preview mode
+  const [isPlaying, setIsPlaying] = useState(false)
+
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1250,6 +238,7 @@ export default function RendererPage() {
         // Unmodified tool hotkeys
         if (e.key.toLowerCase() === 'v') setActiveTool('cursor')
         if (e.key.toLowerCase() === 'h') setActiveTool('pan')
+        if (e.key === 'Escape' && isPlaying) { setIsPlaying(false); setSelectedIds([]) }
       }
       
       // Delete selected node when pressing Delete or Backspace
@@ -1261,7 +250,7 @@ export default function RendererPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [undo, redo, selectedIds, saveHistory, isTweaking, deleteSelected])
+  }, [undo, redo, selectedIds, saveHistory, isTweaking, deleteSelected, isPlaying])
 
   // Chat state
   const [chatOpen, setChatOpen] = useState(false)
@@ -1274,6 +263,22 @@ export default function RendererPage() {
   // Grid State
   const [showGrid, setShowGrid] = useState(false)
   const [activeTool, setActiveTool] = useState('cursor') // 'cursor' | 'pan'
+
+  // PowerFx State
+  const [localVars, setLocalVars] = useState({})
+  const [notification, setNotification] = useState(null) // { message: string, id: number }
+
+  const handleNotify = useCallback((msg) => {
+    const id = Date.now()
+    setNotification({ message: msg, id })
+    setTimeout(() => {
+      setNotification(prev => (prev?.id === id ? null : prev))
+    }, 4000)
+  }, [])
+
+  // Local Data pane
+  const [showLocalData, setShowLocalData] = useState(false)
+  const [localDataTab, setLocalDataTab] = useState('variables') // 'variables' | 'collections'
   
   const chatEndRef = useRef(null)
   const chatInputRef = useRef(null)
@@ -1304,6 +309,18 @@ export default function RendererPage() {
   const flatNodes = flattenTree(tree, collapsedIds)
   const totalCount = flattenTree(tree, new Set()).length // Total count shouldn't hide skipped nodes
 
+  const activeScreenNode = useCallback(() => {
+    const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
+    if (!screens.length) return null
+    if (selectedIds.length > 0) {
+      const sId = selectedIds[0]
+      for (const s of screens) {
+        if (s.id === sId || isDescendant(tree, sId, s.id)) return s
+      }
+    }
+    return screens[0]
+  }, [tree, selectedIds])()
+
   const toggleCollapse = useCallback((id) => {
     setCollapsedIds(prev => {
       const next = new Set(prev)
@@ -1319,19 +336,56 @@ export default function RendererPage() {
 
   // ── Add component to root or into selected container ──────────────────────
   const addComponent = useCallback((sch) => {
-    const parentId = selectedNode?.type === 'Container' ? selectedNode.id : null
+    let parentId = null
+    if (selectedNode?.type === 'Container') {
+      parentId = selectedNode.id
+    } else if (selectedNode?.type === 'Screen') {
+      parentId = selectedNode.id
+    } else {
+      // Component is selected — use the active screen (which follows the selection)
+      parentId = activeScreenNode?.id || null
+    }
+    
     const offset = totalCount * 16
     const comp = createComponent(sch, {
-      x: parentId ? 20 : 60 + offset,
-      y: parentId ? 20 + offset : 60 + offset,
+      x: 20,
+      y: 20 + offset,
     })
+    
     setTree(prev => {
       const next = insertNode(prev, comp, parentId)
       saveHistory(next)
       return next
     })
     setSelectedIds([comp.id])
-  }, [selectedNode, totalCount, saveHistory])
+  }, [selectedNode, activeScreenNode, totalCount, saveHistory])
+
+  // ── Add a new Screen ────────────────────────────────────────────────────────
+  const addScreen = useCallback(() => {
+    const comp = {
+      id: uid(),
+      type: 'Screen',
+      name: nextName('Screen'),
+      fill: 'RGBA(255, 255, 255, 1)',
+      children: []
+    }
+    
+    setTree(prev => {
+      // Insert into the root 'App'
+      const appRootId = prev[0]?.id
+      if (!appRootId) return prev
+      const next = insertNode(prev, comp, appRootId)
+      saveHistory(next)
+      return next
+    })
+    setSelectedIds([comp.id])
+    // Un-collapse App node to show the new screen
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      next.delete(tree[0]?.id)
+      return next
+    })
+  }, [saveHistory, tree])
 
   // ── Update a property on selected node ─────────────────────────────────────
   const updateProp = useCallback((id, key, val) => {
@@ -1346,6 +400,7 @@ export default function RendererPage() {
 
   // ── Drag state ──────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e, id) => {
+    if (isPlaying) return // In preview mode — no drag/select
     if (activeTool === 'pan' || e.button === 2) return // Don't interact with components while panning
 
     e.stopPropagation()
@@ -1376,7 +431,7 @@ export default function RendererPage() {
         return { id: sid, startX: n?.x || 0, startY: n?.y || 0 }
       }).filter(n => n.startX !== undefined) // filter out nodes that might not immediately be found
     }
-  }, [tree, selectedIds])
+  }, [tree, selectedIds, isPlaying])
 
   // Keep canvas size ref in sync
   useEffect(() => { canvasSizeRef.current = { w: canvasW, h: canvasH } }, [canvasW, canvasH])
@@ -1513,7 +568,9 @@ export default function RendererPage() {
           }
         }
         
-        findIntersectingNodes(tree)
+        if (activeScreenNode?.children) {
+          findIntersectingNodes(activeScreenNode.children)
+        }
         
         // Update selection (don't clear if Shift is held)
         if (e.shiftKey) {
@@ -1779,7 +836,7 @@ export default function RendererPage() {
 
     const payload = {
       message: msg || "See attached image.",
-      canvas_components: tree,
+      canvas_components: activeScreenNode?.children || [],
       canvas_width: canvasW,
       canvas_height: canvasH,
     }
@@ -1828,7 +885,7 @@ export default function RendererPage() {
           if (data.components_to_add?.length) {
             data.components_to_add.forEach(spec => {
               const comp = createFromSpec(spec)
-              if (comp) nextTree = insertNode(nextTree, comp, spec.parentId)
+              if (comp) nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
             })
           }
 
@@ -1860,7 +917,7 @@ export default function RendererPage() {
     } finally {
       setChatLoading(false)
     }
-  }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH, saveHistory])
+  }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH, saveHistory, activeScreenNode])
 
   // ── Shared child event handlers ─────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
@@ -1896,6 +953,36 @@ export default function RendererPage() {
         </div>
         {/* Toolbar Left */}
         <div className="flex items-center">
+          {/* Play / Pause Button */}
+          <button
+            onClick={() => {
+              setIsPlaying(p => !p)
+              setSelectedIds([])
+            }}
+            title={isPlaying ? 'Stop Preview (Esc)' : 'Preview App'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all mr-3 ${
+              isPlaying
+                ? 'bg-green-500/20 text-green-300 border border-green-500/40 shadow-inner'
+                : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            }`}
+          >
+            {isPlaying ? (
+              <>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z" clipRule="evenodd" />
+                </svg>
+                Stop
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
+                </svg>
+                Play
+              </>
+            )}
+          </button>
+
           {/* Tool Selector */}
           <div className="flex items-center bg-surface/50 border border-overlay/40 rounded-lg p-0.5 mr-3">
             <button
@@ -1938,6 +1025,29 @@ export default function RendererPage() {
           >
             <span className="text-[13px]">{chatOpen ? '✨' : '🤖'}</span>
             AI Assistant
+          </button>
+          
+          <button
+            onClick={() => setShowCodePane(!showCodePane)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showCodePane ? 'bg-accent/20 text-accent border border-accent/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <span className="text-[13px]">💻</span>
+            YAML Code
+          </button>
+
+          <button
+            onClick={() => {
+              setShowLocalData(v => !v)
+              setSelectedIds([])
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showLocalData ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5Z" />
+            </svg>
+            Local Data
           </button>
 
           {/* Undo / Redo Buttons */}
@@ -1989,8 +1099,24 @@ export default function RendererPage() {
           )}
           <button
             onClick={() => {
-              setTree([])
-              setHistory([[]])
+              const defaultTree = [
+                {
+                  id: 'app_root',
+                  type: 'App',
+                  name: 'App',
+                  children: [
+                    {
+                      id: 'screen_1',
+                      type: 'Screen',
+                      name: 'Screen1',
+                      fill: 'RGBA(255, 255, 255, 1)',
+                      children: []
+                    }
+                  ]
+                }
+              ]
+              setTree(defaultTree)
+              setHistory([defaultTree])
               setHistoryIndex(0)
               setSelectedIds([])
             }}
@@ -2006,28 +1132,45 @@ export default function RendererPage() {
 
         {/* Left Toolbar */}
         <div className="w-52 shrink-0 border-r border-overlay/30 bg-surface/20 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-overlay/20">
-            <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest mb-2">
+          <div className="max-h-[50%] flex flex-col overflow-hidden border-b border-overlay/20">
+            <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest px-3 pt-3 pb-2 shrink-0">
               {selectedNode?.type === 'Container' ? 'Add To Container' : 'Add Component'}
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="overflow-y-auto flex-1 px-3 pb-3">
+              <div className="flex flex-col gap-1.5">
               {[
-                { schema: buttonSchema, color: 'bg-[#0078d4]', label: 'Button' },
-                { schema: labelSchema, color: 'bg-overlay', label: 'Label' },
-                { schema: textInputSchema, color: 'bg-emerald-500', label: 'TextInput' },
-                { schema: dropdownSchema, color: 'bg-amber-500', label: 'Dropdown' },
-                { schema: containerSchema, color: 'bg-violet-500', label: 'Container' },
-                { schema: gallerySchema, color: 'bg-pink-500', label: 'Gallery' },
-              ].map(({ schema: sch, color, label }) => (
-                <button key={label} onClick={() => addComponent(sch)}
-                  className="flex items-center gap-2 w-full text-left bg-base/60 border border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext text-xs px-3 py-2.5 rounded-lg transition-all duration-150 cursor-pointer">
-                  <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white`}>
-                    {TYPE_ICONS[label]}
-                  </span>
-                  <span className="font-medium">{label}</span>
-                </button>
-              ))}
-            </div>
+                { schema: SCHEMAS.Button, label: 'Button' },
+                { schema: SCHEMAS.Label, label: 'Label' },
+                { schema: SCHEMAS.TextInput, label: 'TextInput' },
+                { schema: SCHEMAS.Dropdown, label: 'Dropdown' },
+                { schema: SCHEMAS.Checkbox, label: 'Checkbox' },
+                { schema: SCHEMAS.Rectangle, label: 'Rectangle' },
+                { schema: SCHEMAS.Icon, label: 'Icon' },
+                { schema: SCHEMAS.HtmlText, label: 'HtmlText' },
+                { schema: SCHEMAS.DatePicker, label: 'DatePicker' },
+                { schema: SCHEMAS.ComboBox, label: 'ComboBox' },
+                { schema: SCHEMAS.Container, label: 'Container' },
+                { schema: SCHEMAS.Gallery, label: 'Gallery' },
+              ].map(({ schema: sch, label }) => {
+                const Icon = TYPE_ICONS[label]
+                const color = TYPE_COLORS[label]
+                return (
+                  <button key={label} onClick={() => !isPlaying && addComponent(sch)}
+                    disabled={isPlaying}
+                    className={`flex items-center gap-2 w-full text-left border text-xs px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                      isPlaying
+                        ? 'bg-base/30 border-overlay/15 text-subtext/30 cursor-not-allowed'
+                        : 'bg-base/60 border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext cursor-pointer'
+                    }`}>
+                    <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
+                      {Icon && <Icon className="w-3.5 h-3.5" />}
+                    </span>
+                    <span className="font-medium">{label}</span>
+                  </button>
+                )
+              })}
+              </div>{/* end button list */}
+            </div>{/* end scrollable */}
             {selectedNode?.type === 'Container' && (
               <p className="text-[10px] text-accent/70 mt-2 text-center">
                 Adding inside selected container
@@ -2069,6 +1212,15 @@ export default function RendererPage() {
             />
           ))}
           {tree.length === 0 && <div className="text-xs text-subtext/40 italic px-2 py-4">Canvas is empty</div>}
+          <div className="pt-2 px-1">
+            <button 
+              onClick={addScreen}
+              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-overlay/40 text-subtext/80 hover:text-text hover:border-accent/40 hover:bg-accent/5 transition-colors text-xs font-medium"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Add Screen
+            </button>
+          </div>
         </div>
       </div>    {/* Center: Canvas + Chat */}
         <div className="flex-1 bg-[#1e1e2e] relative overflow-hidden">
@@ -2081,6 +1233,7 @@ export default function RendererPage() {
               e.preventDefault()
             }}
             onMouseDown={(e) => {
+              if (isPlaying) return // In preview mode, don't intercept canvas clicks
               const wrapper = e.currentTarget
               
               // Handle Panning (Right Click OR Pan Tool active)
@@ -2119,13 +1272,26 @@ export default function RendererPage() {
           >
             <div id="canvas-padding-wrapper" className="inline-block transition-transform duration-200" style={{ padding: '50vh 50vw', transform: `scale(${zoom})`, transformOrigin: 'center' }}>
               <div
-                className="relative bg-white shrink-0"
-                style={{ width: canvasW, height: canvasH, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
-                data-container-id="root"
+                className="relative shrink-0"
+                style={{ width: canvasW, height: canvasH, backgroundColor: activeScreenNode?.fill || 'white', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
+                data-container-id={activeScreenNode?.id || 'root'}
                 id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
                 onDrop={e => { e.preventDefault(); setDragOverId(null) }}
               >
+                {/* Global Toast Notification inside Canvas */}
+                {notification && (
+                  <div className="absolute top-4 left-4 right-4 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
+                    <div className="bg-surface border border-overlay/40 shadow-xl shadow-black/20 rounded-xl px-4 py-2 flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                      </div>
+                      <p className="text-xs font-medium text-text">{notification.message}</p>
+                    </div>
+                  </div>
+                )}
                 {showGrid && (
                   <svg className="absolute inset-0 pointer-events-none w-full h-full text-blue-400 opacity-20 z-0">
                     {[1, 2, 3, 4, 5, 6, 7].map(i => (
@@ -2136,7 +1302,7 @@ export default function RendererPage() {
                     ))}
                   </svg>
                 )}
-                {tree.length === 0 && (
+                {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
                       <svg className="w-7 h-7 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -2147,12 +1313,20 @@ export default function RendererPage() {
                     <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
-                {tree.map(comp => {
+                {(activeScreenNode?.children || []).map(comp => {
                   const isSelected = selectedIds.includes(comp.id)
                   const sharedProps = {
-                    comp, selected: isSelected,
-                    onMouseDown: (e) => handleMouseDown(e, comp.id),
-                    onClick: (e) => { e.stopPropagation(); setSelectedIds([comp.id]) },
+                    comp, selected: isSelected, isPlaying,
+                    localVars, setLocalVars, notify: handleNotify,
+                    onMouseDown: (e) => {
+                      if (comp.type === 'App') return // Prevent interacting with App node
+                      handleMouseDown(e, comp.id)
+                    },
+                    onClick: (e) => { 
+                      e.stopPropagation(); 
+                      if (isPlaying || comp.type === 'App') return; // Cannot select App or when playing
+                      setSelectedIds([comp.id]) 
+                    },
                   }
                   if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
                   if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
@@ -2178,6 +1352,27 @@ export default function RendererPage() {
                       setDragOverId={setDragOverId}
                     />
                   )
+                  if (comp.type === 'Checkbox') return (
+                    <CheckboxRenderer key={comp.id} {...sharedProps} />
+                  )
+                  if (comp.type === 'Rectangle') return (
+                    <RectangleRenderer key={comp.id} {...sharedProps} />
+                  )
+                  if (comp.type === 'Icon') {
+                    // Inject the raw SVG string from the schema mapping so it displays accurately in Canvas
+                    const schemaOptionVal = SCHEMAS.Icon.properties.find(p => p.key === 'icon').options.find(o => o.value === comp.icon)
+                    const svgString = schemaOptionVal ? schemaOptionVal.svg : null
+                    return <IconRenderer key={comp.id} {...sharedProps} comp={{...comp, _svg: svgString}} />
+                  }
+                  if (comp.type === 'HtmlText') return (
+                    <HtmlTextRenderer key={comp.id} {...sharedProps} />
+                  )
+                  if (comp.type === 'DatePicker') return (
+                    <DatePickerRenderer key={comp.id} {...sharedProps} />
+                  )
+                  if (comp.type === 'ComboBox') return (
+                    <ComboBoxRenderer key={comp.id} {...sharedProps} />
+                  )
                   return null
                 })}
 
@@ -2202,8 +1397,9 @@ export default function RendererPage() {
                 })()}
 
                 {/* Resize handles for selected root-level component */}
-                {selectedNode && selectedIds.length === 1 && (() => {
-                  const comp = tree.find(c => c.id === selectedNode.id)
+                {/* Resize handles — hidden in preview mode */}
+                {selectedNode && selectedIds.length === 1 && !isPlaying && (() => {
+                  const comp = (activeScreenNode?.children || []).find(c => c.id === selectedNode.id)
                   if (!comp) return null
                   const { x, y, width: w, height: h } = comp
                   const handles = [
@@ -2251,22 +1447,6 @@ export default function RendererPage() {
               </button>
             </div>
 
-            {/* Confirm / Undo Tweak Banner */}
-            {tweakOriginalNode && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-surface/90 backdrop-blur-md border border-accent/40 shadow-lg shadow-black/20 rounded-full px-4 py-2 flex items-center gap-4 z-50 animate-in slide-in-from-bottom-4">
-                <span className="text-xs font-medium text-text">Review AI changes</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={undoTweak}
-                    className="text-xs px-3 py-1.5 rounded-full border border-overlay/40 hover:bg-red/10 hover:text-red hover:border-red/40 text-subtext transition-colors">
-                    Undo
-                  </button>
-                  <button onClick={confirmTweak}
-                    className="text-xs px-3 py-1.5 rounded-full bg-accent hover:bg-accent/80 text-white font-medium transition-colors">
-                    Looks Good
-                  </button>
-                </div>
-              </div>
-            )}
 
           {/* AI Chat Panel */}
           <div className={`absolute bottom-0 left-0 w-full z-50 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)] ${chatOpen ? 'h-60' : 'h-0'}`}>
@@ -2357,65 +1537,205 @@ export default function RendererPage() {
         </div>
 
         {/* Code Pane */}
-        <CodePane 
-          node={selectedNode}
-          tree={tree}
-          canvasW={canvasW}
-          canvasH={canvasH}
-          isTweaking={isTweaking}
-          setIsTweaking={setIsTweaking}
-          tweakInput={tweakInput}
-          setTweakInput={setTweakInput}
-          handleTweakSubmit={handleTweakSubmit}
-          tweakLoading={tweakLoading}
-          tweakOriginalNode={tweakOriginalNode}
-        />
+        {showCodePane && (
+          <CodePane 
+            node={selectedNode}
+            tree={tree}
+            canvasW={canvasW}
+            canvasH={canvasH}
+            isTweaking={isTweaking}
+            setIsTweaking={setIsTweaking}
+            tweakInput={tweakInput}
+            setTweakInput={setTweakInput}
+            handleTweakSubmit={handleTweakSubmit}
+            tweakLoading={tweakLoading}
+            tweakOriginalNode={tweakOriginalNode}
+          />
+        )}
 
-        {/* Right Properties Panel */}
-        <div className="w-64 shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden">
-          {selectedNode && schema ? (
-            <>
-              <div className="px-4 py-3 border-b border-overlay/20 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] bg-accent/15 text-accent border border-accent/25 px-2 py-0.5 rounded-full font-medium">
-                    {schema.control}
-                  </span>
-                </div>
-                
-                <input
-                  type="text"
-                  value={selectedNode.name || ''}
-                  onChange={e => updateProp(selectedNode.id, 'name', e.target.value)}
-                  placeholder="Component name"
-                  className="w-full bg-base border border-overlay/40 rounded-lg px-2.5 py-1.5 text-xs text-text font-semibold focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/20 transition-all"
-                />
+        {/* Right Panel: Local Data OR Properties */}
+        {showLocalData ? (
+          <div className="w-64 shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-overlay/20 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-semibold text-text">Local Data</span>
               </div>
-              <div className="flex-1 overflow-y-auto px-4 py-2">
-                {selectedNode.type === 'Container' && (
-                  <p className="text-[10px] text-subtext/50 mb-2 bg-overlay/20 rounded-lg px-2 py-1.5">
-                    {selectedNode.children?.length ?? 0} child component{(selectedNode.children?.length ?? 0) !== 1 ? 's' : ''}
-                    {' · '}Select this container then click &quot;Add Component&quot; to add children.
-                  </p>
-                )}
-                <div className="divide-y divide-overlay/20">
-                  {schema.properties.map(prop => (
-                    <PropField key={prop.key} prop={prop} value={selectedNode[prop.key]}
-                      onChange={val => updateProp(selectedNode.id, prop.key, val)} />
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center flex-1 text-center px-6">
-              <div className="w-12 h-12 rounded-xl bg-overlay/30 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6 text-subtext/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+              <button
+                onClick={() => setShowLocalData(false)}
+                className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
                 </svg>
-              </div>
-              <p className="text-subtext/50 text-xs">Select a component to edit its properties</p>
+              </button>
             </div>
-          )}
-        </div>
+            {/* Tabs */}
+            <div className="flex border-b border-overlay/20 shrink-0">
+              {['variables', 'collections'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setLocalDataTab(tab)}
+                  className={`flex-1 py-2 text-xs font-medium capitalize transition-colors ${
+                    localDataTab === tab
+                      ? 'text-emerald-300 border-b-2 border-emerald-400 bg-emerald-500/5'
+                      : 'text-subtext/60 hover:text-text hover:bg-overlay/10'
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+            {/* Tab Content */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {localDataTab === 'variables' ? (
+                Object.keys(localVars).length > 0 ? (
+                  <div className="flex-1 overflow-y-auto w-full">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-surface/50 border-b border-overlay/20 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-2 text-[11px] font-semibold text-subtext/70 uppercase tracking-wide">Variable</th>
+                          <th className="px-4 py-2 text-[11px] font-semibold text-subtext/70 uppercase tracking-wide">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-overlay/10">
+                        {Object.entries(localVars).map(([key, val]) => (
+                          <tr key={key} className="hover:bg-overlay/5 transition-colors">
+                            <td className="px-4 py-2.5 text-xs text-text border-r border-overlay/5 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]" title={key}>{key}</td>
+                            <td className="px-4 py-2.5 text-xs font-mono text-emerald-400 bg-emerald-500/5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]" title={String(val)}>{String(val)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+                    <div className="w-12 h-12 rounded-xl bg-overlay/20 flex items-center justify-center mb-3">
+                      <svg className="w-6 h-6 text-subtext/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23-.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.15 3.338-1.55 3.338H5.35c-1.7 0-2.783-2.106-1.55-3.338L5 14.5" />
+                      </svg>
+                    </div>
+                    <p className="text-subtext/40 text-[11px] leading-relaxed">
+                      No variables yet.<br/>Use <code className="bg-overlay/20 px-1 py-0.5 rounded text-subtext/70 font-mono">Set(VarName, "Value")</code> in a component's OnSelect property.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+                  <div className="w-12 h-12 rounded-xl bg-overlay/20 flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6 text-subtext/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+                    </svg>
+                  </div>
+                  <p className="text-subtext/40 text-xs">
+                    No collections yet.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="w-64 shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden">
+            {selectedNode && schema ? (
+              <>
+                <div className="px-4 py-3 border-b border-overlay/20 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] bg-accent/15 text-accent border border-accent/25 px-2 py-0.5 rounded-full font-medium">
+                      {schema.control}
+                    </span>
+                    <button 
+                      onClick={() => setIsTweaking(!isTweaking)}
+                      className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors border ${
+                        isTweaking || tweakOriginalNode ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-surface/50 text-subtext/70 border-overlay/40 hover:text-accent hover:border-accent/40'
+                      }`}
+                    >
+                      ✨ Tweak
+                    </button>
+                  </div>
+                  
+                  {isTweaking && !tweakOriginalNode && (
+                    <div className="flex flex-col gap-2 p-2.5 bg-violet-500/10 border border-violet-500/20 rounded-lg animate-in fade-in zoom-in-95 duration-200">
+                      <p className="text-[10px] text-violet-300/80 font-medium">What should AI change about this component?</p>
+                      <div className="flex gap-1.5">
+                        <input 
+                          type="text" 
+                          value={tweakInput}
+                          onChange={e => setTweakInput(e.target.value)}
+                          onKeyDown={e => {
+                            e.stopPropagation() // prevent delete/copy hotkeys while typing
+                            if (e.key === 'Enter') handleTweakSubmit()
+                          }}
+                          autoFocus
+                          placeholder="e.g. make text red and bold"
+                          className="flex-1 min-w-0 bg-base border border-violet-500/30 rounded px-2 py-1 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500"
+                        />
+                        <button 
+                          onClick={handleTweakSubmit}
+                          disabled={tweakLoading || !tweakInput.trim()}
+                          className="w-6 h-6 rounded bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-50"
+                        >
+                          {tweakLoading ? (
+                            <div className="w-2.5 h-2.5 rounded-full border border-white border-t-transparent animate-spin" />
+                          ) : (
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {tweakOriginalNode && (
+                    <div className="flex items-center justify-between p-2.5 bg-violet-500/10 border border-violet-500/30 rounded-lg animate-in fade-in zoom-in-95 duration-200">
+                      <span className="text-[11px] font-medium text-violet-200">Review tweaks</span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={undoTweak}
+                          className="text-[10px] px-2 py-1 rounded-md border border-overlay/40 hover:bg-red/10 hover:text-red hover:border-red/40 text-subtext transition-colors">
+                          Undo
+                        </button>
+                        <button onClick={confirmTweak}
+                          className="text-[10px] px-2 py-1 rounded-md bg-violet-500 hover:bg-violet-600 text-white font-medium transition-colors">
+                          Keep
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    value={selectedNode.name || ''}
+                    onChange={e => updateProp(selectedNode.id, 'name', e.target.value)}
+                    placeholder="Component name"
+                    className="w-full bg-base border border-overlay/40 rounded-lg px-2.5 py-1.5 text-xs text-text font-semibold focus:outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/20 transition-all"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-2">
+                  {selectedNode.type === 'Container' && (
+                    <p className="text-[10px] text-subtext/50 mb-2 bg-overlay/20 rounded-lg px-2 py-1.5">
+                      {selectedNode.children?.length ?? 0} child component{(selectedNode.children?.length ?? 0) !== 1 ? 's' : ''}
+                      {' · '}Select this container then click &quot;Add Component&quot; to add children.
+                    </p>
+                  )}
+                  <div className="divide-y divide-overlay/20">
+                    {schema.properties.map(prop => (
+                      <PropField key={prop.key} prop={prop} value={selectedNode[prop.key]}
+                        onChange={val => updateProp(selectedNode.id, prop.key, val)} />
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center flex-1 text-center px-6">
+                <div className="w-12 h-12 rounded-xl bg-overlay/30 flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-subtext/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                  </svg>
+                </div>
+                <p className="text-subtext/50 text-xs">Select a component to edit its properties</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -2430,5 +1750,8 @@ export {
   DropdownRenderer,
   ContainerRenderer,
   GalleryRenderer,
+  CheckboxRenderer,
+  RectangleRenderer,
+  IconRenderer,
   createFromSpec
 }

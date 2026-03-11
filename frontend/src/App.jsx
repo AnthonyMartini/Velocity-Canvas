@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import GeneratorPage from './GeneratorPage'
-import RendererPage from './RendererPage'
-import ComponentLibraryPage from './ComponentLibraryPage'
-import LandingPage from './LandingPage'
+import GeneratorPage from './GeneratorPage/index.jsx'
+import RendererPage from './RendererPage/index.jsx'
+import ComponentLibraryPage from './ComponentLibraryPage/index.jsx'
+import LandingPage from './LandingPage/index.jsx'
+import logo from './assets/logo.png'
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
 const GeneratorIcon = () => (
@@ -48,12 +49,7 @@ export default function App() {
         <div className="max-w-none px-6 py-3 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center shadow-lg shadow-accent/30">
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="white" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1M4.22 4.22l.707.707M18.364 18.364l.707.707M3 12h1m16 0h1M4.927 19.073l.707-.707M18.364 5.636l.707-.707" />
-                <circle cx="12" cy="12" r="4" strokeLinecap="round" />
-              </svg>
-            </div>
+            <img src={logo} alt="Velocity Canvas Logo" className="w-9 h-9 rounded-xl object-cover shadow-lg shadow-accent/30" />
             <div>
               <h1 className="text-white font-bold text-lg leading-tight tracking-tight">Velocity Canvas</h1>
               <p className="text-subtext text-xs leading-tight">Power Apps UI Generator</p>

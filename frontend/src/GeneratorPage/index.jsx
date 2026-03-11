@@ -1,39 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
-import { screenToYaml, ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, createFromSpec } from './RendererPage'
-
-// ── Icons ──────────────────────────────────────────────────────────────────────
-const SparkleIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path d="M12 1.5a.75.75 0 0 1 .75.75V4.5a.75.75 0 0 1-1.5 0V2.25A.75.75 0 0 1 12 1.5ZM12 19.5a.75.75 0 0 1 .75.75v2.25a.75.75 0 0 1-1.5 0V20.25a.75.75 0 0 1 .75-.75ZM2.25 12a.75.75 0 0 1 .75-.75H5.25a.75.75 0 0 1 0 1.5H3A.75.75 0 0 1 2.25 12ZM19.5 12a.75.75 0 0 1 .75-.75h2.25a.75.75 0 0 1 0 1.5H20.25a.75.75 0 0 1-.75-.75ZM6.166 5.106a.75.75 0 0 1 1.06 0l1.591 1.591a.75.75 0 0 1-1.06 1.06L6.166 6.167a.75.75 0 0 1 0-1.06ZM15.182 15.183a.75.75 0 0 1 1.06 0l1.591 1.59a.75.75 0 1 1-1.06 1.061l-1.591-1.59a.75.75 0 0 1 0-1.061ZM5.106 17.835a.75.75 0 0 1 0-1.061l1.591-1.59a.75.75 0 1 1 1.06 1.06l-1.59 1.591a.75.75 0 0 1-1.061 0ZM15.183 8.818a.75.75 0 0 1 0-1.06l1.59-1.591a.75.75 0 1 1 1.061 1.06l-1.59 1.591a.75.75 0 0 1-1.061 0Z" />
-  </svg>
-)
-
-const CopyIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
-    <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
-  </svg>
-)
-
-const CheckIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 0 1 1.04-.208Z" clipRule="evenodd" />
-  </svg>
-)
-
-const SendIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
-  </svg>
-)
-
-const EXAMPLE_PROMPTS = [
-  "A dark mode navigation bar with a logo on the left and 4 nav buttons on the right",
-  "A login form card with email input, password input, and a submit button",
-  "A dashboard stat card showing '1,284' users with a blue accent and subtle icon",
-  "A mobile-style bottom tab bar with 5 icons: Home, Search, Create, Alerts, Profile",
-  "A hero banner with a large headline, subtitle text, and a CTA button",
-]
+import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer } from '../components/controls/index.jsx'
+import { screenToYaml } from '../RendererPage/helpers.jsx'
+import { SparkleIcon, CopyIcon, CheckIcon, SendIcon, EXAMPLE_PROMPTS } from './constants.jsx'
+import { fetchComponents } from './helpers.jsx'
+import { copyToClipboard, highlightYamlLine } from '../common/helpers.jsx'
 
 export default function GeneratorPage() {
   const [prompt, setPrompt] = useState('')
@@ -55,26 +25,8 @@ export default function GeneratorPage() {
     setError(null)
     setTree([])
     setCopied(false)
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/renderer-chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: prompt.trim(),
-          canvas_width: 1366,
-          canvas_height: 768,
-          canvas_components: []
-        }),
-      })
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || `Server error: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const newTree = (data.components_to_add || []).map(createFromSpec).filter(Boolean)
+      const newTree = await fetchComponents(prompt)
       setTree(newTree)
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.')
@@ -91,20 +43,9 @@ export default function GeneratorPage() {
 
   const handleCopy = useCallback(async () => {
     if (!yamlOutput) return
-    try {
-      await navigator.clipboard.writeText(yamlOutput)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
-    } catch {
-      const el = document.createElement('textarea')
-      el.value = yamlOutput
-      document.body.appendChild(el)
-      el.select()
-      document.execCommand('copy')
-      document.body.removeChild(el)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
-    }
+    await copyToClipboard(yamlOutput)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }, [tree])
 
   const handleExampleClick = useCallback((ex) => {
@@ -316,24 +257,7 @@ export default function GeneratorPage() {
                 </div>
                 <pre className="flex-1 p-4 code-output text-text/90 overflow-x-auto whitespace-pre text-[11px] leading-[1.7]">
                   <code>
-                    {yamlOutput.split('\n').map((line, i) => {
-                      let className = 'text-text/80'
-                      const trimmed = line.trimStart()
-                      if (trimmed.startsWith('-') && trimmed.endsWith(':')) className = 'text-violet-300 font-semibold'
-                      else if (/^Control:/.test(trimmed)) className = 'text-blue-300'
-                      else if (/^Properties:|^Children:/.test(trimmed)) className = 'text-accent/70 font-semibold'
-                      else if (/^[A-Z][A-Za-z]+:/.test(trimmed)) {
-                        const [, val] = line.split(/:\s*=?/)
-                        return (
-                          <div key={i}>
-                            <span className="text-blue-200/80">{line.split(':')[0]}</span>
-                            <span className="text-subtext/50">: </span>
-                            <span className="text-green-300/80">={val?.trim()}</span>
-                          </div>
-                        )
-                      }
-                      return <div key={i} className={className}>{line}</div>
-                    })}
+                    {yamlOutput.split('\n').map((line, i) => highlightYamlLine(line, i))}
                   </code>
                 </pre>
               </div>

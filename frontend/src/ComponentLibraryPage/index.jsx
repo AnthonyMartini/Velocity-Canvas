@@ -1,39 +1,22 @@
 import { useState } from 'react'
+import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
+import { PROP_TYPE_COLORS } from './constants.jsx'
 import buttonSchema from '@schemas/button.json'
 import labelSchema from '@schemas/label.json'
 import containerSchema from '@schemas/container.json'
 import textInputSchema from '@schemas/textInput.json'
 import dropdownSchema from '@schemas/dropdown.json'
 import gallerySchema from '@schemas/gallery.json'
+import checkboxSchema from '@schemas/checkbox.json'
+import rectangleSchema from '@schemas/rectangle.json'
+import iconSchema from '@schemas/icon.json'
+import htmlTextSchema from '@schemas/htmltext.json'
+import datePickerSchema from '@schemas/datepicker.json'
+import comboBoxSchema from '@schemas/combobox.json'
 
-const SCHEMAS = [buttonSchema, labelSchema, textInputSchema, dropdownSchema, containerSchema, gallerySchema]
+const SCHEMAS = [buttonSchema, labelSchema, textInputSchema, dropdownSchema, checkboxSchema, rectangleSchema, iconSchema, htmlTextSchema, datePickerSchema, comboBoxSchema, containerSchema, gallerySchema]
 
-// ── Icons ──────────────────────────────────────────────────────────────────────
-const TYPE_ICONS = {
-  Button: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V12.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" /></svg>,
-  Label: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527Z" clipRule="evenodd" /></svg>,
-  Container: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M2 3a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm0 9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8Zm11-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-6Z" /></svg>,
-  TextInput: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" /></svg>,
-  Dropdown: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" /></svg>,
-  Gallery: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
-}
 
-const TYPE_COLORS = { 
-  Button: 'bg-[#0078d4]', 
-  Label: 'bg-overlay', 
-  Container: 'bg-violet-500', 
-  TextInput: 'bg-emerald-500',
-  Dropdown: 'bg-amber-500',
-  Gallery: 'bg-pink-500'
-}
-
-const PROP_TYPE_COLORS = {
-  text: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  number: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
-  color: 'text-pink-400 bg-pink-400/10 border-pink-400/20',
-  boolean: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
-  select: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-}
 
 export default function ComponentLibraryPage() {
   const [expanded, setExpanded] = useState({})
@@ -64,7 +47,7 @@ export default function ComponentLibraryPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md ${TYPE_COLORS[schema.type] || 'bg-overlay'}`}>
-                    {TYPE_ICONS[schema.type]}
+                    {(() => { const Icon = TYPE_ICONS[schema.type]; return Icon ? <Icon className="w-6 h-6" /> : null })()}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-text">{schema.type}</h3>
