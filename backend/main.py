@@ -7,7 +7,38 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import datetime
+from typing import Dict, Any, Optional
 from prompts import SYSTEM_PROMPT, TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT
+
+# ── Logging Utility ──────────────────────────────────────────────────────────
+def log_llm_interaction(endpoint: str, input_prompt: str, response_text: str, usage: Any):
+    try:
+        # Use absolute path for robustness
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        log_dir = os.path.join(base_dir, "logs")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir, exist_ok=True)
+            print(f"Created log directory at: {log_dir}")
+            
+        log_file = os.path.join(log_dir, "llm_trace.jsonl")
+        
+        log_entry = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "endpoint": endpoint,
+            "input": input_prompt,
+            "output": response_text,
+            "usage": {
+                "prompt_tokens": usage.prompt_token_count if usage else 0,
+                "candidates_tokens": usage.candidates_token_count if usage else 0
+            }
+        }
+        
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+        print(f"Logged interaction to {log_file}")
+    except Exception as e:
+        print(f"Failed to log interaction: {e}")
 
 load_dotenv()
 
@@ -33,14 +64,18 @@ if not api_key:
 class GenerateRequest(BaseModel):
     prompt: str
 
+class UsageMetadata(BaseModel):
+    prompt_token_count: int
+    candidates_token_count: int
+
 class GenerateResponse(BaseModel):
     yaml_code: str
+    usage: UsageMetadata
 
 class CanvasComponent(BaseModel):
     id: str | None = None
     type: str
 
-from typing import Dict, Any, Optional
 
 class RendererChatRequest(BaseModel):
     message: str
@@ -49,12 +84,14 @@ class RendererChatRequest(BaseModel):
     canvas_height: int = 750
     image_data: Optional[str] = None
     image_mime_type: Optional[str] = None
+    chat_history: list[dict] = []
 
 class RendererChatResponse(BaseModel):
     reply: str
     components_to_add: list[Dict[str, Any]] = []
     components_to_update: list[Dict[str, Any]] = []
     components_to_remove: list[str] = []
+    usage: UsageMetadata
 
 class TweakComponentRequest(BaseModel):
     prompt: str
@@ -100,10 +137,23 @@ def generate_yaml(request: GenerateRequest):
         cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text.strip())
         cleaned = re.sub(r"\n?```$", "", cleaned.strip())
 
-        return GenerateResponse(yaml_code=cleaned.strip())
+        # Log token usage
+        usage = response.usage_metadata
+        print(f"Generate YAML Tokens: Input={usage.prompt_token_count}, Output={usage.candidates_token_count}")
+
+        return GenerateResponse(
+            yaml_code=cleaned.strip(),
+            usage=UsageMetadata(
+                prompt_token_count=usage.prompt_token_count,
+                candidates_token_count=usage.candidates_token_count
+            )
+        )
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(exc)}")
+    finally:
+        if 'response' in locals() and 'raw_text' in locals():
+            log_llm_interaction("/generate", request.prompt, raw_text, response.usage_metadata)
 
 
 @app.post("/tweak-component")
@@ -126,11 +176,18 @@ def tweak_component(request: TweakComponentRequest):
         cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text.strip())
         cleaned = re.sub(r"\n?```$", "", cleaned.strip())
 
+        # Log token usage
+        usage = response.usage_metadata
+        print(f"Tweak Component Tokens: Input={usage.prompt_token_count}, Output={usage.candidates_token_count}")
+
         # Return the modified component object dict directly
         return json_module.loads(cleaned)
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(exc)}")
+    finally:
+        if 'response' in locals() and 'raw_text' in locals():
+            log_llm_interaction("/tweak-component", full_prompt, raw_text, response.usage_metadata)
 
 
 @app.post("/renderer-chat", response_model=RendererChatResponse)
@@ -164,12 +221,31 @@ def renderer_chat(request: RendererChatRequest):
 
     full_prompt = f"{canvas_ctx}\n\nUser prompt: {request.message.strip()}"
 
-    contents = [full_prompt]
+    contents: list[Dict[str, Any]] = []
+    
+    for msg in request.chat_history:
+        role = "user" if msg.get("role") == "user" else "model"
+        parts = []
+        if msg.get("content"):
+            parts.append(msg.get("content"))
+        img = msg.get("image")
+        if img and isinstance(img, str):
+            mime_match = re.search(r"data:(.*?);base64,(.*)", img)
+            if mime_match:
+                parts.append({
+                    "mime_type": mime_match.group(1),
+                    "data": base64.b64decode(mime_match.group(2))
+                })
+        if parts:
+            contents.append({"role": role, "parts": parts})
+
+    current_parts = [full_prompt]
     if request.image_data and request.image_mime_type:
-        contents.append({
+        current_parts.append({
             "mime_type": request.image_mime_type,
             "data": base64.b64decode(request.image_data)
         })
+    contents.append({"role": "user", "parts": current_parts})
 
     try:
         response = renderer_chat_model.generate_content(contents)
@@ -180,15 +256,43 @@ def renderer_chat(request: RendererChatRequest):
         cleaned = re.sub(r"\n?```$", "", cleaned.strip())
 
         parsed = json_module.loads(cleaned)
+        usage = response.usage_metadata
         return RendererChatResponse(
             reply=parsed.get("reply", ""),
             components_to_add=parsed.get("components_to_add", []),
             components_to_update=parsed.get("components_to_update", []),
             components_to_remove=parsed.get("components_to_remove", []),
+            usage=UsageMetadata(
+                prompt_token_count=usage.prompt_token_count,
+                candidates_token_count=usage.candidates_token_count
+            )
         )
 
     except json_module.JSONDecodeError:
+        # Log token usage even on failure if response exists
+        usage = response.usage_metadata
+        if 'response' in locals():
+            print(f"Renderer Chat Tokens (JSON Error): Input={usage.prompt_token_count}, Output={usage.candidates_token_count}")
+        
         # If model didn't return valid JSON, treat as a plain reply
-        return RendererChatResponse(reply=raw_text.strip(), components_to_add=[], components_to_update=[], components_to_remove=[])
+        return RendererChatResponse(
+            reply=raw_text.strip(), 
+            components_to_add=[], 
+            components_to_update=[], 
+            components_to_remove=[],
+            usage=UsageMetadata(
+                prompt_token_count=usage.prompt_token_count,
+                candidates_token_count=usage.candidates_token_count
+            )
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(exc)}")
+    finally:
+        # Log token usage for successful path
+        if 'response' in locals() and 'parsed' in locals():
+             usage = response.usage_metadata
+             print(f"Renderer Chat Tokens: Input={usage.prompt_token_count}, Output={usage.candidates_token_count}")
+             log_llm_interaction("/renderer-chat", full_prompt, raw_text, usage)
+        elif 'response' in locals() and 'raw_text' in locals():
+             # Case where JSON failed but we have a text reply
+             log_llm_interaction("/renderer-chat", full_prompt, raw_text, response.usage_metadata)

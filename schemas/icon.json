@@ -2,21 +2,30 @@
   "type": "Icon",
   "control": "Classic/Icon@2.5.0",
   "defaults": {
-    "icon": "Icon.Printing3D",
-    "x": 40,
-    "y": 40,
-    "width": 64,
-    "height": 64,
-    "color": "#0078d4",
-    "fill": "transparent",
-    "visible": true,
-    "disabled": false
+    "Icon": "Icon.Printing3D",
+    "Rotation": 0,
+    "Color": "#0078d4",
+    "Fill": "transparent",
+    "OnSelect": "",
+    "AccessibleLabel": "\"\"",
+    "DisplayMode": "DisplayMode.Edit",
+    "FocusedBorderColor": "transparent",
+    "FocusedBorderThickness": 0,
+    "Height": 64,
+    "HoverFill": "transparent",
+    "PressedBorderColor": "transparent",
+    "PressedFill": "transparent",
+    "Visible": true,
+    "Width": 64,
+    "X": 40,
+    "Y": 40
   },
   "properties": [
     {
-      "key": "icon",
+      "key": "Icon",
       "label": "Icon",
       "type": "icon-selector",
+      "propertyType": "Input",
       "options": [
         { "label": "Add", "value": "Icon.Add", "original_id": "Basel_Add", "svg": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='5' x2='12' y2='19'></line><line x1='5' y1='12' x2='19' y2='12'></line></svg>" },
         { "label": "Cancel", "value": "Icon.Cancel", "original_id": "Basel_Cancel", "svg": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='18' y1='6' x2='6' y2='18'></line><line x1='6' y1='6' x2='18' y2='18'></line></svg>" },
@@ -79,15 +88,17 @@
         { "label": "Printing 3D", "value": "Icon.Printing3D", "original_id": "Printing3D", "svg": "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'></path><path d='M6 9V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v5'></path><polygon points='10 13 14 13 16 20 8 20 10 13'></polygon></svg>" }
       ]
     },
-    { "key": "OnSelect", "label": "OnSelect", "type": "action" },
-    { "key": "x", "label": "X", "type": "number" },
-    { "key": "y", "label": "Y", "type": "number" },
-    { "key": "width", "label": "Width", "type": "number" },
-    { "key": "height", "label": "Height", "type": "number" },
-    { "key": "color", "label": "Color", "type": "color" },
-    { "key": "fill", "label": "Fill", "type": "color" },
-    { "key": "visible", "label": "Visible", "type": "boolean" },
-    { "key": "disabled", "label": "Disabled", "type": "boolean" }
+    { "key": "Rotation",        "label": "Rotation",      "type": "number",  "propertyType": "Input" },
+    { "key": "Color",           "label": "Color",         "type": "color",   "propertyType": "Input" },
+    { "key": "Fill",            "label": "Fill",          "type": "color",   "propertyType": "Input" },
+    { "key": "X",               "label": "X",             "type": "number",  "propertyType": "Input" },
+    { "key": "Y",               "label": "Y",             "type": "number",  "propertyType": "Input" },
+    { "key": "Width",           "label": "Width",         "type": "number",  "propertyType": "Input" },
+    { "key": "Height",          "label": "Height",        "type": "number",  "propertyType": "Input" },
+    { "key": "DisplayMode",     "label": "Display Mode",  "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
+    { "key": "Visible",         "label": "Visible",       "type": "boolean", "propertyType": "Input" },
+    { "key": "OnSelect",        "label": "OnSelect",      "type": "text",    "propertyType": "Event" },
+    { "key": "AccessibleLabel", "label": "Accessible Label", "type": "text", "propertyType": "Input" }
   ],
   "keyProperties": {
     "Icon": "The type of icon to display (e.g., Edit, Cancel)."

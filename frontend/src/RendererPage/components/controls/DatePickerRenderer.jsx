@@ -1,6 +1,6 @@
 import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../common/helpers.jsx'
+import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
 // Inline calendar icon (no external dependency needed)
 const CalendarIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -17,15 +17,18 @@ export default function DatePickerRenderer({
   isPlaying, 
   localVars, 
   setLocalVars, 
-  notify, 
+  notify,
+  navigate,
+  flatNodes,
+  parentNode,
   onMouseDown, 
   onClick 
 }) {
   const inputRef = useRef(null)
 
   // Evaluate the DefaultDate or SelectedDate to use as value
-  const defaultDateStr = evaluateValue(comp.DefaultDate, localVars)
-  const selectedDateStr = evaluateValue(comp.SelectedDate, localVars)
+  const defaultDateStr = evaluateValue(comp.DefaultDate, localVars, flatNodes, new Set(), parentNode)
+  const selectedDateStr = evaluateValue(comp.SelectedDate, localVars, flatNodes, new Set(), parentNode)
   
   // PowerApps uses SelectedDate if provided, otherwise DefaultDate
   const displayDateStr = selectedDateStr || defaultDateStr || ''
@@ -33,19 +36,19 @@ export default function DatePickerRenderer({
   const isInteractive = isPlaying && !comp.disabled
 
   // Calculate borders based on state
-  let currentBorderColor = comp.borderColor
-  let currentBorderThickness = comp.borderThickness
-  if (comp.disabled && comp.disabledBorderColor) {
-    currentBorderColor = comp.disabledBorderColor
-  } else if (comp.hoverBorderColor && comp.hoverBorderColor !== 'transparent') {
+  let currentBorderColor = comp.BorderColor
+  let currentBorderThickness = comp.BorderThickness
+  if (comp.DisplayMode === 'DisplayMode.Disabled' && comp.DisabledBorderColor) {
+    currentBorderColor = comp.DisabledBorderColor
+  } else if (comp.HoverBorderColor && comp.HoverBorderColor !== 'transparent') {
     // Basic fallback without full hover state tracking implemented per component
   }
   
-  let currentFill = comp.fill
-  let currentColor = comp.color
-  if (comp.disabled) {
-    if (comp.disabledFill) currentFill = comp.disabledFill
-    if (comp.disabledColor) currentColor = comp.disabledColor
+  let currentFill = comp.Fill
+  let currentColor = comp.Color
+  if (comp.DisplayMode === 'DisplayMode.Disabled') {
+    if (comp.DisabledFill) currentFill = comp.DisabledFill
+    if (comp.DisabledColor) currentColor = comp.DisabledColor
   }
 
   const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
@@ -59,16 +62,16 @@ export default function DatePickerRenderer({
   // The outer wrapper styling
   const wrapperStyle = {
     position: 'absolute',
-    left: comp.x,
-    top: comp.y,
-    width: comp.width,
-    height: comp.height,
-    borderStyle: borderMap[comp.borderStyle] || 'none',
+    left: comp.X,
+    top: comp.Y,
+    width: comp.Width,
+    height: comp.Height,
+    borderStyle: borderMap[comp.BorderStyle] || 'none',
     borderWidth: currentBorderThickness ? `${currentBorderThickness}px` : 0,
     borderColor: currentBorderColor,
     backgroundColor: currentFill,
-    opacity: comp.visible !== false ? 1 : 0,
-    pointerEvents: comp.visible !== false ? 'auto' : 'none',
+    opacity: comp.Visible !== false ? 1 : 0,
+    pointerEvents: comp.Visible !== false ? 'auto' : 'none',
     display: 'flex',
     boxSizing: 'border-box',
     overflow: 'hidden',
@@ -85,28 +88,29 @@ export default function DatePickerRenderer({
     width: '100%',
     backgroundColor: 'transparent',
     color: currentColor,
-    fontSize: comp.fontSize ? `${comp.fontSize}px` : 'inherit',
-    fontWeight: fontWeightMap[comp.fontWeight] || 'normal',
-    fontStyle: comp.italic ? 'italic' : 'normal',
-    paddingLeft: comp.paddingLeft || 0,
-    paddingRight: comp.paddingRight || 0,
-    paddingTop: comp.paddingTop || 0,
-    paddingBottom: comp.paddingBottom || 0,
+    fontSize: comp.Size ? `${comp.Size}px` : 'inherit',
+    fontWeight: fontWeightMap[comp.FontWeight] || 'normal',
+    fontStyle: comp.Italic ? 'italic' : 'normal',
+    paddingLeft: comp.PaddingLeft || 0,
+    paddingRight: comp.PaddingRight || 0,
+    paddingTop: comp.PaddingTop || 0,
+    paddingBottom: comp.PaddingBottom || 0,
     border: 'none',
     outline: 'none',
-    cursor: isInteractive ? (comp.isEditable ? 'text' : 'pointer') : 'default',
-    fontFamily: comp.font || 'inherit',
+    cursor: isInteractive ? (comp.IsEditable ? 'text' : 'pointer') : (isPlaying ? 'default' : 'move'),
+    userSelect: 'none',
+    fontFamily: comp.Font || 'inherit',
   }
 
   // Date icon area styling
   const iconAreaStyle = {
-    width: Math.max(comp.height, 40), // Typically square based on height
+    width: Math.max(comp.Height, 40), // Typically square based on height
     height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: comp.iconBackground,
-    color: comp.iconFill,
+    backgroundColor: comp.IconBackground,
+    color: comp.IconFill,
     cursor: isInteractive ? 'pointer' : 'default',
     borderLeft: `1px solid ${currentBorderColor}`, // Divider
     flexShrink: 0,
@@ -119,7 +123,7 @@ export default function DatePickerRenderer({
 
   const handleChange = (e) => {
     if (!isInteractive) return
-    if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify)
+    if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
   }
 
   // Intercept clicks on the icon to open the native date picker calendar
@@ -130,7 +134,7 @@ export default function DatePickerRenderer({
       return
     }
     
-    if (comp.OnSelect) executeAction(comp.OnSelect, localVars, setLocalVars, notify)
+    if (comp.OnSelect) executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
     
     // Trigger native date picker if supported
     if (inputRef.current && typeof inputRef.current.showPicker === 'function') {
@@ -157,11 +161,11 @@ export default function DatePickerRenderer({
         style={inputStyle}
         value={displayDateStr}
         onChange={handleChange}
-        placeholder={evaluateValue(comp.inputTextPlaceholder, localVars)}
-        readOnly={!isInteractive || !comp.isEditable}
-        disabled={comp.disabled}
-        min={comp.startYear ? `${comp.startYear}-01-01` : undefined}
-        max={comp.endYear ? `${comp.endYear}-12-31` : undefined}
+        placeholder={evaluateValue(comp.InputTextPlaceholder, localVars)}
+        readOnly={!isInteractive || comp.IsEditable === false}
+        disabled={comp.DisplayMode === 'DisplayMode.Disabled'}
+        min={comp.StartYear ? `${comp.StartYear}-01-01` : undefined}
+        max={comp.EndYear ? `${comp.EndYear}-12-31` : undefined}
         // In preview mode, allow standard native events. In edit mode, suppress them.
         onMouseDown={!isPlaying ? (e) => onMouseDown(e) : undefined} 
       />
@@ -169,19 +173,37 @@ export default function DatePickerRenderer({
         style={iconAreaStyle} 
         onMouseDown={handleIconClick}
       >
-        <CalendarIcon size={Math.min(20, comp.height * 0.6)} />
+        <CalendarIcon size={Math.min(20, comp.Height * 0.6)} />
       </div>
     </div>
   )
 }
 
 DatePickerRenderer.propTypes = {
-  comp: PropTypes.object.isRequired,
+  comp: PropTypes.shape({
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    Color: PropTypes.string,
+    Size: PropTypes.number,
+    FontWeight: PropTypes.string,
+    BorderStyle: PropTypes.string,
+    BorderThickness: PropTypes.number,
+    Visible: PropTypes.bool,
+    DisplayMode: PropTypes.string,
+    DefaultDate: PropTypes.string,
+    SelectedDate: PropTypes.string,
+    IconBackground: PropTypes.string,
+    IconFill: PropTypes.string,
+  }).isRequired,
   selected: PropTypes.bool,
   isPlaying: PropTypes.bool,
   localVars: PropTypes.object,
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
+  navigate: PropTypes.func,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

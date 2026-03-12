@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer } from '../components/controls/index.jsx'
+import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer } from '../RendererPage/components/controls/index.jsx'
 import { screenToYaml } from '../RendererPage/helpers.jsx'
 import { SparkleIcon, CopyIcon, CheckIcon, SendIcon, EXAMPLE_PROMPTS } from './constants.jsx'
 import { fetchComponents } from './helpers.jsx'

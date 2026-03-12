@@ -1,20 +1,7 @@
 import { useState } from 'react'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
-import { PROP_TYPE_COLORS } from './constants.jsx'
-import buttonSchema from '@schemas/button.json'
-import labelSchema from '@schemas/label.json'
-import containerSchema from '@schemas/container.json'
-import textInputSchema from '@schemas/textInput.json'
-import dropdownSchema from '@schemas/dropdown.json'
-import gallerySchema from '@schemas/gallery.json'
-import checkboxSchema from '@schemas/checkbox.json'
-import rectangleSchema from '@schemas/rectangle.json'
-import iconSchema from '@schemas/icon.json'
-import htmlTextSchema from '@schemas/htmltext.json'
-import datePickerSchema from '@schemas/datepicker.json'
-import comboBoxSchema from '@schemas/combobox.json'
-
-const SCHEMAS = [buttonSchema, labelSchema, textInputSchema, dropdownSchema, checkboxSchema, rectangleSchema, iconSchema, htmlTextSchema, datePickerSchema, comboBoxSchema, containerSchema, gallerySchema]
+import { PROP_TYPE_COLORS, SCHEMAS } from './constants.jsx'
+import { formatDefaultValue, formatPropertyType } from './helpers.jsx'
 
 
 
@@ -87,17 +74,11 @@ export default function ComponentLibraryPage() {
                         </td>
                         <td className="px-6 py-3 text-sm text-subtext">{p.label}</td>
                         <td className="px-6 py-3">
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded border ${PROP_TYPE_COLORS[p.type] || 'text-subtext bg-overlay/10 border-overlay/20'}`}>
-                            {p.type} {p.type === 'select' && p.options && <span className="opacity-60 ml-1">({p.options.length})</span>}
-                          </span>
+                          {formatPropertyType(p, PROP_TYPE_COLORS)}
                         </td>
                         <td className="px-6 py-3">
                           <span className="font-mono text-xs text-subtext/70">
-                            {schema.defaults[p.key] !== undefined 
-                              ? typeof schema.defaults[p.key] === 'boolean' 
-                                ? schema.defaults[p.key].toString() 
-                                : String(schema.defaults[p.key])
-                              : <span className="italic opacity-50">none</span>}
+                            {formatDefaultValue(schema.defaults[p.key])}
                           </span>
                         </td>
                       </tr>

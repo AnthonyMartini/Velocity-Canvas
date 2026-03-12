@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../common/helpers.jsx'
+import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
 // Inline icons (no external dependency needed)
 const ChevronDownIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -20,13 +20,16 @@ export default function ComboBoxRenderer({
   isPlaying, 
   localVars, 
   setLocalVars, 
-  notify, 
+  notify,
+  navigate,
+  flatNodes,
+  parentNode,
   onMouseDown, 
   onClick 
 }) {
   const containerRef = useRef(null)
 
-  const isInteractive = isPlaying && comp.displayMode !== 'DisplayMode.Disabled' && comp.displayMode !== 'DisplayMode.View' && !comp.disabled
+  const isInteractive = isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' && comp.DisplayMode !== 'DisplayMode.View'
 
   // Safely parse JSON properties
   const parseJsonStr = (str, fallback = []) => {
@@ -34,7 +37,7 @@ export default function ComboBoxRenderer({
   }
 
   // ComboBox strictly deals with arrays of items.
-  let rawItems = evaluateValue(comp.Items, localVars)
+  let rawItems = evaluateValue(comp.Items, localVars, flatNodes, new Set(), parentNode)
   let items = []
   if (Array.isArray(rawItems)) items = rawItems
   else items = parseJsonStr(rawItems, [])
@@ -44,7 +47,7 @@ export default function ComboBoxRenderer({
   
   // PowerApps has SearchFields and DisplayFields
   const displayFields = parseJsonStr(comp.DisplayFields, [])
-  const placeholder = evaluateValue(comp.inputTextPlaceholder, localVars) || ''
+  const placeholder = evaluateValue(comp.InputTextPlaceholder, localVars, flatNodes, new Set(), parentNode) || ''
 
   // Internal state for the dropdown simulation MVP
   const [isOpen, setIsOpen] = useState(false)
@@ -52,18 +55,18 @@ export default function ComboBoxRenderer({
   const [localSelected, setLocalSelected] = useState([]) // For MVP standalone preview
 
   // Calculate borders based on state
-  let currentBorderColor = comp.borderColor
-  let currentBorderThickness = comp.borderThickness
-  if (comp.displayMode === 'DisplayMode.Disabled' || comp.disabled) {
+  let currentBorderColor = comp.BorderColor
+  let currentBorderThickness = comp.BorderThickness
+  if (comp.DisplayMode === 'DisplayMode.Disabled') {
     currentBorderColor = '#c8c6c4' 
   } else if (isOpen) {
-    currentBorderColor = comp.focusedBorderColor
-    currentBorderThickness = comp.focusedBorderThickness
+    currentBorderColor = comp.FocusedBorderColor
+    currentBorderThickness = comp.FocusedBorderThickness
   }
 
-  let currentFill = comp.fill
-  let currentColor = comp.color
-  if (comp.displayMode === 'DisplayMode.Disabled' || comp.disabled) {
+  let currentFill = comp.Fill
+  let currentColor = comp.Color
+  if (comp.DisplayMode === 'DisplayMode.Disabled') {
     currentFill = '#f3f2f1'
     currentColor = '#a19f9d'
   }
@@ -79,25 +82,26 @@ export default function ComboBoxRenderer({
   // Container styling
   const wrapperStyle = {
     position: 'absolute',
-    left: comp.x,
-    top: comp.y,
-    width: comp.width,
-    height: comp.height,
-    borderStyle: borderMap[comp.borderStyle] || 'none',
+    left: comp.X,
+    top: comp.Y,
+    width: comp.Width,
+    height: comp.Height,
+    borderStyle: borderMap[comp.BorderStyle] || 'none',
     borderWidth: currentBorderThickness ? `${currentBorderThickness}px` : 0,
     borderColor: currentBorderColor,
     backgroundColor: currentFill,
     color: currentColor,
-    fontSize: comp.fontSize ? `${comp.fontSize}px` : 'inherit',
-    fontWeight: fontWeightMap[comp.fontWeight] || 'normal',
-    opacity: comp.visible !== false ? 1 : 0,
-    pointerEvents: comp.visible !== false ? 'auto' : 'none',
+    fontSize: comp.Size ? `${comp.Size}px` : 'inherit',
+    fontWeight: fontWeightMap[comp.FontWeight] || 'normal',
+    opacity: comp.Visible !== false ? 1 : 0,
+    pointerEvents: comp.Visible !== false ? 'auto' : 'none',
     boxSizing: 'border-box',
     display: 'flex',
     alignItems: 'center',
     padding: '0 8px',
-    cursor: isInteractive ? 'pointer' : 'default',
-    fontFamily: comp.font || 'inherit',
+    cursor: isInteractive ? 'pointer' : (isPlaying ? 'default' : 'move'),
+    userSelect: 'none',
+    fontFamily: comp.Font || 'inherit',
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
@@ -113,7 +117,7 @@ export default function ComboBoxRenderer({
     onClick(e)
     if (isInteractive) {
       setIsOpen(!isOpen)
-      if (comp.OnSelect) executeAction(comp.OnSelect, localVars, setLocalVars, notify)
+      if (comp.OnSelect) executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
     }
   }
 
@@ -133,8 +137,8 @@ export default function ComboBoxRenderer({
       setIsOpen(false)
     }
     
-    if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify)
-    if (comp.OnNavigate) executeAction(comp.OnNavigate, localVars, setLocalVars, notify)
+    if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
+    if (comp.OnNavigate) executeAction(comp.OnNavigate, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
   }
 
   // Render Display Text MVP
@@ -239,12 +243,37 @@ export default function ComboBoxRenderer({
 }
 
 ComboBoxRenderer.propTypes = {
-  comp: PropTypes.object.isRequired,
+  comp: PropTypes.shape({
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    Color: PropTypes.string,
+    Items: PropTypes.string,
+    DisplayFields: PropTypes.string,
+    SearchFields: PropTypes.string,
+    InputTextPlaceholder: PropTypes.string,
+    Visible: PropTypes.bool,
+    DisplayMode: PropTypes.string,
+    Font: PropTypes.string,
+    FontWeight: PropTypes.string,
+    Size: PropTypes.number,
+    BorderColor: PropTypes.string,
+    BorderStyle: PropTypes.string,
+    BorderThickness: PropTypes.number,
+    FocusedBorderColor: PropTypes.string,
+    FocusedBorderThickness: PropTypes.number,
+    OnChange: PropTypes.string,
+    OnSelect: PropTypes.string,
+    OnNavigate: PropTypes.string,
+  }).isRequired,
   selected: PropTypes.bool,
   isPlaying: PropTypes.bool,
   localVars: PropTypes.object,
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
+  navigate: PropTypes.func,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

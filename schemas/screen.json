@@ -1,0 +1,27 @@
+{
+  "type": "Screen",
+  "control": "Screen",
+  "defaults": {
+    "Fill": "RGBA(255, 255, 255, 1)"
+  },
+  "properties": [
+    {
+      "key": "Fill",
+      "label": "Background Color",
+      "type": "color",
+      "propertyType": "Input"
+    },
+    {
+      "key": "Width",
+      "label": "Width",
+      "type": "number",
+      "propertyType": "Output"
+    },
+    {
+      "key": "Height",
+      "label": "Height",
+      "type": "number",
+      "propertyType": "Output"
+    }
+  ]
+}

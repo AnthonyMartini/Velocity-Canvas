@@ -11,12 +11,12 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
 
   return (
     <div 
-      className={`flex items-center gap-1.5 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
+      className={`flex items-center gap-1 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
         isSelected
           ? 'bg-accent/15 text-accent border border-accent/30'
           : 'text-subtext hover:bg-overlay/30 border border-transparent'
       }`}
-      style={{ paddingLeft: `${8 + depth * 14}px` }}
+      style={{ paddingLeft: `${4 + depth * 10}px` }}
     >
       {/* Collapse/Expand Toggle */}
       <div className="w-4 h-4 flex items-center justify-center shrink-0">
@@ -39,13 +39,13 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
         onClick={(e) => {
           if (node.type !== 'App') onSelect(e, node.id)
         }}
-        className={`flex-1 flex items-center gap-1.5 truncate ${node.type === 'App' ? 'cursor-default' : 'cursor-pointer'}`}
+        className={` flex-1 flex items-center gap-1.5 truncate ${node.type === 'App' ? 'cursor-default' : 'cursor-pointer'}`}
       >
-        <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
+        <span className={` w-4 h-4 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
           {Icon && <Icon className="w-2.5 h-2.5" />}
         </span>
         <span className="truncate">{node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type))}</span>
-        <span className="ml-auto text-subtext/30 text-[10px] shrink-0">{node.type}</span>
+        
       </button>
     </div>
   )

@@ -24,6 +24,18 @@ export default function ChatMessage({ msg }) {
             </span>
           )}
         </div>
+        {msg.usage && (
+          <div className="flex flex-col gap-0.5 mt-1 opacity-50 text-[9px] font-mono tracking-tight uppercase">
+            <div className="flex gap-2">
+              <span>In: {msg.usage.prompt_token_count}</span>
+              <span className="opacity-30">|</span>
+              <span>Out: {msg.usage.candidates_token_count}</span>
+            </div>
+            <div className="text-accent/80 font-bold">
+              Cost: ${((msg.usage.prompt_token_count * 0.25 / 1000000) + (msg.usage.candidates_token_count * 1.50 / 1000000)).toFixed(5)}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

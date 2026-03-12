@@ -1,10 +1,11 @@
-import { evaluateValue, executeAction } from '../../common/helpers.jsx'
+import PropTypes from 'prop-types'
+import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
 
-export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, onMouseDown, onClick }) {
+export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
   const handleActionClick = (e) => {
     if (isPlaying && comp.OnSelect) {
       e.stopPropagation()
-      executeAction(comp.OnSelect, localVars, setLocalVars, notify)
+      executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
     } else if (onClick) {
       onClick(e)
     }
@@ -27,15 +28,15 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
 
   const containerStyle = {
     position: 'absolute',
-    left: comp.x,
-    top: comp.y,
-    width: comp.width,
-    height: comp.height,
-    backgroundColor: comp.fill || 'transparent',
-    color: comp.color || '#0078d4',
-    opacity: comp.visible === false ? 0 : (comp.disabled ? 0.5 : 1),
-    cursor: isPlaying && comp.OnSelect && !comp.disabled ? 'pointer' : 'default',
-    pointerEvents: (comp.disabled && isPlaying) ? 'none' : 'auto',
+    left: comp.X,
+    top: comp.Y,
+    width: comp.Width,
+    height: comp.Height,
+    backgroundColor: comp.Fill || 'transparent',
+    color: comp.Color || '#0078d4',
+    opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
+    cursor: isPlaying && comp.OnSelect && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : 'default',
+    pointerEvents: (comp.DisplayMode === 'DisplayMode.Disabled' && isPlaying) ? 'none' : 'auto',
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     display: 'flex',
     alignItems: 'center',
@@ -47,7 +48,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
       style={containerStyle} 
       onMouseDown={onMouseDown} 
       onClick={handleActionClick}
-      data-icon-type={comp.icon}
+      data-icon-type={comp.Icon}
     >
       <div 
         className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-current [&>svg]:fill-none"
@@ -55,4 +56,27 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
       />
     </div>
   )
+}
+
+IconRenderer.propTypes = {
+  comp: PropTypes.shape({
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    Color: PropTypes.string,
+    Icon: PropTypes.string,
+    Visible: PropTypes.bool,
+    DisplayMode: PropTypes.string,
+    _svg: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  isPlaying: PropTypes.bool,
+  localVars: PropTypes.object,
+  setLocalVars: PropTypes.func,
+  notify: PropTypes.func,
+  navigate: PropTypes.func,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
 }

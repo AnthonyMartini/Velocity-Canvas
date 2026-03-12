@@ -26,3 +26,10 @@ export const CSS_VALIGN = {
   'VerticalAlign.Middle': 'center',
   'VerticalAlign.Bottom': 'flex-end',
 }
+
+export const CSS_BORDER_STYLE = {
+  'BorderStyle.None': 'none',
+  'BorderStyle.Solid': 'solid',
+  'BorderStyle.Dashed': 'dashed',
+  'BorderStyle.Dotted': 'dotted',
+}

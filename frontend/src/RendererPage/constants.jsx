@@ -10,6 +10,7 @@ import IconSchema from '../../../schemas/icon.json'
 import HtmlTextSchema from '../../../schemas/htmltext.json'
 import DatePickerSchema from '../../../schemas/datepicker.json'
 import ComboBoxSchema from '../../../schemas/combobox.json'
+import screenSchema from '../../../schemas/screen.json'
 
 // ── Schema lookup ─────────────────────────────────────────────────────────────
 export const SCHEMAS = {
@@ -25,6 +26,7 @@ export const SCHEMAS = {
   HtmlText: HtmlTextSchema,
   DatePicker: DatePickerSchema,
   ComboBox: ComboBoxSchema,
+  Screen: screenSchema,
 }
 
 // ── Shared maps ───────────────────────────────────────────────────────────────

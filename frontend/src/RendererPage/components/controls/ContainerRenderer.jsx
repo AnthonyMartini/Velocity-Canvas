@@ -4,29 +4,40 @@ import LabelRenderer from './LabelRenderer.jsx'
 import TextInputRenderer from './TextInputRenderer.jsx'
 import DropdownRenderer from './DropdownRenderer.jsx'
 import GalleryRenderer from './GalleryRenderer.jsx'
+import CheckboxRenderer from './CheckboxRenderer.jsx'
+import RectangleRenderer from './RectangleRenderer.jsx'
+import IconRenderer from './IconRenderer.jsx'
+import HtmlTextRenderer from './HtmlTextRenderer.jsx'
+import DatePickerRenderer from './DatePickerRenderer.jsx'
+import ComboBoxRenderer from './ComboBoxRenderer.jsx'
+import { resolveProperties } from '../../../common/helpers.jsx'
 
-export default function ContainerRenderer({ comp, selected, isPlaying, selectedIds, onMouseDown, onClick, onChildMouseDown, onChildClick, onDropInto, dragOverId, setDragOverId }) {
+export default function ContainerRenderer({ comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick }) {
   const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
-  const isDragOver = dragOverId === comp.id
+  const shadowMap = {
+    'DropShadow.None': 'none',
+    'DropShadow.Light': '0 2px 4px rgba(0,0,0,0.1)',
+    'DropShadow.Medium': '0 4px 8px rgba(0,0,0,0.15)',
+    'DropShadow.Heavy': '0 8px 16px rgba(0,0,0,0.2)'
+  }
 
   const style = {
     position: 'absolute',
-    left: comp.x, top: comp.y, width: comp.width, height: comp.height,
-    backgroundColor: comp.fill === 'rgba(0,0,0,0)' || comp.fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.fill,
-    border: comp.borderStyle === 'None'
+    left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
+    backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
+    border: comp.BorderStyle === 'None'
       ? '1px dashed rgba(0,0,0,0.12)'
-      : `${comp.borderThickness}px ${borderMap[comp.borderStyle] || 'solid'} ${comp.borderColor}`,
-    opacity: comp.visible ? 1 : 0.3,
+      : `${comp.BorderThickness}px ${borderMap[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`,
+    borderRadius: `${comp.RadiusTopLeft || 0}px ${comp.RadiusTopRight || 0}px ${comp.RadiusBottomRight || 0}px ${comp.RadiusBottomLeft || 0}px`,
+    opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected
       ? '0 0 0 3px rgba(0,120,212,0.25)'
-      : isDragOver
-        ? 'inset 0 0 0 2px #0078d4'
-        : 'none',
-    transition: 'box-shadow 0.12s',
+      : (shadowMap[comp.DropShadow] || 'none'),
+    transition: 'box-shadow 0.12s, border-radius 0.12s',
     zIndex: selected ? 10 : 1,
   }
 
@@ -36,9 +47,6 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
       data-container-id={comp.id}
       onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
       onClick={onClick}
-      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(comp.id) }}
-      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverId(null) }}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); onDropInto(comp.id); setDragOverId(null) }}
     >
       {/* Container label badge */}
       {!comp.children?.length && (
@@ -47,25 +55,18 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
         </div>
       )}
 
-      {/* Drag-over highlight overlay */}
-      {isDragOver && (
-        <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,120,212,0.06)',
-          border: '2px dashed #0078d4', borderRadius: 2, pointerEvents: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontSize: 11, color: '#0078d4', fontWeight: 600 }}>Drop here</span>
-        </div>
-      )}
-
       {/* Children */}
-      {comp.children?.map(child => {
-        const isChildSelected = selectedIds.includes(child.id)
+      {comp.children?.map(rawChild => {
+        const isChildSelected = selectedIds.includes(rawChild.id)
+        const child = resolveProperties(rawChild, localVars, flatNodes, comp)
         const childProps = {
           comp: child,
           selected: isChildSelected,
           isPlaying,
           selectedIds,
+          localVars, setLocalVars, flatNodes, notify, navigate,
+          updateProp,
+          parentNode: comp,
           onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
           onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
         }
@@ -73,14 +74,17 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
         if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
         if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
         if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
+        if (child.type === 'Checkbox') return <CheckboxRenderer key={child.id} {...childProps} />
+        if (child.type === 'Rectangle') return <RectangleRenderer key={child.id} {...childProps} />
+        if (child.type === 'Icon') return <IconRenderer key={child.id} {...childProps} />
+        if (child.type === 'HtmlText') return <HtmlTextRenderer key={child.id} {...childProps} />
+        if (child.type === 'DatePicker') return <DatePickerRenderer key={child.id} {...childProps} />
+        if (child.type === 'ComboBox') return <ComboBoxRenderer key={child.id} {...childProps} />
         if (child.type === 'Container') return (
           <ContainerRenderer
             key={child.id} {...childProps}
             onChildMouseDown={onChildMouseDown}
             onChildClick={onChildClick}
-            onDropInto={onDropInto}
-            dragOverId={dragOverId}
-            setDragOverId={setDragOverId}
           />
         )
         if (child.type === 'Gallery') return (
@@ -88,9 +92,6 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
             key={child.id} {...childProps}
             onChildMouseDown={onChildMouseDown}
             onChildClick={onChildClick}
-            onDropInto={onDropInto}
-            dragOverId={dragOverId}
-            setDragOverId={setDragOverId}
           />
         )
         return null
@@ -102,15 +103,20 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
 ContainerRenderer.propTypes = {
   comp: PropTypes.shape({
     id: PropTypes.string.isRequired,
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    width: PropTypes.number.isRequired,
-    height: PropTypes.number.isRequired,
-    fill: PropTypes.string,
-    borderStyle: PropTypes.string,
-    borderThickness: PropTypes.number,
-    borderColor: PropTypes.string,
-    visible: PropTypes.bool,
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    BorderStyle: PropTypes.string,
+    BorderThickness: PropTypes.number,
+    BorderColor: PropTypes.string,
+    RadiusTopLeft: PropTypes.number,
+    RadiusTopRight: PropTypes.number,
+    RadiusBottomLeft: PropTypes.number,
+    RadiusBottomRight: PropTypes.number,
+    DropShadow: PropTypes.string,
+    Visible: PropTypes.bool,
     children: PropTypes.array,
   }).isRequired,
   selected: PropTypes.bool,
@@ -120,7 +126,4 @@ ContainerRenderer.propTypes = {
   onClick: PropTypes.func.isRequired,
   onChildMouseDown: PropTypes.func.isRequired,
   onChildClick: PropTypes.func.isRequired,
-  onDropInto: PropTypes.func.isRequired,
-  dragOverId: PropTypes.string,
-  setDragOverId: PropTypes.func.isRequired,
 }

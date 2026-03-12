@@ -1,7 +1,6 @@
 import { createFromSpec } from '../RendererPage/index.jsx'
 
-// Re-export shared utilities so callers only need one import
-export { copyToClipboard, highlightYamlLine } from '../common/helpers.jsx'
+
 
 /**
  * Calls the /renderer-chat endpoint and returns a shaped component tree.

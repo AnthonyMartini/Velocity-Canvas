@@ -1,6 +1,6 @@
 # Antigravity — Power Apps YAML Generator
 
-> **Generate production-ready Power Apps Canvas Studio components from plain English — powered by Gemini 2.5 Pro.**
+> **Generate production-ready Power Apps Canvas Studio components from plain English — powered by Gemini 3.1 Flash.**
 
 ---
 

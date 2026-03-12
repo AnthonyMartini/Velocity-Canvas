@@ -77,7 +77,7 @@ export default function App() {
           {/* Status Indicator */}
           <div className="flex items-center gap-2 bg-surface/50 border border-overlay/40 rounded-full px-3 py-1.5">
             <div className="w-2 h-2 rounded-full bg-green animate-pulse-slow" />
-            <span className="text-subtext text-xs font-medium">Gemini 2.5 Pro</span>
+            <span className="text-subtext text-xs font-medium">Gemini 3.1 Flash</span>
           </div>
         </div>
       </header>
@@ -93,7 +93,7 @@ export default function App() {
         <footer className="mt-auto border-t border-surface/60 py-5 px-6 shrink-0">
           <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-subtext/40">
             <span>Velocity Canvas — Power Apps YAML Generator</span>
-            <span>Powered by Gemini 2.5 Pro · pa.yaml v3.0</span>
+            <span>Powered by Gemini 3.1 Flash · pa.yaml v3.0</span>
           </div>
         </footer>
       )}
