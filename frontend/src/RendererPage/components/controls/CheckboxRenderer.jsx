@@ -1,9 +1,11 @@
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 
 export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
-  const displayValue = evaluateValue(comp.Default, localVars, flatNodes, new Set(), parentNode) === true || evaluateValue(comp.Default, localVars, flatNodes, new Set(), parentNode) === 'true'
-  const displayText = evaluateValue(comp.Text, localVars, flatNodes, new Set(), parentNode)
+  const defaultEval = comp.Default
+  const displayValue = defaultEval === true || defaultEval === 'true'
+  const displayText = comp.Text
 
   const handleChange = (e) => {
     if (isPlaying) {
@@ -63,7 +65,7 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
           cursor: isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : 'default',
         }}
       />
-      <span style={{ userSelect: 'none' }}>{displayText || 'Checkbox'}</span>
+      <span style={{ userSelect: 'none' }}>{(comp.Text !== undefined && comp.Text !== null) ? comp.Text : 'Checkbox'}</span>
     </div>
   )
 }

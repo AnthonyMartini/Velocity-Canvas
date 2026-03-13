@@ -32,7 +32,7 @@ export default function LandingPage({ onStart }) {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-6 items-center">
           <button 
-            onClick={onStart}
+            onClick={() => onStart('generator')}
             className="group relative px-8 py-4 bg-accent text-base font-bold rounded-2xl text-lg shadow-xl shadow-accent/20 hover:shadow-accent/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
           >
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
@@ -44,12 +44,7 @@ export default function LandingPage({ onStart }) {
             </span>
           </button>
 
-          <button 
-            onClick={onStart}
-            className="px-8 py-4 bg-surface/50 border border-overlay/30 text-text font-semibold rounded-2xl text-lg hover:bg-surface hover:border-overlay/60 backdrop-blur-sm transition-all duration-300 shadow-lg shadow-black/10 hover:-translate-y-1"
-          >
-            Sign Up
-          </button>
+
         </div>
 
         {/* Features Preview */}

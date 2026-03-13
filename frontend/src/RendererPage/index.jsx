@@ -12,8 +12,9 @@ import { SCHEMAS } from './constants.jsx'
 import PropField from './components/PropField.jsx'
 import ChatMessage from './components/ChatMessage.jsx'
 import LayerRow from './components/LayerRow.jsx'
+import { parseFormula, evaluateAST } from '../common/FormulaParser.jsx'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers.jsx'
-import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, evaluateValue, resolveProperties, getNextAvailableName, getNodeAbsolutePosition } from '../common/helpers.jsx'
+import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition } from '../common/helpers.jsx'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
 
 // ── Live-Validating Name Input ──────────────────────────────────────────────
@@ -56,11 +57,11 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
         placeholder="Component name"
         className={`w-full bg-base border rounded-lg px-2.5 py-1.5 text-xs text-text font-semibold focus:outline-none focus:ring-1 transition-all ${
           error
-            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+            ? 'border-red/100 ring-1 ring-red-500/20 bg-red-500/5 focus:ring-red-500/30'
             : 'border-overlay/40 focus:border-accent/60 focus:ring-accent/20'
         }`}
       />
-      {error && <p className="text-[10px] text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-[10px] text-red/100 font-medium mt-1">{error}</p>}
     </div>
   )
 }
@@ -747,7 +748,7 @@ export default function RendererPage() {
   }, [saveHistory])
 
   // ── Snap Lines state ────────────────────────────────────────────────────────
-  const [activeSnapLines, setActiveSnapLines] = useState([]) // { axis: 'x'|'y', pos: number }[]
+
 
   // ── Drag state ──────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e, id) => {
@@ -848,86 +849,71 @@ export default function RendererPage() {
         const dy = (e.clientY - startMouseY) * pxRatio
         
         const SNAP_THRESHOLD = 8
-        const colW = canvasW / 4
-        const rowH = canvasH / 4
-        const centerX = canvasW / 2
-        const centerY = canvasH / 2
+        
+        const parent = findParent(tree, id)
+        const isChildOfContainer = parent && parent.type !== 'App'
+        const siblings = isChildOfContainer ? (parent.children || []) : (activeScreenNode?.children || [])
+        const filteredSiblings = siblings.filter(s => s.id !== id).map(s => resolveProperties(s, localVars, fullFlatNodes, parent))
 
         let snapDx = dx
         let snapDy = dy
-        const newSnapLines = []
 
         // Horizontal snapping (E/W)
-        if (dir.includes('e')) {
-          const theoreticalRight = startX + startW + dx
+        if (dir.includes('e') || dir.includes('w')) {
+          const theoreticalEdge = dir.includes('e') ? startX + startW + dx : startX + dx
           let bestSnapX = null
           let minDiffX = Infinity
-          for (let i = 0; i <= 4; i++) {
-            const gridX = colW * i
-            const diff = Math.abs(theoreticalRight - gridX)
-            if (diff < SNAP_THRESHOLD && diff < minDiffX) {
-              minDiffX = diff
-              bestSnapX = { gridLine: gridX, isCenter: Math.abs(gridX - centerX) < 1 }
+
+          // Calculate current Y-range of the node being resized
+          const curY1 = startY + (dir.includes('n') ? dy : 0)
+          const curY2 = startY + startH + (dir.includes('s') ? dy : 0)
+
+          for (const s of filteredSiblings) {
+            // Only snap if Y-ranges overlap (collision)
+            const sY1 = s.Y || 0, sY2 = (s.Y || 0) + (s.Height || 0)
+            if (Math.max(curY1, sY1) < Math.min(curY2, sY2)) {
+              const edges = [s.X || 0, (s.X || 0) + (s.Width || 0)]
+              for (const edge of edges) {
+                const diff = Math.abs(theoreticalEdge - edge)
+                if (diff < SNAP_THRESHOLD && diff < minDiffX) {
+                  minDiffX = diff
+                  bestSnapX = { gridLine: edge }
+                }
+              }
             }
           }
           if (bestSnapX) {
-            snapDx = bestSnapX.gridLine - (startX + startW)
-            newSnapLines.push({ axis: 'x', pos: bestSnapX.gridLine, isCenter: bestSnapX.isCenter })
-          }
-        } else if (dir.includes('w')) {
-          const theoreticalLeft = startX + dx
-          let bestSnapX = null
-          let minDiffX = Infinity
-          for (let i = 0; i <= 4; i++) {
-            const gridX = colW * i
-            const diff = Math.abs(theoreticalLeft - gridX)
-            if (diff < SNAP_THRESHOLD && diff < minDiffX) {
-              minDiffX = diff
-              bestSnapX = { gridLine: gridX, isCenter: Math.abs(gridX - centerX) < 1 }
-            }
-          }
-          if (bestSnapX) {
-            snapDx = bestSnapX.gridLine - startX
-            newSnapLines.push({ axis: 'x', pos: bestSnapX.gridLine, isCenter: bestSnapX.isCenter })
+            snapDx = bestSnapX.gridLine - (dir.includes('e') ? (startX + startW) : startX)
           }
         }
 
         // Vertical snapping (N/S)
-        if (dir.includes('s')) {
-          const theoreticalBottom = startY + startH + dy
+        if (dir.includes('s') || dir.includes('n')) {
+          const theoreticalEdge = dir.includes('s') ? startY + startH + dy : startY + dy
           let bestSnapY = null
           let minDiffY = Infinity
-          for (let i = 0; i <= 4; i++) {
-            const gridY = rowH * i
-            const diff = Math.abs(theoreticalBottom - gridY)
-            if (diff < SNAP_THRESHOLD && diff < minDiffY) {
-              minDiffY = diff
-              bestSnapY = { gridLine: gridY, isCenter: Math.abs(gridY - centerY) < 1 }
+
+          // Calculate current X-range
+          const curX1 = startX + (dir.includes('w') ? dx : 0)
+          const curX2 = startX + startW + (dir.includes('e') ? dx : 0)
+
+          for (const s of filteredSiblings) {
+            const sX1 = s.X || 0, sX2 = (s.X || 0) + (s.Width || 0)
+            if (Math.max(curX1, sX1) < Math.min(curX2, sX2)) {
+              const edges = [s.Y || 0, (s.Y || 0) + (s.Height || 0)]
+              for (const edge of edges) {
+                const diff = Math.abs(theoreticalEdge - edge)
+                if (diff < SNAP_THRESHOLD && diff < minDiffY) {
+                  minDiffY = diff
+                  bestSnapY = { gridLine: edge }
+                }
+              }
             }
           }
           if (bestSnapY) {
-            snapDy = bestSnapY.gridLine - (startY + startH)
-            newSnapLines.push({ axis: 'y', pos: bestSnapY.gridLine, isCenter: bestSnapY.isCenter })
-          }
-        } else if (dir.includes('n')) {
-          const theoreticalTop = startY + dy
-          let bestSnapY = null
-          let minDiffY = Infinity
-          for (let i = 0; i <= 4; i++) {
-            const gridY = rowH * i
-            const diff = Math.abs(theoreticalTop - gridY)
-            if (diff < SNAP_THRESHOLD && diff < minDiffY) {
-              minDiffY = diff
-              bestSnapY = { gridLine: gridY, isCenter: Math.abs(gridY - centerY) < 1 }
-            }
-          }
-          if (bestSnapY) {
-            snapDy = bestSnapY.gridLine - startY
-            newSnapLines.push({ axis: 'y', pos: bestSnapY.gridLine, isCenter: bestSnapY.isCenter })
+            snapDy = bestSnapY.gridLine - (dir.includes('s') ? (startY + startH) : startY)
           }
         }
-
-        setActiveSnapLines(newSnapLines)
 
         setTree(prev => updateNode(prev, id, (node) => {
           let newX = startX, newY = startY, newW = startW, newH = startH
@@ -980,81 +966,83 @@ export default function RendererPage() {
         const groupWidth = maxX - minX
         const groupHeight = maxY - minY
         
-        // Let's use 4x4 for the main structural grid, which provides quarters (including the center half)
-        const colW = canvasW / 4
-        const rowH = canvasH / 4
+        const parent = nodes.length > 0 ? findParent(tree, nodes[0].id) : null
+        const isChildOfContainer = parent && parent.type !== 'App'
+        const siblings = isChildOfContainer ? (parent.children || []) : (activeScreenNode?.children || [])
         
-        // Hard-code the exact vertical and horizontal centers of the canvas to guarantee they are available for snapping
-        const centerX = canvasW / 2
-        const centerY = canvasH / 2
-        
+        const draggedIds = new Set(nodes.map(n => n.id))
+        const filteredSiblings = siblings.filter(s => !draggedIds.has(s.id)).map(s => resolveProperties(s, localVars, fullFlatNodes, parent))
+
         let snapDx = dx
         let snapDy = dy
-        const newSnapLines = []
 
         // X-axis snapping
-        const theoreticalX = minX + dx
-        const edgesX = [
-          { val: theoreticalX, type: 'left' },
-          { val: theoreticalX + groupWidth / 2, type: 'center' },
-          { val: theoreticalX + groupWidth, type: 'right' }
-        ]
-        
+        const theoreticalX1 = minX + dx
+        const theoreticalX2 = minX + groupWidth + dx
         let bestSnapX = null
         let minDiffX = Infinity
 
-        for (let i = 0; i <= 4; i++) {
-          const gridX = colW * i
-          for (const edge of edgesX) {
-            const diff = Math.abs(edge.val - gridX)
-            if (diff < SNAP_THRESHOLD && diff < minDiffX) {
-              minDiffX = diff
-              // Flag if this grid line is the exact center of the canvas
-              const isCenter = Math.abs(gridX - centerX) < 1 
-              bestSnapX = { gridLine: gridX, edgeType: edge.type, isCenter }
-            }
+        for (const s of filteredSiblings) {
+          // Collision check: Y-ranges overlap
+          const sY1 = s.Y || 0, sY2 = (s.Y || 0) + (s.Height || 0)
+          const curY1 = minY + dy, curY2 = minY + groupHeight + dy
+          if (Math.max(curY1, sY1) < Math.min(curY2, sY2)) {
+             const sEdges = [s.X || 0, (s.X || 0) + (s.Width || 0)]
+             for (const sEdge of sEdges) {
+                // Check dragged group left edge
+                let d1 = Math.abs(theoreticalX1 - sEdge)
+                if (d1 < SNAP_THRESHOLD && d1 < minDiffX) {
+                   minDiffX = d1
+                   bestSnapX = { gridLine: sEdge, type: 'left' }
+                }
+                // Check dragged group right edge
+                let d2 = Math.abs(theoreticalX2 - sEdge)
+                if (d2 < SNAP_THRESHOLD && d2 < minDiffX) {
+                   minDiffX = d2
+                   bestSnapX = { gridLine: sEdge, type: 'right' }
+                }
+             }
           }
         }
 
         if (bestSnapX) {
-          if (bestSnapX.edgeType === 'left') snapDx = bestSnapX.gridLine - minX
-          if (bestSnapX.edgeType === 'center') snapDx = bestSnapX.gridLine - groupWidth / 2 - minX
-          if (bestSnapX.edgeType === 'right') snapDx = bestSnapX.gridLine - groupWidth - minX
-          newSnapLines.push({ axis: 'x', pos: bestSnapX.gridLine, isCenter: bestSnapX.isCenter })
+          if (bestSnapX.type === 'left') snapDx = bestSnapX.gridLine - minX
+          else snapDx = bestSnapX.gridLine - groupWidth - minX
         }
 
         // Y-axis snapping
-        const theoreticalY = minY + dy
-        const edgesY = [
-          { val: theoreticalY, type: 'top' },
-          { val: theoreticalY + groupHeight / 2, type: 'center' },
-          { val: theoreticalY + groupHeight, type: 'bottom' }
-        ]
-
+        const theoreticalY1 = minY + dy
+        const theoreticalY2 = minY + groupHeight + dy
         let bestSnapY = null
         let minDiffY = Infinity
 
-        for (let i = 0; i <= 4; i++) {
-          const gridY = rowH * i
-          for (const edge of edgesY) {
-            const diff = Math.abs(edge.val - gridY)
-            if (diff < SNAP_THRESHOLD && diff < minDiffY) {
-              minDiffY = diff
-              // Flag if this grid line is the exact center of the canvas
-              const isCenter = Math.abs(gridY - centerY) < 1 
-              bestSnapY = { gridLine: gridY, edgeType: edge.type, isCenter }
-            }
+        for (const s of filteredSiblings) {
+          // Collision check: X-ranges overlap
+          const sX1 = s.X || 0, sX2 = (s.X || 0) + (s.Width || 0)
+          const curX1 = minX + snapDx, curX2 = minX + groupWidth + snapDx
+          if (Math.max(curX1, sX1) < Math.min(curX2, sX2)) {
+             const sEdges = [s.Y || 0, (s.Y || 0) + (s.Height || 0)]
+             for (const sEdge of sEdges) {
+                // Check dragged group top edge
+                let d1 = Math.abs(theoreticalY1 - sEdge)
+                if (d1 < SNAP_THRESHOLD && d1 < minDiffY) {
+                   minDiffY = d1
+                   bestSnapY = { gridLine: sEdge, type: 'top' }
+                }
+                // Check dragged group bottom edge
+                let d2 = Math.abs(theoreticalY2 - sEdge)
+                if (d2 < SNAP_THRESHOLD && d2 < minDiffY) {
+                   minDiffY = d2
+                   bestSnapY = { gridLine: sEdge, type: 'bottom' }
+                }
+             }
           }
         }
 
         if (bestSnapY) {
-          if (bestSnapY.edgeType === 'top') snapDy = bestSnapY.gridLine - minY
-          if (bestSnapY.edgeType === 'center') snapDy = bestSnapY.gridLine - groupHeight / 2 - minY
-          if (bestSnapY.edgeType === 'bottom') snapDy = bestSnapY.gridLine - groupHeight - minY
-          newSnapLines.push({ axis: 'y', pos: bestSnapY.gridLine, isCenter: bestSnapY.isCenter })
+          if (bestSnapY.type === 'top') snapDy = bestSnapY.gridLine - minY
+          else snapDy = bestSnapY.gridLine - groupHeight - minY
         }
-
-        setActiveSnapLines(newSnapLines)
 
         setTree(prev => {
           let nextTree = prev
@@ -1121,7 +1109,7 @@ export default function RendererPage() {
       if (resizeRef.current) {
         resizeRef.current = null
         document.body.style.cursor = ''
-        setActiveSnapLines([])
+
         saveHistory(tree)
         return
       }
@@ -1195,7 +1183,7 @@ export default function RendererPage() {
       
       dragRef.current = null 
       setDragOverId(null)
-      setActiveSnapLines([])
+  
       
       // Tree was updated during onMove.
       // We need to trigger saveHistory with the current tree.
@@ -1700,7 +1688,7 @@ export default function RendererPage() {
                       id: 'screen_1',
                       type: 'Screen',
                       name: 'Screen1',
-                      fill: 'RGBA(255, 255, 255, 1)',
+                      Fill: 'RGBA(255, 255, 255, 1)',
                       children: []
                     }
                   ]
@@ -1759,8 +1747,8 @@ export default function RendererPage() {
                           ? 'bg-base/30 border-overlay/15 text-subtext/30 cursor-not-allowed'
                           : 'bg-base/60 border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext cursor-pointer'
                       }`}>
-                      <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
-                        {Icon && <Icon className="w-3.5 h-3.5" />}
+                      <span className={`w-8 h-8 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
+                        {Icon && <Icon className="w-5 h-5" />}
                       </span>
                       <span className="font-medium">{label}</span>
                     </button>
@@ -1881,7 +1869,7 @@ export default function RendererPage() {
               )}
               <div
                 className="relative shrink-0"
-                style={{ width: canvasW, height: canvasH, backgroundColor: evaluateValue(activeScreenNode?.Fill || 'white', localVars, fullFlatNodes), boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
+                style={{ width: canvasW, height: canvasH, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
                 data-container-id={activeScreenNode?.id || 'root'}
                 id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
@@ -1899,16 +1887,6 @@ export default function RendererPage() {
                       <p className="text-xs font-medium text-text">{notification.message}</p>
                     </div>
                   </div>
-                )}
-                {/* Active Snap Lines Overlay */}
-                {activeSnapLines.length > 0 && (
-                  <svg className="absolute inset-0 pointer-events-none w-full h-full z-50">
-                    {activeSnapLines.map((line, idx) => (
-                      line.axis === 'x' 
-                        ? <line key={`x-${idx}`} x1={line.pos} y1={0} x2={line.pos} y2={canvasH} stroke={line.isCenter ? '#f43f5e' : '#0ea5e9'} strokeWidth={line.isCenter ? "2" : "1.5"} />
-                        : <line key={`y-${idx}`} x1={0} y1={line.pos} x2={canvasW} y2={line.pos} stroke={line.isCenter ? '#f43f5e' : '#0ea5e9'} strokeWidth={line.isCenter ? "2" : "1.5"} />
-                    ))}
-                  </svg>
                 )}
                 {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">

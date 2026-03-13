@@ -41,8 +41,8 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
         }}
         className={` flex-1 flex items-center gap-1.5 truncate ${node.type === 'App' ? 'cursor-default' : 'cursor-pointer'}`}
       >
-        <span className={` w-4 h-4 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
-          {Icon && <Icon className="w-2.5 h-2.5" />}
+        <span className={` w-5 h-5 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
+          {Icon && <Icon className="w-3.5 h-3.5" />}
         </span>
         <span className="truncate">{node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type))}</span>
         

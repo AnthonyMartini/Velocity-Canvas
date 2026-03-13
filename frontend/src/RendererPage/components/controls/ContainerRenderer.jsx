@@ -10,10 +10,10 @@ import IconRenderer from './IconRenderer.jsx'
 import HtmlTextRenderer from './HtmlTextRenderer.jsx'
 import DatePickerRenderer from './DatePickerRenderer.jsx'
 import ComboBoxRenderer from './ComboBoxRenderer.jsx'
+import { CSS_BORDER_STYLE } from './cssProps.js'
 import { resolveProperties } from '../../../common/helpers.jsx'
 
 export default function ContainerRenderer({ comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick }) {
-  const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
   const shadowMap = {
     'DropShadow.None': 'none',
     'DropShadow.Light': '0 2px 4px rgba(0,0,0,0.1)',
@@ -25,9 +25,9 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
     position: 'absolute',
     left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
-    border: comp.BorderStyle === 'None'
-      ? '1px dashed rgba(0,0,0,0.12)'
-      : `${comp.BorderThickness}px ${borderMap[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`,
+    border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && (comp.BorderThickness || 0) > 0)
+      ? `${comp.BorderThickness}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
+      : 'none',
     borderRadius: `${comp.RadiusTopLeft || 0}px ${comp.RadiusTopRight || 0}px ${comp.RadiusBottomRight || 0}px ${comp.RadiusBottomLeft || 0}px`,
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',

@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { CSS_BORDER_STYLE } from './cssProps.js'
+import { executeAction } from '../../../common/helpers.jsx'
 
 export default function RectangleRenderer({ 
   comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick 
@@ -11,13 +12,6 @@ export default function RectangleRenderer({
     }
   }
 
-  const borderStyleMap = {
-    'BorderStyle.Solid': 'solid',
-    'BorderStyle.Dashed': 'dashed',
-    'BorderStyle.Dotted': 'dotted',
-    'BorderStyle.None': 'none'
-  }
-
   const containerStyle = {
     position: 'absolute',
     left: comp.X,
@@ -25,8 +19,8 @@ export default function RectangleRenderer({
     width: comp.Width,
     height: comp.Height,
     backgroundColor: comp.Fill,
-    border: comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None'
-      ? `${comp.BorderThickness || 0}px ${borderStyleMap[comp.BorderStyle] || 'solid'} ${comp.BorderColor || 'transparent'}`
+    border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && (comp.BorderThickness || 0) > 0)
+      ? `${comp.BorderThickness || 0}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor || 'transparent'}`
       : 'none',
     opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
     cursor: isPlaying ? (comp.DisplayMode === 'DisplayMode.Disabled' ? 'default' : 'pointer') : 'move',

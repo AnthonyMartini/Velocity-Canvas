@@ -46,6 +46,7 @@
   },
   "properties": [
     { "key": "Text",            "label": "Text",              "type": "text",   "propertyType": "Input" },
+    { "key": "OnSelect",        "label": "OnSelect",          "type": "text",    "propertyType": "Event" },
     { "key": "Align",           "label": "Alignment",         "type": "select", "options": ["Align.Left", "Align.Center", "Align.Right", "Align.Justify"], "propertyType": "Input" },
     { "key": "VerticalAlign",    "label": "Vertical Align",    "type": "select", "options": ["VerticalAlign.Top", "VerticalAlign.Middle", "VerticalAlign.Bottom"], "propertyType": "Input" },
     { "key": "X",               "label": "X",                 "type": "number", "propertyType": "Input" },
@@ -74,7 +75,6 @@
     { "key": "DisplayMode",     "label": "Display Mode",      "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
     { "key": "Visible",         "label": "Visible",           "type": "boolean", "propertyType": "Input" },
     { "key": "Italic",          "label": "Italic",            "type": "boolean", "propertyType": "Input" },
-    { "key": "Underline",       "label": "Underline",         "type": "boolean", "propertyType": "Input" },
-    { "key": "OnSelect",        "label": "OnSelect",          "type": "text",    "propertyType": "Event" }
+    { "key": "Underline",       "label": "Underline",         "type": "boolean", "propertyType": "Input" }
   ]
 }

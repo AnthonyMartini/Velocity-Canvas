@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
-import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN } from './cssProps.js'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN, CSS_BORDER_STYLE } from './cssProps.js'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 
 export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
   const style = {
@@ -21,14 +22,17 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
     boxSizing: 'border-box',
     paddingLeft: comp.PaddingLeft, paddingRight: comp.PaddingRight,
     paddingTop: comp.PaddingTop, paddingBottom: comp.PaddingBottom,
-    outline: selected ? '2px solid #0078d4' : '1px dashed rgba(0,0,0,0.15)',
+    border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && comp.BorderThickness > 0)
+      ? `${comp.BorderThickness}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
+      : 'none',
+    outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
     overflow: 'hidden', zIndex: selected ? 10 : 1,
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
-  const displayText = evaluateValue(comp.Text, localVars, flatNodes, new Set(), parentNode)  || ''
+  const displayText = (comp.Text !== undefined && comp.Text !== null) ? comp.Text : ''
 
   const handleClick = (e) => {
     onClick(e)

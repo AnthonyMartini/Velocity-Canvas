@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import Editor from 'react-simple-code-editor'
+import { FUNCTIONS } from '../Functions.jsx'
 
-export default function FormulaInput({ value, onChange, onBlur, className = "", placeholder = "", onKeyDown }) {
+export default function FormulaInput({ value, onChange, onBlur, className = "", placeholder = "", onKeyDown, hasError }) {
   const [isFocused, setIsFocused] = useState(false)
   const editorRef = useRef(null)
 
@@ -26,7 +27,10 @@ export default function FormulaInput({ value, onChange, onBlur, className = "", 
       if (isString) type = 'string'
       else if (isCompProp) type = 'compProp'
       else if (isFunc) type = 'function'
-      else if (isVar) type = 'variable'
+      else if (isVar) {
+        const isKnownFunc = FUNCTIONS.some(f => f.name.toLowerCase() === fullMatch.toLowerCase())
+        type = isKnownFunc ? 'function' : 'variable'
+      }
       else if (isSymbol) type = 'symbol'
 
       tokens.push({ text: fullMatch, type })
@@ -76,7 +80,11 @@ export default function FormulaInput({ value, onChange, onBlur, className = "", 
 
   return (
     <div 
-      className={`relative flex flex-col font-mono bg-base overflow-hidden transition-colors duration-200 border border-transparent rounded-md focus-within:border-accent/60 ${className}`}
+      className={`relative flex flex-col font-mono bg-base overflow-hidden transition-colors duration-200 border rounded-md ${
+        hasError 
+          ? 'border-red/100 bg-red-500/5 ring-1 ring-red-500/20' 
+          : (isFocused ? 'border-accent/60 ring-1 ring-accent/20' : 'border-overlay/40')
+      } ${className}`}
       onKeyDown={onKeyDown}
     >
       <Editor

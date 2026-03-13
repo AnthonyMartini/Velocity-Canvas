@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 // Inline icons (no external dependency needed)
 const ChevronDownIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -37,7 +38,7 @@ export default function ComboBoxRenderer({
   }
 
   // ComboBox strictly deals with arrays of items.
-  let rawItems = evaluateValue(comp.Items, localVars, flatNodes, new Set(), parentNode)
+  let rawItems = comp.Items
   let items = []
   if (Array.isArray(rawItems)) items = rawItems
   else items = parseJsonStr(rawItems, [])
@@ -47,7 +48,7 @@ export default function ComboBoxRenderer({
   
   // PowerApps has SearchFields and DisplayFields
   const displayFields = parseJsonStr(comp.DisplayFields, [])
-  const placeholder = evaluateValue(comp.InputTextPlaceholder, localVars, flatNodes, new Set(), parentNode) || ''
+  const placeholder = comp.InputTextPlaceholder || ''
 
   // Internal state for the dropdown simulation MVP
   const [isOpen, setIsOpen] = useState(false)

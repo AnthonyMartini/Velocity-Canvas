@@ -1,6 +1,7 @@
 import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 
 export default function HtmlTextRenderer({ 
   comp, 
@@ -17,8 +18,7 @@ export default function HtmlTextRenderer({
 }) {
   const contentRef = useRef(null)
 
-  // Use evaluateValue to evaluate any formula binding for the html string
-  const rawHtml = evaluateValue(comp.HtmlText, localVars, flatNodes, new Set(), parentNode)
+  const rawHtml = comp.HtmlText || ''
 
   const isInteractive = isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' && comp.OnSelect
 

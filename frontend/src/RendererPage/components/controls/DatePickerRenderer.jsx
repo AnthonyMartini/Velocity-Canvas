@@ -1,6 +1,7 @@
 import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 // Inline calendar icon (no external dependency needed)
 const CalendarIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -27,8 +28,8 @@ export default function DatePickerRenderer({
   const inputRef = useRef(null)
 
   // Evaluate the DefaultDate or SelectedDate to use as value
-  const defaultDateStr = evaluateValue(comp.DefaultDate, localVars, flatNodes, new Set(), parentNode)
-  const selectedDateStr = evaluateValue(comp.SelectedDate, localVars, flatNodes, new Set(), parentNode)
+  const defaultDateStr = comp.DefaultDate
+  const selectedDateStr = comp.SelectedDate
   
   // PowerApps uses SelectedDate if provided, otherwise DefaultDate
   const displayDateStr = selectedDateStr || defaultDateStr || ''
@@ -161,7 +162,7 @@ export default function DatePickerRenderer({
         style={inputStyle}
         value={displayDateStr}
         onChange={handleChange}
-        placeholder={evaluateValue(comp.InputTextPlaceholder, localVars)}
+        placeholder={comp.InputTextPlaceholder}
         readOnly={!isInteractive || comp.IsEditable === false}
         disabled={comp.DisplayMode === 'DisplayMode.Disabled'}
         min={comp.StartYear ? `${comp.StartYear}-01-01` : undefined}

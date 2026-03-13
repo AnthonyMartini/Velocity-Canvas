@@ -1,106 +1,113 @@
 // ── Component Type Icons ──────────────────────────────────────────────────────
-// Each icon accepts a `className` prop for sizing (default: "w-4 h-4").
+// ── Component Type Icons ──────────────────────────────────────────────────────
+const ACCENT_COLOR = "currentColor"; // Changed to white/currentColor
 
 export const ButtonIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V12.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clipRule="evenodd" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path 
+      d="M8 4l0 22 6-6 4 8 3-2-4-8 8 0z" 
+      stroke={ACCENT_COLOR} 
+      fill={ACCENT_COLOR} 
+      fillOpacity="0.2" 
+      strokeLinejoin="round" 
+    />
   </svg>
 )
 
 export const LabelIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path fillRule="evenodd" d="M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527Z" clipRule="evenodd" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M8 8h16M16 8v16" stroke={ACCENT_COLOR} strokeLinecap="round" />
   </svg>
 )
 
 export const ContainerIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M2 3a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Zm0 9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-8Zm11-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-6Z" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="6" width="24" height="20" rx="1" strokeDasharray="4 4" />
   </svg>
 )
 
 export const TextInputIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M8 10H4v12h4m16-12h4v12h4" strokeLinecap="round" />
+    <path d="M12 10v12" stroke={ACCENT_COLOR} strokeWidth="3" strokeLinecap="round" />
+    <rect x="8" y="15" width="16" height="2" fill="currentColor" fillOpacity="0.1" stroke="none" />
   </svg>
 )
 
 export const DropdownIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path fillRule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clipRule="evenodd" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="8" width="24" height="16" rx="1" />
+    <path d="M22 14l3 3 3-3" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="20" y1="10" x2="20" y2="22" strokeOpacity="0.4" />
   </svg>
 )
 
 export const GalleryIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <line x1="3" y1="9" x2="21" y2="9" />
-    <line x1="3" y1="15" x2="21" y2="15" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="6" y="6" width="20" height="20" rx="1" />
+    <path d="M10 11h12m-12 5h12m-12 5h12" strokeOpacity="0.5" />
+    <circle cx="8" cy="11" r="0.8" fill="currentColor" />
+    <circle cx="8" cy="16" r="0.8" fill="currentColor" />
+    <circle cx="8" cy="21" r="0.8" fill="currentColor" />
   </svg>
 )
 
 export const CheckboxIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <path d="M9 12l2 2 4-4" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="8" y="8" width="16" height="16" rx="1" />
+    <path d="M12 16l3 3 6-7" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
 
 export const RectangleIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="8" width="24" height="16" rx="1" />
   </svg>
 )
 
 export const IconIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 16 16 12 12 8"></polyline>
-    <line x1="8" y1="12" x2="16" y2="12"></line>
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <circle cx="16" cy="16" r="10" />
+    <circle cx="16" cy="16" r="4" stroke={ACCENT_COLOR} />
   </svg>
 )
 
 export const AppIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M16 4L4 16l12 12 12-12L16 4z" />
+    <path d="M16 10l-6 6 6 6 6-6-6-6z" stroke={ACCENT_COLOR} />
   </svg>
 )
 
 export const ScreenIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-    <line x1="8" y1="21" x2="16" y2="21" />
-    <line x1="12" y1="17" x2="12" y2="21" />
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="6" width="24" height="16" rx="1" />
+    <path d="M12 26h8m-4-4v4" strokeLinecap="round" />
   </svg>
 )
 
-// Icon for HtmlText
 export const HtmlTextIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="16 18 22 12 16 6"></polyline>
-    <polyline points="8 6 2 12 8 18"></polyline>
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M12 10L8 16l4 6m8-12l4 6-4 6" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="18" y1="8" x2="14" y2="24" strokeOpacity="0.4" />
   </svg>
 )
 
-// Icon for DatePicker
 export const DatePickerIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="6" y="8" width="20" height="18" rx="1" />
+    <line x1="6" y1="14" x2="26" y2="14" />
+    <line x1="11" y1="6" x2="11" y2="10" />
+    <line x1="21" y1="6" x2="21" y2="10" />
+    <rect x="18" y="18" width="4" height="4" fill={ACCENT_COLOR} fillOpacity="0.4" stroke="none" />
   </svg>
 )
 
-// Icon for ComboBox
 export const ComboBoxIcon = ({ className = 'w-4 h-4' }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" y1="6" x2="21" y2="6"></line>
-    <line x1="8" y1="12" x2="21" y2="12"></line>
-    <line x1="8" y1="18" x2="21" y2="18"></line>
-    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="8" width="24" height="16" rx="1" />
+    <path d="M22 14l3 3 3-3" strokeOpacity="0.6" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M8 14h8m-8 4h4" stroke={ACCENT_COLOR} strokeLinecap="round" />
   </svg>
 )
 

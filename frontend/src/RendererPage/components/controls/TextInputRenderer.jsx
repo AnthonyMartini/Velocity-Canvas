@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps.js'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 
 export default function TextInputRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
   const style = {
@@ -23,9 +24,9 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
     zIndex: selected ? 10 : 1,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
-  const displayDefaultValue = evaluateValue(comp.Default, localVars, flatNodes, new Set(), parentNode)
-  const displayValue = comp.Text !== undefined && comp.Text !== '""' && comp.Text !== '' ? comp.Text : displayDefaultValue
-  const displayHint = evaluateValue(comp.HintText, localVars, flatNodes, new Set(), parentNode)
+  const displayDefaultValue = (comp.Default !== undefined && comp.Default !== null) ? comp.Default : ''
+  const displayValue = (comp.Text !== undefined && comp.Text !== null) ? comp.Text : displayDefaultValue
+  const displayHint = (comp.HintText !== undefined && comp.HintText !== null) ? comp.HintText : ''
 
   const handleChange = (e) => {
     const val = e.target.value
@@ -53,7 +54,7 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
 
   return (
     <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
-      {(displayValue && displayValue !== '""')
+      {(displayValue !== undefined && displayValue !== null && displayValue !== "")
         ? <span>{displayValue}</span>
         : <span style={{ color: '#aaa', fontStyle: 'italic' }}>{comp.HintText}</span>
       }

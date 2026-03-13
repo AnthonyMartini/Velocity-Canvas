@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps.js'
-import { evaluateValue, executeAction } from '../../../common/helpers.jsx'
+import { executeAction } from '../../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../../common/FormulaParser.jsx'
 
 export default function DropdownRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
   const style = {
@@ -26,7 +27,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
   let items = []
   try { items = JSON.parse(comp.Items) } catch (e) { items = comp.Items ? [comp.Items] : [] }
 
-  const displayDefaultValue = evaluateValue(comp.Default, localVars, flatNodes, new Set(), parentNode)
+  const displayDefaultValue = comp.Default || ''
   const displayValue = comp.Selected !== undefined && comp.Selected !== "" ? comp.Selected : displayDefaultValue
 
   const handleChange = (e) => {
@@ -45,7 +46,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
     return (
       <select
         style={{ ...style, outline: 'none', appearance: 'auto', paddingRight: '4px', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill }}
-        defaultValue={displayValue || (items[0] || '')}
+        defaultValue={(displayValue !== undefined && displayValue !== null) ? displayValue : (items[0] || '')}
         onMouseDown={onMouseDown}
         onClick={onClick}
         onChange={handleChange}
@@ -57,7 +58,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
 
   return (
     <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
-      <span className="truncate">{displayValue || (items[0] || 'Dropdown')}</span>
+      <span className="truncate">{(displayValue !== undefined && displayValue !== null) ? displayValue : (items[0] || 'Dropdown')}</span>
       <svg className="w-4 h-4 text-subtext/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="6 9 12 15 18 9"></polyline>
       </svg>

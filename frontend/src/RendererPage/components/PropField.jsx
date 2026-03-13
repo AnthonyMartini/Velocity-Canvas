@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import FormulaInput from './FormulaInput.jsx'
-import { evaluateValue, flattenTree, findParent } from '../../common/helpers.jsx'
+import { flattenTree, findParent } from '../../common/helpers.jsx'
+import { parseFormula, evaluateAST } from '../../common/FormulaParser.jsx'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
 function ValidatedNumberInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
@@ -10,49 +11,22 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
 
   useEffect(() => {
     setTempValue(String(value))
-    setError(null)
-  }, [value])
+    setError(validate(String(value)))
+  }, [value, localVars, flatNodes, parentNode, selfNode]) // Re-validate if dependencies or value changes
 
   const validate = (val) => {
     if (val.trim() === '') return "Required"
     
-    // Evaluate the property
-    const evaluated = evaluateValue(val, localVars, flatNodes, new Set(), parentNode, selfNode)
-    if (evaluated === '#CYCLE!') return "Circular dependency detected"
-    
-    // Check for naked variables/components that didn't resolve into something meaningful
-    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val.trim())) {
-      const t = val.trim()
-      const knownFuncs = ['true', 'false', 'RGBA', 'Math', 'Color']
-      if (!knownFuncs.includes(t)) {
-        const isVar = localVars && localVars[t] !== undefined
-        const isComp = flatNodes && flatNodes.some(n => n.name === t)
-        const isSelf = t.toLowerCase() === 'self' || t.toLowerCase() === 'parent'
-        if (!isVar && !isComp && !isSelf) {
-            return `Unresolved variable or component: ${t}`
-        }
-      }
-    } else if (/\b[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\b/.test(val)) {
-      // It has a property access format. If evaluateValue returned the exact string unparsed, it failed.
-      if (evaluated === val.trim() && !val.trim().startsWith('"') && !val.trim().startsWith("'")) {
-        return "Unresolved property"
-      }
+    try {
+      const ast = parseFormula(val, true, false)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
+      if (evaluated instanceof Error) return evaluated.message
+      
+      const n = Number(evaluated)
+      if (isNaN(n)) return "Must evaluate to a number"
+    } catch (e) {
+      return e.message
     }
-
-    // If it's meant to be a number but evaluation resulted in a distinct non-numeric string (that isn't a pure literal)
-    if (typeof evaluated === 'string' && isNaN(Number(evaluated)) && !val.trim().startsWith('"') && !val.trim().startsWith("'")) {
-       // Only error if it looks like they were trying to write a property access formula
-       if (/\b[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\b/.test(val)) {
-         return "Unresolved property"
-       }
-       // If it's a naked word and evaluate Value spit it exactly back out, it's not a known number or variable
-       if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val.trim()) && evaluated === val.trim()) {
-         return "Unresolved variable or component"
-       }
-    }
-
-    const n = Number(evaluated)
-    if (isNaN(n)) return "Must evaluate to a number"
     return null
   }
 
@@ -90,9 +64,9 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}`}
+        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[9px] text-red-500 leading-none">{error}</span>}
+      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
     </div>
   )
 }
@@ -104,45 +78,20 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
 
   useEffect(() => {
     setTempValue(String(value || ""))
-    setError(null)
-  }, [value])
+    setError(validate(String(value || "")))
+  }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const validate = (val) => {
     if (val.trim() === "") return null // Allow empty
     
-    // Extract strings first so we don't try to resolve them as variables
-    // Replace all occurrences of "..." or '...' with empty strings so they are ignored by the token splitter
-    const strRemoved = val.replace(/('[^']*'|"[^"]*")/g, '')
-    
-    // Test a dummy evaluation to see if tokens resolve
-    // match anything that looks like a variable or Component.Property
-    const tokens = strRemoved.match(/[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?/g) || []
-    
-    for (const t of tokens) {
-      if (t.includes('.')) {
-        // We only evaluate `t` itself to see if the property path resolves
-        const evaluated = evaluateValue(t, localVars, flatNodes, new Set(), parentNode, selfNode)
-        // Check if evaluateValue failed. Usually #CYCLE! or the exact string.
-        // Wait, evaluateValue for "Label1.Text" returns the value. 
-        // If it returns "Label1.Text" it means it couldn't resolve it.
-        if (evaluated === t || evaluated === '#CYCLE!') {
-           return `Unresolved property: ${t}`
-        }
-      } else {
-         // Check if it's a known function or true/false
-         const knownFuncs = ['Notify', 'Navigate', 'Set', 'true', 'false', 'RGBA', 'Math', 'Color']
-         if (!knownFuncs.includes(t)) {
-            // Check if it's a known variable or component
-            const isVar = localVars && localVars[t] !== undefined
-            const isComp = flatNodes && flatNodes.some(n => n.name === t)
-            const isSelf = t.toLowerCase() === 'self' || t.toLowerCase() === 'parent'
-            if (!isVar && !isComp && !isSelf) {
-               return `Unresolved variable or component: ${t}`
-            }
-         }
-      }
+    try {
+      const ast = parseFormula(val, true, true)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
+      if (evaluated instanceof Error) return evaluated.message
+    } catch (e) {
+      return e.message
     }
-
+    
     return null
   }
 
@@ -170,9 +119,9 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[9px] text-red-500 leading-none">{error}</span>}
+      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
     </div>
   )
 }
@@ -184,57 +133,18 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
 
   useEffect(() => {
     setTempValue(String(value || ""))
-    setError(null)
-  }, [value])
+    setError(validate(String(value || "")))
+  }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const validate = (val) => {
     if (val.trim() === "") return null // Allow empty
     
-    // Evaluate the property
-    const evaluated = evaluateValue(val, localVars, flatNodes, new Set(), parentNode, selfNode)
-    if (evaluated === '#CYCLE!') return "Circular dependency detected"
-    
-    // If evaluateValue returns the exact same string (and it wasn't a quoted literal),
-    // it means it either fell back to returning the raw string, or it successfully evaluated to it.
-    if (evaluated === val.trim() && !val.trim().startsWith('"') && !val.trim().startsWith("'")) {
-       
-       // If the input has no spaces and represents a single naked word, we're strict about it missing quotes.
-       if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val.trim())) {
-          const t = val.trim()
-          const knownFuncs = ['true', 'false', 'RGBA', 'Math', 'Color']
-          if (!knownFuncs.includes(t)) {
-             const isVar = localVars && localVars[t] !== undefined
-             const isComp = flatNodes && flatNodes.some(n => n.name === t)
-             const isSelf = t.toLowerCase() === 'self' || t.toLowerCase() === 'parent'
-             if (!isVar && !isComp && !isSelf) {
-                return `Unresolved variable or component: ${t}`
-             }
-          }
-       } else {
-         // If it's a more complex string, we need to see if it was trying to be a function call or concat formula.
-         // If it contains typical formula symbols but evaluateValue failed to do anything with it 
-         // other than return the raw string, we parse the tokens to find out what's unresolved.
-         if (/[()=+,.&]/.test(val)) {
-            const strRemoved = val.replace(/('[^']*'|"[^"]*")/g, '')
-            const tokens = strRemoved.match(/[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?/g) || []
-            for (const t of tokens) {
-               if (t.includes('.')) {
-                  const ev = evaluateValue(t, localVars, flatNodes, new Set(), parentNode, selfNode)
-                  if (ev === t || ev === '#CYCLE!') return `Unresolved property: ${t}`
-               } else {
-                  const knownFuncs = ['Notify', 'Navigate', 'Set', 'true', 'false', 'RGBA', 'Math', 'Color']
-                  if (!knownFuncs.includes(t)) {
-                     const isVar = localVars && localVars[t] !== undefined
-                     const isComp = flatNodes && flatNodes.some(n => n.name === t)
-                     const isSelf = t.toLowerCase() === 'self' || t.toLowerCase() === 'parent'
-                     if (!isVar && !isComp && !isSelf) {
-                        return `Unresolved variable or component: ${t}`
-                     }
-                  }
-               }
-            }
-         }
-       }
+    try {
+      const ast = parseFormula(val, true, false)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
+      if (evaluated instanceof Error) return evaluated.message
+    } catch (e) {
+      return e.message
     }
     
     return null
@@ -264,9 +174,9 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[9px] text-red-500 leading-none">{error}</span>}
+      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
     </div>
   )
 }

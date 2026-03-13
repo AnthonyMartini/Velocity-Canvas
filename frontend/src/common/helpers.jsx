@@ -1,3 +1,5 @@
+import { parseFormula, evaluateAST } from './FormulaParser.jsx'
+
 /**
  * Copies `text` to the clipboard.
  * Falls back to the execCommand approach if the Clipboard API isn't available.
@@ -250,113 +252,6 @@ export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars 
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Evaluates a string value.
- * If strictly quoted (e.g. "Hello" or ="Hello"), it returns the inner string literal.
- * Otherwise, it supports simple math expressions and concatenations like `"Hello " & VarName`
- * or `Parent.Width / 2`.
- * @param {string} expression
- * @param {Object} localVars
- * @param {Array} flatNodes
- * @param {Set} visited
- * @param {Object} parentNode
- * @returns {any}
- */
-export function evaluateValue(expression, localVars = {}, flatNodes = [], visited = new Set(), parentNode = null, selfNode = null) {
-  if (typeof expression !== 'string') return expression
-  let trimmed = expression.trim()
-  if (!trimmed) return ''
-
-  // If it starts with '=', it's a PowerFx formula, strip it (optional now)
-  if (trimmed.startsWith('=')) {
-    trimmed = trimmed.slice(1).trim()
-  }
-  
-  // Check if it's a quoted literal
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || 
-      (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    return trimmed.slice(1, -1)
-  }
-
-  // Pre-check for pure numbers
-  if (!isNaN(Number(trimmed))) {
-    return Number(trimmed)
-  }
-  
-  // Cycle detection
-  if (visited.has(trimmed)) {
-    return "#CYCLE!"
-  }
-
-  // Helper to resolve a logical component property or variable
-  const resolveToken = (token) => {
-    if (token.includes('.')) {
-      const [compName, propName] = token.split('.')
-      let targetNode = null
-      if (compName.toLowerCase() === 'parent') {
-        targetNode = parentNode
-      } else if (compName.toLowerCase() === 'self') {
-        targetNode = selfNode
-      } else {
-        targetNode = flatNodes.find(n => n.name === compName)
-      }
-
-      if (targetNode && targetNode[propName] !== undefined) {
-        const nextVisited = new Set(visited).add(token)
-        return evaluateValue(targetNode[propName], localVars, flatNodes, nextVisited, parentNode, selfNode)
-      }
-    }
-    if (localVars[token] !== undefined) return localVars[token]
-    return null
-  }
-
-  // 1. Check if it's purely a single complete token (e.g., "Button1.Text")
-  const singleVal = resolveToken(trimmed)
-  if (singleVal !== null) return singleVal
-
-  // 2. Try parsing and evaluating as an expression (math or string concat)
-  try {
-    let unresolvedTokens = false;
-    
-    // Replace string literals, & concat operators, and variable tokens
-    const replaced = trimmed.replace(/('[^']*'|"[^"]*")|(&)|([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)/g, (match, strGrp, ampGrp, varGrp) => {
-      if (strGrp) return strGrp; // Keep literals exact
-      if (ampGrp) return '+';    // Convert PowerApps concat to JS concat
-      if (varGrp) {
-        // Leave boolean, null, and Math calls to be handled by JS natively
-        if (varGrp === 'true' || varGrp === 'false' || varGrp === 'null' || varGrp.startsWith('Math.')) {
-          return varGrp;
-        }
-        
-        const val = resolveToken(varGrp);
-        if (val !== null) {
-          // Wrap strings in quotes to safely embed them in the evaluator
-          if (typeof val === 'string') return `"${val.replace(/"/g, '\\"')}"`;
-          return val;
-        }
-        unresolvedTokens = true;
-        return varGrp;
-      }
-      return match;
-    });
-
-    if (!unresolvedTokens) {
-      // Evaluate the sanitized expression
-      // eslint-disable-next-line
-      const result = new Function('return (' + replaced + ')')();
-      // Only return if it evaluates properly (avoid replacing fallback with NaN errors)
-      if (typeof result === 'number' && isNaN(result)) {
-         return trimmed
-      }
-      return result
-    }
-  } catch (e) {
-    // Math evaluation failed, fallback to returning the original trimmed string 
-  }
-
-  return trimmed // Fallback for raw text unresolvable through tokens
-}
-
-/**
  * Resolves all properties for a single component, evaluating formulas.
  * Ignores structural properties and events.
  * Coerces into numbers if the target schema property is a number.
@@ -372,7 +267,8 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
 
     const val = comp[key]
     if (typeof val === 'string') {
-      const evaluated = evaluateValue(val, localVars, flatNodes, new Set(), parentNode, comp)
+      const ast = parseFormula(val)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, comp)
       
       // Basic heuristic: if it looks like a number and isn't "#CYCLE!", parse it
       // to support numeric properties like Width, Height, X, Y
@@ -404,47 +300,19 @@ export function executeAction(formula, localVars, setLocalVars, notify, navigate
     trimmedFormula = trimmedFormula.slice(1).trim()
   }
 
-  // Split by semi-colons, though a naive split might break strings containing semi-colons.
-  // We'll do a simple split and trim for this prototype.
-  const statements = trimmedFormula.split(';').map(s => s.trim()).filter(Boolean)
+  // Set up the context for the evaluator
+  const context = { notify, navigate, setVariable: setLocalVars }
 
-  const newlySetVars = { ...localVars }
+  // We can just parse the formula and execute it directly, because the AST evaluator 
+  // supports ActionSequence and FunctionCall execution natively now.
   let varsChanged = false
 
-  for (const statement of statements) {
-    if (statement.startsWith('Set(') && statement.endsWith(')')) {
-      // Parse Set(VarName, Value)
-      const argsStr = statement.slice(4, -1).trim() // e.g. 'VarName, "Hello"'
-      // Naive split by first comma
-      const commaIdx = argsStr.indexOf(',')
-      if (commaIdx > -1) {
-        const varName = argsStr.slice(0, commaIdx).trim()
-        const valExpr = argsStr.slice(commaIdx + 1).trim()
-        
-        // Evaluate the second argument, which might be a literal string or another variable reference
-        const val = evaluateValue(valExpr, newlySetVars, flatNodes, new Set(), parentNode, selfNode)
-        newlySetVars[varName] = val
-        varsChanged = true
-      }
-    } else if (statement.startsWith('Notify(') && statement.endsWith(')')) {
-      // Parse Notify("Message")
-      const msgExpr = statement.slice(7, -1).trim()
-      const msg = evaluateValue(msgExpr, newlySetVars, flatNodes, new Set(), parentNode, selfNode)
-      if (notify && typeof notify === 'function') {
-        notify(msg)
-      }
-    } else if (statement.startsWith('Navigate(') && statement.endsWith(')')) {
-      // Parse Navigate(ScreenName)
-      const targetExpr = statement.slice(9, -1).trim()
-      const targetScreen = evaluateValue(targetExpr, newlySetVars, flatNodes, new Set(), parentNode, selfNode)
-      if (navigate && typeof navigate === 'function') {
-        navigate(targetScreen)
-      }
-    }
+  // Wrap the setLocalVars in the context so we can track if it was called
+  context.setVariable = (varName, value) => {
+      setLocalVars(prev => ({...prev, [varName]: value}))
+      varsChanged = true
   }
 
-  // Update React state if Set() was called
-  if (varsChanged && typeof setLocalVars === 'function') {
-    setLocalVars(newlySetVars)
-  }
+  const ast = parseFormula(trimmedFormula)
+  evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, context)
 }
