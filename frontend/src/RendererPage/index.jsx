@@ -434,7 +434,6 @@ export default function RendererPage() {
   const [rightWidth, setRightWidth] = useState(256)
   const [chatHeight, setChatHeight] = useState(240)
   const [codeWidth, setCodeWidth] = useState(288)
-  const [errorsWidth, setErrorsWidth] = useState(288)
   const paneResizeRef = useRef(null)
 
   // History state for Undo/Redo
@@ -824,6 +823,7 @@ export default function RendererPage() {
       }
     }
     setSelectedIds(newSelectedIds)
+    setShowErrorsPane(false)
     
     const parent = findParent(tree, id)
     const limitW = (parent && parent.type !== 'App') ? (parent.Width || 800) : canvasW
@@ -1960,11 +1960,11 @@ export default function RendererPage() {
                       newSelectedIds = [id]
                     }
                     setSelectedIds(newSelectedIds)
+                    setShowErrorsPane(false)
                   }}
                   depth={_depth}
                   isCollapsed={collapsedIds.has(node.id)}
                   toggleCollapse={toggleCollapse}
-                  hasError={globalErrors.some(err => err.nodeId === node.id)}
                 />
               ))}
               {tree.length === 0 && <div className="text-xs text-subtext/40 italic px-2 py-4">Canvas is empty</div>}
@@ -2013,6 +2013,7 @@ export default function RendererPage() {
               if (isBg) {
                 // console.log('--- MOUSE DOWN ON bg ---', e.target.id)
                 if (!e.shiftKey) setSelectedIds([activeScreenNode?.id].filter(Boolean))
+                setShowErrorsPane(false)
                 const canvasEl = document.getElementById('canvas-root')
                 if (!canvasEl) return
                 const rect = canvasEl.getBoundingClientRect()
@@ -2438,27 +2439,6 @@ export default function RendererPage() {
           </div>
         </div>
 
-        {/* Errors Pane */}
-        {showErrorsPane && (
-          <div className="relative flex shrink-0 border-r border-overlay/20">
-            {/* Resize Handle Errors */}
-            <div 
-              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
-              onMouseDown={(e) => {
-                paneResizeRef.current = { side: 'errors', startMouseX: e.clientX, startWidth: errorsWidth }
-                document.body.style.cursor = 'col-resize'
-              }}
-            />
-            <ErrorsPane 
-              errors={globalErrors}
-              onSelectNode={(id) => {
-                setSelectedIds([id])
-                setShowErrorsPane(false) // Optional: close pane on select
-              }}
-              width={errorsWidth}
-            />
-          </div>
-        )}
 
         {/* Code Pane */}
         {showCodePane && (
@@ -2489,7 +2469,27 @@ export default function RendererPage() {
         )}
 
         {/* Right Panel: Local Data OR Properties */}
-        {showLocalData ? (
+        {/* Right Panel: Errors OR Local Data OR Properties */}
+        {showErrorsPane ? (
+          <div style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
+            {/* Resize Handle Right */}
+            <div 
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
+              onMouseDown={(e) => {
+                paneResizeRef.current = { side: 'right', startMouseX: e.clientX, startWidth: rightWidth }
+                document.body.style.cursor = 'col-resize'
+              }}
+            />
+            <ErrorsPane 
+              errors={globalErrors}
+              onSelectNode={(id) => {
+                setSelectedIds([id])
+                setShowErrorsPane(false)
+              }}
+              width={rightWidth}
+            />
+          </div>
+        ) : showLocalData ? (
           <div style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 

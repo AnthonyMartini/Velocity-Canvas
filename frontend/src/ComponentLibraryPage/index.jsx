@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
 import { PROP_TYPE_COLORS, SCHEMAS } from './constants.jsx'
 import { formatDefaultValue, formatPropertyType } from './helpers.jsx'
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow } from '../RendererPage/Functions.jsx'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '../RendererPage/Functions.jsx'
 
 
 
@@ -136,20 +136,21 @@ export default function DocumentationPage() {
                   { name: 'FontWeight', data: FontWeight, color: 'emerald' },
                    { name: 'BorderStyle', data: BorderStyle, color: 'amber' },
                   { name: 'DisplayMode', data: DisplayMode, color: 'rose' },
-                  { name: 'Overflow', data: Overflow, color: 'cyan' }
+                  { name: 'Overflow', data: Overflow, color: 'cyan' },
+                  { name: 'DropShadow', data: DropShadow, color: 'slate' },
+                  { name: 'TextMode', data: TextMode, color: 'orange' },
+                  { name: 'TextFormat', data: TextFormat, color: 'teal' },
+                  { name: 'Icon', data: Icon, color: 'sky' }
                 ].map(enm => (
                   <div key={enm.name} className="bg-base/40 rounded-xl p-4 border border-overlay/10">
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-mono text-sm font-bold text-accent">{enm.name}</span>
                       <span className={`text-[10px] font-bold bg-${enm.color}-500/10 text-${enm.color}-500 px-2 py-0.5 rounded border border-${enm.color}-500/20 uppercase`}>Enum</span>
                     </div>
-                    <div className="space-y-2">
-                      {Object.keys(enm.data).map(key => (
-                        <div key={key} className="flex items-center justify-between text-xs border-b border-overlay/5 pb-1.5 last:border-0 last:pb-0">
-                          <span className="font-mono text-text/70">{enm.name}.{key}</span>
-                          <span className="text-[10px] font-mono text-subtext/40 italic">"{enm.data[key]}"</span>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-subtext/60 font-mono italic">
+                        {Object.keys(enm.data).length} values
+                      </span>
                     </div>
                   </div>
                 ))}

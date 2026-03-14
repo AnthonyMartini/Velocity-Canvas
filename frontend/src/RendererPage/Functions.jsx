@@ -54,6 +54,86 @@ export const Overflow = {
     Visible: "Overflow.Visible"
 }
 
+export const DropShadow = {
+    None: "DropShadow.None",
+    Light: "DropShadow.Light",
+    Medium: "DropShadow.Medium",
+    Heavy: "DropShadow.Heavy"
+}
+
+export const TextMode = {
+    SingleLine: "TextMode.SingleLine",
+    Multiline: "TextMode.Multiline",
+    Password: "TextMode.Password"
+}
+
+export const TextFormat = {
+    Text: "TextFormat.Text",
+    Number: "TextFormat.Number"
+}
+
+export const Icon = {
+    Add: "Icon.Add",
+    Cancel: "Icon.Cancel",
+    CancelBadge: "Icon.CancelBadge",
+    Edit: "Icon.Edit",
+    Check: "Icon.Check",
+    CheckBadge: "Icon.CheckBadge",
+    Search: "Icon.Search",
+    Filter: "Icon.Filter",
+    FilterFlat: "Icon.FilterFlat",
+    FilterFlatFilled: "Icon.FilterFlatFilled",
+    Sort: "Icon.Sort",
+    Reload: "Icon.Reload",
+    Trash: "Icon.Trash",
+    Save: "Icon.Save",
+    Download: "Icon.Download",
+    Copy: "Icon.Copy",
+    LikeDislike: "Icon.LikeDislike",
+    Crop: "Icon.Crop",
+    Pin: "Icon.Pin",
+    ClearDrawing: "Icon.ClearDrawing",
+    ExpandView: "Icon.ExpandView",
+    CollapseView: "Icon.CollapseView",
+    Draw: "Icon.Draw",
+    Compose: "Icon.Compose",
+    Erase: "Icon.Erase",
+    Message: "Icon.Message",
+    Post: "Icon.Post",
+    AddDocument: "Icon.AddDocument",
+    AddLibrary: "Icon.AddLibrary",
+    Import: "Icon.Import",
+    Export: "Icon.Export",
+    QuestionMark: "Icon.QuestionMark",
+    Help: "Icon.Help",
+    ThumbsDown: "Icon.ThumbsDown",
+    ThumbsUp: "Icon.ThumbsUp",
+    ThumbsDownFilled: "Icon.ThumbsDownFilled",
+    ThumbsUpFilled: "Icon.ThumbsUpFilled",
+    Undo: "Icon.Undo",
+    Redo: "Icon.Redo",
+    ZoomIn: "Icon.ZoomIn",
+    ZoomOut: "Icon.ZoomOut",
+    OpenInNewWindow: "Icon.OpenInNewWindow",
+    Share: "Icon.Share",
+    Publish: "Icon.Publish",
+    Link: "Icon.Link",
+    Sync: "Icon.Sync",
+    View: "Icon.View",
+    Hide: "Icon.Hide",
+    Bookmark: "Icon.Bookmark",
+    BookmarkFilled: "Icon.BookmarkFilled",
+    Reset: "Icon.Reset",
+    Blocked: "Icon.Blocked",
+    DockLeft: "Icon.DockLeft",
+    DockRight: "Icon.DockRight",
+    AddUser: "Icon.AddUser",
+    Cut: "Icon.Cut",
+    Paste: "Icon.Paste",
+    Leave: "Icon.Leave",
+    Printing3D: "Icon.Printing3D"
+}
+
 // These are the available functions that can be used in the formulas within our app. 
 // The app needs to verify the type of the property that invokes these functions matchs the type of the function. 
 // For example, if a property is of type "text", it should not be able to invoke a function of type "number". App should return an error message. 

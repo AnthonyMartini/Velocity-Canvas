@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow } from '../RendererPage/Functions.jsx'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '../RendererPage/Functions.jsx'
 
 /**
  * Parses a formula string into an Abstract Syntax Tree (AST).
@@ -232,13 +232,17 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     else if (compName === 'BorderStyle') targetNode = BorderStyle
     else if (compName === 'DisplayMode') targetNode = DisplayMode
     else if (compName === 'Overflow') targetNode = Overflow
+    else if (compName === 'Icon') targetNode = Icon
+    else if (compName === 'DropShadow') targetNode = DropShadow
+    else if (compName === 'TextMode') targetNode = TextMode
+    else if (compName === 'TextFormat') targetNode = TextFormat
     else targetNode = flatNodes.find(n => n.name === compName)
 
     if (targetNode && targetNode[propName] !== undefined) {
       const rawVal = targetNode[propName]
       
       // If resolving from an enum, return literal value and don't re-evaluate
-      const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow].includes(targetNode)
+      const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat].includes(targetNode)
       if (isEnum) return rawVal
 
       // If the property itself is a formula, parse and evaluate it
