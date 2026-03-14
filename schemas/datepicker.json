@@ -22,7 +22,7 @@
     "FontWeight": "FontWeight.Normal",
     "Height": 40,
     "IconFill": "#605e5c",
-    "IconBackground": "transparent",
+    "IconBackground": "RGBA(0,0,0,0)",
     "InputTextPlaceholder": "\"\"",
     "IsEditable": false,
     "Italic": false,

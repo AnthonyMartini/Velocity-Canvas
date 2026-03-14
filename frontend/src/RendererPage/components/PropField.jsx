@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import FormulaInput from './FormulaInput.jsx'
-import { flattenTree, findParent } from '../../common/helpers.jsx'
-import { parseFormula, evaluateAST } from '../../common/FormulaParser.jsx'
+import { flattenTree, findParent, validateProperty } from '../../common/helpers.jsx'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
 function ValidatedNumberInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
@@ -15,19 +14,14 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
   }, [value, localVars, flatNodes, parentNode, selfNode]) // Re-validate if dependencies or value changes
 
   const validate = (val) => {
-    if (val.trim() === '') return "Required"
-    
-    try {
-      const ast = parseFormula(val, true, false)
-      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
-      if (evaluated instanceof Error) return evaluated.message
-      
-      const n = Number(evaluated)
-      if (isNaN(n)) return "Must evaluate to a number"
-    } catch (e) {
-      return e.message
-    }
-    return null
+    return validateProperty(
+      selfNode,
+      { name: "Value", type: "number" },
+      val,
+      localVars,
+      flatNodes,
+      parentNode
+    )
   }
 
   const handleChange = (v) => {
@@ -82,17 +76,14 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
   }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const validate = (val) => {
-    if (val.trim() === "") return null // Allow empty
-    
-    try {
-      const ast = parseFormula(val, true, true)
-      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
-      if (evaluated instanceof Error) return evaluated.message
-    } catch (e) {
-      return e.message
-    }
-    
-    return null
+    return validateProperty(
+      selfNode,
+      { name: "OnSelect", type: "string" },
+      val,
+      localVars,
+      flatNodes,
+      parentNode
+    )
   }
 
   const handleChange = (v) => {
@@ -137,17 +128,14 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
   }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const validate = (val) => {
-    if (val.trim() === "") return null // Allow empty
-    
-    try {
-      const ast = parseFormula(val, true, false)
-      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, {}, true)
-      if (evaluated instanceof Error) return evaluated.message
-    } catch (e) {
-      return e.message
-    }
-    
-    return null
+    return validateProperty(
+      selfNode,
+      { name: "Text", type: "string" }, // Just treating as string for validateProperty
+      val,
+      localVars,
+      flatNodes,
+      parentNode
+    )
   }
 
   const handleChange = (v) => {
@@ -183,13 +171,31 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
 
 export default function PropField({ prop, value, onChange, localVars = {}, flatNodes = [], parentNode = null, selfNode = null }) {
   if (prop.type === 'boolean') {
+    const isFormula = typeof value === 'string' && value.startsWith('=')
+    
     return (
-      <div className="flex items-center justify-between py-1.5">
-        <label className="text-xs text-subtext">{prop.label}</label>
-        <button onClick={() => onChange(!value)}
-          className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${value ? 'bg-accent' : 'bg-overlay'}`}>
-          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${value ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
+      <div className="flex flex-col py-1.5 gap-1">
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-subtext">{prop.label}</label>
+          {!isFormula && (
+            <button onClick={() => onChange(!value)}
+              className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${value ? 'bg-accent' : 'bg-overlay'}`}>
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${value ? 'translate-x-4' : 'translate-x-0'}`} />
+            </button>
+          )}
+        </div>
+        {(isFormula || typeof value === 'string' && value.trim() === '') && (
+          <FormulaInput
+            value={value}
+            onChange={onChange}
+            onBlur={() => {}}
+            className="w-full bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60"
+            localVars={localVars}
+            flatNodes={flatNodes}
+            parentNode={parentNode}
+            selfNode={selfNode}
+          />
+        )}
       </div>
     )
   }

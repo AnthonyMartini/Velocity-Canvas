@@ -1,3 +1,4 @@
+import React from 'react'
 import { parseFormula, evaluateAST } from './FormulaParser.jsx'
 
 /**
@@ -107,9 +108,9 @@ export function removeNode(nodes, id) {
 
 /** Insert a node as a child of parentId (or at root if parentId is null) */
 export function insertNode(nodes, node, parentId) {
-  if (!parentId) return [...nodes, node]
+  if (!parentId) return [node, ...nodes]
   return nodes.map(n => {
-    if (n.id === parentId) return { ...n, children: [...(n.children || []), node] }
+    if (n.id === parentId) return { ...n, children: [node, ...(n.children || [])] }
     if (n.children?.length) return { ...n, children: insertNode(n.children, node, parentId) }
     return n
   })
@@ -280,6 +281,102 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
     }
   }
   return resolved
+}
+
+/**
+ * Validates a single property on a component, mimicking the logic in PropField.
+ * Returns an error string or null if valid.
+ */
+export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode = null) {
+  if (value === undefined || value === null) return null
+  const valStr = String(value)
+
+  // Empty string checks based on prop type
+  if (valStr.trim() === '') {
+    if (propDef.type === 'number') return "Required"
+    return null // Events and strings can be empty
+  }
+
+  const isEvent = propDef.propertyType === 'Event' || (propDef.type === 'string' && propDef.name?.startsWith('On')) || propDef.type === 'event'
+  
+  try {
+    const isAction = isEvent
+    // Events don't expect a return value
+    const ast = parseFormula(valStr, true)
+    const context = { isControl: (name) => flatNodes.some(n => n.name === name) }
+    
+    // Evaluate the AST strictly to catch type/syntax errors
+    const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, node, context, true)
+    
+    if (evaluated instanceof Error) return evaluated.message
+
+    if (propDef.type === 'number') {
+      const n = Number(evaluated)
+      if (isNaN(n)) return "Must evaluate to a number"
+    }
+
+  } catch (e) {
+    return e.message
+  }
+
+  return null
+}
+
+/**
+ * Gets all property validation errors in the app.
+ * Returns an array of: { nodeId, nodeName, path, propName, error }
+ */
+export function getAllAppErrors(tree, localVars, schemas) {
+  const errors = []
+  const flatNodes = flattenTree(tree, new Set())
+
+  // Walk the tree
+  for (const node of flatNodes) {
+    // App and Screen nodes can also have properties (like Screen.Fill)
+    const schema = schemas[node.type]
+    if (!schema) continue
+
+    const parentNode = findParent(tree, node.id)
+    
+    // Attempt to find the screen name for the path
+    let screenName = 'App'
+    if (node.type === 'Screen') {
+      screenName = node.name
+    } else {
+      const screenNode = flatNodes.find(n => n.type === 'Screen' && isDescendant(tree, node.id, n.id))
+      if (screenNode) screenName = screenNode.name
+    }
+
+    // Check all properties defined in the schema
+    const allProps = schema.groups
+      ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
+      : (schema.properties || [])
+
+    for (const propDef of allProps) {
+      const propKey = propDef.key || propDef.name
+      
+      // Skip structural and computed internal props
+      if (['id', 'type', 'name', 'children'].includes(propKey)) continue
+      
+      const value = node[propKey]
+      
+      // We validate anything that has a value or is explicitly in the schema
+      if (value !== undefined && value !== null) {
+         const error = validateProperty(node, propDef, value, localVars, flatNodes, parentNode)
+         if (error) {
+           errors.push({
+             nodeId: node.id,
+             nodeName: node.name,
+             path: `${screenName}${node.type !== 'Screen' ? '.' + node.name : ''}.${propKey}`,
+             propName: propKey,
+             error: error
+           })
+         }
+      }
+    }
+  }
+
+  return errors
 }
 
 /**

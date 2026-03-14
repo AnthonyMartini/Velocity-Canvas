@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import GeneratorPage from './GeneratorPage/index.jsx'
 import RendererPage from './RendererPage/index.jsx'
-import ComponentLibraryPage from './ComponentLibraryPage/index.jsx'
+import DocumentationPage from './ComponentLibraryPage/index.jsx'
 import LandingPage from './LandingPage/index.jsx'
-import IconPlayground from './IconPlayground/index.jsx'
 import logo from './assets/logo.png'
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
@@ -28,17 +27,11 @@ const LibraryIcon = () => (
   </svg>
 )
 
-const PlaygroundIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd" />
-  </svg>
-)
 
 const TABS = [
   { id: 'generator', label: 'Component Generator', Icon: GeneratorIcon },
   { id: 'renderer', label: 'Canvas Editor', Icon: RendererIcon },
-  { id: 'library', label: 'Component Library', Icon: LibraryIcon },
-  { id: 'playground', label: 'Icon Playground', Icon: PlaygroundIcon },
+  { id: 'library', label: 'Documentation', Icon: LibraryIcon },
 ]
 
 export default function App() {
@@ -99,8 +92,7 @@ export default function App() {
       <div className={`flex-1 flex flex-col ${activeTab === 'renderer' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {activeTab === 'generator' && <GeneratorPage />}
       {activeTab === 'renderer' && <RendererPage />}
-      {activeTab === 'library' && <ComponentLibraryPage />}
-      {activeTab === 'playground' && <IconPlayground />}
+      {activeTab === 'library' && <DocumentationPage />}
 
       {/* ── Footer (Generator only) ──────────────────────────────────────────── */}
       {activeTab === 'generator' && (

@@ -1,4 +1,4 @@
-import { FUNCTIONS } from '../RendererPage/Functions.jsx'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow } from '../RendererPage/Functions.jsx'
 
 /**
  * Parses a formula string into an Abstract Syntax Tree (AST).
@@ -19,7 +19,7 @@ export function parseFormula(formula, strict = false) {
   // Tokenizer
   const tokens = []
   // Updated regex to include # for hex colors and maybe some basic logical operators
-  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|([()=+\-*/&,;<>!|])/g
+  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|])/g
   let match
   
   while ((match = regex.exec(text)) !== null) {
@@ -30,8 +30,9 @@ export function parseFormula(formula, strict = false) {
     } else if (isProp) {
       tokens.push({ type: 'PropertyAccess', value: full })
     } else if (isWord) {
-      if (full === 'true') tokens.push({ type: 'Boolean', value: true })
-      else if (full === 'false') tokens.push({ type: 'Boolean', value: false })
+      const lower = full.toLowerCase()
+      if (lower === 'true') tokens.push({ type: 'Boolean', value: true })
+      else if (lower === 'false') tokens.push({ type: 'Boolean', value: false })
       else tokens.push({ type: 'Identifier', value: full })
     } else if (isColor) {
       // Treat hex colors as strings/literals
@@ -72,9 +73,21 @@ export function parseFormula(formula, strict = false) {
   }
 
   function parseConcatenation() {
-    let left = parseAddition()
+    let left = parseComparison()
     
     while (peek() && peek().value === '&') {
+      const op = consume().value
+      const right = parseComparison()
+      left = { type: 'BinaryExpression', operator: op, left, right }
+    }
+    return left
+  }
+
+  function parseComparison() {
+    let left = parseAddition()
+    const comparisonOps = ['=', '<>', '>', '<', '>=', '<=']
+    
+    while (peek() && comparisonOps.includes(peek().value)) {
       const op = consume().value
       const right = parseAddition()
       left = { type: 'BinaryExpression', operator: op, left, right }
@@ -94,14 +107,23 @@ export function parseFormula(formula, strict = false) {
   }
 
   function parseMultiplication() {
-    let left = parseAtomic()
+    let left = parseUnary()
     
     while (peek() && (peek().value === '*' || peek().value === '/')) {
       const op = consume().value
-      const right = parseAtomic()
+      const right = parseUnary()
       left = { type: 'BinaryExpression', operator: op, left, right }
     }
     return left
+  }
+
+  function parseUnary() {
+    if (peek() && peek().value === '!') {
+      const op = consume().value
+      const argument = parseUnary()
+      return { type: 'UnaryExpression', operator: op, argument }
+    }
+    return parseAtomic()
   }
 
   function parseAtomic() {
@@ -190,7 +212,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
   if (!node) return strict ? null : ""
 
   const handleError = (msg) => {
-    if (strict) throw new Error(msg)
+    if (strict) return new Error(msg) // Return Error object instead of throwing, so we can catch it or return it
     return ""
   }
 
@@ -203,14 +225,25 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     let targetNode = null
     if (compName.toLowerCase() === 'parent') targetNode = parentNode
     else if (compName.toLowerCase() === 'self') targetNode = selfNode
+    else if (compName === 'NotificationType') targetNode = NotificationType
+    else if (compName === 'Align') targetNode = Align
+    else if (compName === 'VerticalAlign') targetNode = VerticalAlign
+    else if (compName === 'FontWeight') targetNode = FontWeight
+    else if (compName === 'BorderStyle') targetNode = BorderStyle
+    else if (compName === 'DisplayMode') targetNode = DisplayMode
+    else if (compName === 'Overflow') targetNode = Overflow
     else targetNode = flatNodes.find(n => n.name === compName)
 
     if (targetNode && targetNode[propName] !== undefined) {
       const rawVal = targetNode[propName]
+      
+      // If resolving from an enum, return literal value and don't re-evaluate
+      const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow].includes(targetNode)
+      if (isEnum) return rawVal
 
       // If the property itself is a formula, parse and evaluate it
       if (typeof rawVal === 'string') {
-          const subAst = parseFormula(rawVal)
+          const subAst = parseFormula(rawVal, strict)
           return evaluateAST(subAst, localVars, flatNodes, nextVisited, targetNode?.parent, targetNode, context, strict)
       }
       return rawVal
@@ -253,10 +286,6 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       if (compNode && strict) return compNode
       if (compNode && !strict) return node.name
       
-      // If it's a known function name, treat it as a function reference
-      const isFunction = FUNCTIONS.some(f => f.name.toLowerCase() === node.name.toLowerCase())
-      if (isFunction) return node.name
-
       // In non-strict mode (normal rendering), an unknown token should return blank
       // EXCEPT for single identifiers which might be unquoted literals like colors (white, red, etc)
       if (!strict) {
@@ -290,12 +319,26 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
         case '*': res = Number(left) * Number(right); break
         case '/': res = Number(left) / Number(right); break
         case '&': res = String(left === null ? '' : left) + String(right === null ? '' : right); break
+        case '=': res = left == right; break
+        case '<>': res = left != right; break
+        case '>': res = left > right; break
+        case '<': res = left < right; break
+        case '>=': res = left >= right; break
+        case '<=': res = left <= right; break
         default: res = null
       }
       if (!strict) {
           if (res === null || res === undefined || (typeof res === 'number' && isNaN(res))) return ""
       }
       return res
+    }
+
+    case 'UnaryExpression': {
+      const arg = evaluateAST(node.argument, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      if (node.operator === '!') {
+        return !arg
+      }
+      return null
     }
 
     case 'FunctionCall': {
@@ -316,9 +359,18 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       const evaluatedArgs = []
       for (let i = 0; i < node.arguments.length; i++) {
         const argData = node.arguments[i]
-        if (funcDef.name === 'Set' && i === 0 && argData.type === 'VariableAccess') {
-          // Pass the literal name of the variable instead of evaluating it
-          evaluatedArgs.push(argData.name)
+        if (funcDef.name === 'Set' && i === 0) {
+          if (argData.type === 'PropertyAccess') {
+            return handleError(`"Set" cannot be used to update a component property. Please target a variable instead.`)
+          }
+          if (argData.type === 'VariableAccess') {
+             // Pass the literal name of the variable instead of evaluating it
+             evaluatedArgs.push(argData.name)
+          } else {
+             // If it's something else (like a literal or expression), evaluate it and hope for the best, 
+             // though normally Set expects an identifier.
+             evaluatedArgs.push(evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
+          }
         } else {
           evaluatedArgs.push(evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
         }
@@ -330,6 +382,8 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       const finalRes = (result && result.status) 
         ? (result.status === "error" ? handleError(result.message) : result.message)
         : result
+
+      if (finalRes instanceof Error) return finalRes
 
       if (!strict && (finalRes === null || finalRes === undefined)) return ""
       return finalRes

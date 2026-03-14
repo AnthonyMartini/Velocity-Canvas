@@ -28,7 +28,7 @@ export const ContainerIcon = ({ className = 'w-4 h-4' }) => (
 
 export const TextInputIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <path d="M8 10H4v12h4m16-12h4v12h4" strokeLinecap="round" />
+    <path d="M8 10H4v12h4m16-12h4v12h-4" strokeLinecap="round" />
     <path d="M12 10v12" stroke={ACCENT_COLOR} strokeWidth="3" strokeLinecap="round" />
     <rect x="8" y="15" width="16" height="2" fill="currentColor" fillOpacity="0.1" stroke="none" />
   </svg>
@@ -37,8 +37,8 @@ export const TextInputIcon = ({ className = 'w-4 h-4' }) => (
 export const DropdownIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
     <rect x="4" y="8" width="24" height="16" rx="1" />
-    <path d="M22 14l3 3 3-3" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
-    <line x1="20" y1="10" x2="20" y2="22" strokeOpacity="0.4" />
+    <path d="M19 14l3 3 3-3" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="16" y1="10" x2="16" y2="22" stroke={ACCENT_COLOR} />
   </svg>
 )
 
@@ -106,7 +106,7 @@ export const DatePickerIcon = ({ className = 'w-4 h-4' }) => (
 export const ComboBoxIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
     <rect x="4" y="8" width="24" height="16" rx="1" />
-    <path d="M22 14l3 3 3-3" strokeOpacity="0.6" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19 14l3 3 3-3" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
     <path d="M8 14h8m-8 4h4" stroke={ACCENT_COLOR} strokeLinecap="round" />
   </svg>
 )

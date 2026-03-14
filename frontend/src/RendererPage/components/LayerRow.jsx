@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants.jsx'
 
-export default function LayerRow({ node, selectedIds, onSelect, depth, isCollapsed, toggleCollapse }) {
+export default function LayerRow({ node, selectedIds, onSelect, depth, isCollapsed, toggleCollapse, hasError }) {
   const isContainer = node.type === 'Container' || node.type === 'Gallery'
   const hasChildren = isContainer && node.children?.length > 0
   const isSelected = selectedIds.includes(node.id)
@@ -41,8 +41,13 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
         }}
         className={` flex-1 flex items-center gap-1.5 truncate ${node.type === 'App' ? 'cursor-default' : 'cursor-pointer'}`}
       >
-        <span className={` w-5 h-5 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
+        <span className={` relative w-5 h-5 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
           {Icon && <Icon className="w-3.5 h-3.5" />}
+          {hasError && (
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-white flex items-center justify-center shadow-sm">
+              <span className="text-[7px] text-white font-bold leading-none">!</span>
+            </div>
+          )}
         </span>
         <span className="truncate">{node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type))}</span>
         
@@ -64,4 +69,5 @@ LayerRow.propTypes = {
   depth: PropTypes.number.isRequired,
   isCollapsed: PropTypes.bool.isRequired,
   toggleCollapse: PropTypes.func.isRequired,
+  hasError: PropTypes.bool,
 }

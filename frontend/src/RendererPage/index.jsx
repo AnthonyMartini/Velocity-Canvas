@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import PropTypes from 'prop-types'
 import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
@@ -14,7 +14,7 @@ import ChatMessage from './components/ChatMessage.jsx'
 import LayerRow from './components/LayerRow.jsx'
 import { parseFormula, evaluateAST } from '../common/FormulaParser.jsx'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers.jsx'
-import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition } from '../common/helpers.jsx'
+import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers.jsx'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants.jsx'
 
 // ── Live-Validating Name Input ──────────────────────────────────────────────
@@ -62,6 +62,48 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
         }`}
       />
       {error && <p className="text-[10px] text-red/100 font-medium mt-1">{error}</p>}
+    </div>
+  )
+}
+
+// ── Errors Pane ───────────────────────────────────────────────────────────────
+function ErrorsPane({ errors, onSelectNode, width }) {
+  return (
+    <div style={{ width }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-overlay/20 bg-surface/30 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <span className="text-xs font-semibold text-text">Validation Errors</span>
+          <span className="text-[10px] text-white bg-red/80 px-1.5 py-0.5 rounded-full">{errors.length}</span>
+        </div>
+      </div>
+
+      {/* Errors list */}
+      <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
+        {errors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-subtext/40 gap-2">
+            <svg className="w-8 h-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs italic">No errors found. Great job!</span>
+          </div>
+        ) : (
+          errors.map((err, i) => (
+            <div 
+              key={i} 
+              onClick={() => onSelectNode(err.nodeId)}
+              className="group flex flex-col gap-1 p-3 rounded-lg border border-red/20 bg-red/5 hover:bg-red/10 hover:border-red/40 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-red-300 font-semibold">{err.path}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 text-subtext/60 group-hover:text-text transition-colors">Select &rarr;</span>
+              </div>
+              <p className="text-[11px] text-red-200 mt-0.5">{err.error}</p>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -362,6 +404,7 @@ export default function RendererPage() {
   const [collapsedIds, setCollapsedIds] = useState(new Set()) // Container collapse state
   const [zoom, setZoom] = useState(1) // Canvas zoom level
   const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
+  const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
 
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
@@ -391,6 +434,7 @@ export default function RendererPage() {
   const [rightWidth, setRightWidth] = useState(256)
   const [chatHeight, setChatHeight] = useState(240)
   const [codeWidth, setCodeWidth] = useState(288)
+  const [errorsWidth, setErrorsWidth] = useState(288)
   const paneResizeRef = useRef(null)
 
   // History state for Undo/Redo
@@ -398,6 +442,8 @@ export default function RendererPage() {
     items: [[...tree]],
     index: 0
   })
+
+  const [snapLines, setSnapLines] = useState([]) // Active grid lines [{x?, y?, orientation}]
 
   // Function to save a new state to history
   const saveHistory = useCallback((newTree) => {
@@ -497,12 +543,12 @@ export default function RendererPage() {
   }, [tree])
 
   // Custom notify function exposes an API similar to Notify() function
-  const notify = useCallback((message) => {
+  const notify = useCallback((message, type = 'Information') => {
     setNotification(prev => {
       // Clear previous timeout if any
       if (prev?.timer) clearTimeout(prev.timer)
       const timer = setTimeout(() => setNotification(null), 3000)
-      return { message, timer }
+      return { message, type, timer }
     })
   }, [])
 
@@ -612,6 +658,10 @@ export default function RendererPage() {
   const flatNodes = flattenTree(tree, collapsedIds)
   const fullFlatNodes = flattenTree(tree, new Set())
   const totalCount = fullFlatNodes.length // Total count shouldn't hide skipped nodes
+
+  const globalErrors = useMemo(() => {
+    return getAllAppErrors(tree, localVars, SCHEMAS)
+  }, [tree, localVars])
 
   // Sticky active screen — only changes when the selection moves to a different screen.
   // Deselecting (empty selectedIds) keeps the last active screen.
@@ -775,9 +825,15 @@ export default function RendererPage() {
     }
     setSelectedIds(newSelectedIds)
     
+    const parent = findParent(tree, id)
+    const limitW = (parent && parent.type !== 'App') ? (parent.Width || 800) : canvasW
+    const limitH = (parent && parent.type !== 'App') ? (parent.Height || 600) : canvasH
+
     dragRef.current = {
       startMouseX: e.clientX,
       startMouseY: e.clientY,
+      parentGridLinesX: [limitW * 0.25, limitW * 0.5, limitW * 0.75],
+      parentGridLinesY: [limitH * 0.25, limitH * 0.5, limitH * 0.75],
       nodes: newSelectedIds.map(sid => {
         const n = findNode(tree, sid)
         if (!n) return null
@@ -792,7 +848,7 @@ export default function RendererPage() {
         }
       }).filter(Boolean)
     }
-  }, [tree, selectedIds, isPlaying, localVars, fullFlatNodes])
+  }, [tree, selectedIds, isPlaying, localVars, fullFlatNodes, canvasW, canvasH])
 
   // Keep canvas size ref in sync
   useEffect(() => { canvasSizeRef.current = { w: canvasW, h: canvasH } }, [canvasW, canvasH])
@@ -857,6 +913,7 @@ export default function RendererPage() {
 
         let snapDx = dx
         let snapDy = dy
+        const newSnapLines = []
 
         // Horizontal snapping (E/W)
         if (dir.includes('e') || dir.includes('w')) {
@@ -868,6 +925,7 @@ export default function RendererPage() {
           const curY1 = startY + (dir.includes('n') ? dy : 0)
           const curY2 = startY + startH + (dir.includes('s') ? dy : 0)
 
+          // Snap to siblings
           for (const s of filteredSiblings) {
             // Only snap if Y-ranges overlap (collision)
             const sY1 = s.Y || 0, sY2 = (s.Y || 0) + (s.Height || 0)
@@ -882,8 +940,19 @@ export default function RendererPage() {
               }
             }
           }
+          // Snap to parent grid lines
+          const gridLinesX = resizeRef.current.parentGridLinesX || []
+          for (const line of gridLinesX) {
+            const diff = Math.abs(theoreticalEdge - line)
+            if (diff < SNAP_THRESHOLD && diff < minDiffX) {
+              minDiffX = diff
+              bestSnapX = { gridLine: line }
+            }
+          }
+
           if (bestSnapX) {
             snapDx = bestSnapX.gridLine - (dir.includes('e') ? (startX + startW) : startX)
+            newSnapLines.push({ x: bestSnapX.gridLine, orientation: 'vertical', parentId: parent?.id || 'root' })
           }
         }
 
@@ -897,6 +966,7 @@ export default function RendererPage() {
           const curX1 = startX + (dir.includes('w') ? dx : 0)
           const curX2 = startX + startW + (dir.includes('e') ? dx : 0)
 
+          // Snap to siblings
           for (const s of filteredSiblings) {
             const sX1 = s.X || 0, sX2 = (s.X || 0) + (s.Width || 0)
             if (Math.max(curX1, sX1) < Math.min(curX2, sX2)) {
@@ -910,10 +980,23 @@ export default function RendererPage() {
               }
             }
           }
+          // Snap to parent grid lines
+          const gridLinesY = resizeRef.current.parentGridLinesY || []
+          for (const line of gridLinesY) {
+            const diff = Math.abs(theoreticalEdge - line)
+            if (diff < SNAP_THRESHOLD && diff < minDiffY) {
+              minDiffY = diff
+              bestSnapY = { gridLine: line }
+            }
+          }
+
           if (bestSnapY) {
             snapDy = bestSnapY.gridLine - (dir.includes('s') ? (startY + startH) : startY)
+            newSnapLines.push({ y: bestSnapY.gridLine, orientation: 'horizontal', parentId: parent?.id || 'root' })
           }
         }
+
+        setSnapLines(newSnapLines)
 
         setTree(prev => updateNode(prev, id, (node) => {
           let newX = startX, newY = startY, newW = startW, newH = startH
@@ -975,19 +1058,22 @@ export default function RendererPage() {
 
         let snapDx = dx
         let snapDy = dy
+        const newSnapLines = []
 
         // X-axis snapping
         const theoreticalX1 = minX + dx
         const theoreticalX2 = minX + groupWidth + dx
+        const theoreticalXC = minX + groupWidth / 2 + dx
         let bestSnapX = null
         let minDiffX = Infinity
 
+        // Snap to siblings
         for (const s of filteredSiblings) {
           // Collision check: Y-ranges overlap
           const sY1 = s.Y || 0, sY2 = (s.Y || 0) + (s.Height || 0)
           const curY1 = minY + dy, curY2 = minY + groupHeight + dy
           if (Math.max(curY1, sY1) < Math.min(curY2, sY2)) {
-             const sEdges = [s.X || 0, (s.X || 0) + (s.Width || 0)]
+             const sEdges = [s.X || 0, (s.X || 0) + (s.Width || 0), (s.X || 0) + (s.Width || 0) / 2]
              for (const sEdge of sEdges) {
                 // Check dragged group left edge
                 let d1 = Math.abs(theoreticalX1 - sEdge)
@@ -1001,27 +1087,56 @@ export default function RendererPage() {
                    minDiffX = d2
                    bestSnapX = { gridLine: sEdge, type: 'right' }
                 }
+                // Check dragged group center
+                let dc = Math.abs(theoreticalXC - sEdge)
+                if (dc < SNAP_THRESHOLD && dc < minDiffX) {
+                  minDiffX = dc
+                  bestSnapX = { gridLine: sEdge, type: 'center' }
+                }
              }
           }
+        }
+        // Snap to parent grid lines
+        const gridLinesX = dragRef.current.parentGridLinesX || []
+        for (const line of gridLinesX) {
+           let d1 = Math.abs(theoreticalX1 - line)
+           if (d1 < SNAP_THRESHOLD && d1 < minDiffX) {
+              minDiffX = d1
+              bestSnapX = { gridLine: line, type: 'left' }
+           }
+           let d2 = Math.abs(theoreticalX2 - line)
+           if (d2 < SNAP_THRESHOLD && d2 < minDiffX) {
+              minDiffX = d2
+              bestSnapX = { gridLine: line, type: 'right' }
+           }
+           let dc = Math.abs(theoreticalXC - line)
+           if (dc < SNAP_THRESHOLD && dc < minDiffX) {
+              minDiffX = dc
+              bestSnapX = { gridLine: line, type: 'center' }
+           }
         }
 
         if (bestSnapX) {
           if (bestSnapX.type === 'left') snapDx = bestSnapX.gridLine - minX
-          else snapDx = bestSnapX.gridLine - groupWidth - minX
+          else if (bestSnapX.type === 'right') snapDx = bestSnapX.gridLine - groupWidth - minX
+          else snapDx = bestSnapX.gridLine - groupWidth / 2 - minX
+          newSnapLines.push({ x: bestSnapX.gridLine, orientation: 'vertical', parentId: parent?.id || 'root' })
         }
 
         // Y-axis snapping
         const theoreticalY1 = minY + dy
         const theoreticalY2 = minY + groupHeight + dy
+        const theoreticalYC = minY + groupHeight / 2 + dy
         let bestSnapY = null
         let minDiffY = Infinity
 
+        // Snap to siblings
         for (const s of filteredSiblings) {
           // Collision check: X-ranges overlap
           const sX1 = s.X || 0, sX2 = (s.X || 0) + (s.Width || 0)
           const curX1 = minX + snapDx, curX2 = minX + groupWidth + snapDx
           if (Math.max(curX1, sX1) < Math.min(curX2, sX2)) {
-             const sEdges = [s.Y || 0, (s.Y || 0) + (s.Height || 0)]
+             const sEdges = [s.Y || 0, (s.Y || 0) + (s.Height || 0), (s.Y || 0) + (s.Height || 0) / 2]
              for (const sEdge of sEdges) {
                 // Check dragged group top edge
                 let d1 = Math.abs(theoreticalY1 - sEdge)
@@ -1035,14 +1150,43 @@ export default function RendererPage() {
                    minDiffY = d2
                    bestSnapY = { gridLine: sEdge, type: 'bottom' }
                 }
+                // Check dragged group center
+                let dc = Math.abs(theoreticalYC - sEdge)
+                if (dc < SNAP_THRESHOLD && dc < minDiffY) {
+                  minDiffY = dc
+                  bestSnapY = { gridLine: sEdge, type: 'center' }
+                }
              }
           }
+        }
+        // Snap to parent grid lines
+        const gridLinesY = dragRef.current.parentGridLinesY || []
+        for (const line of gridLinesY) {
+           let d1 = Math.abs(theoreticalY1 - line)
+           if (d1 < SNAP_THRESHOLD && d1 < minDiffY) {
+              minDiffY = d1
+              bestSnapY = { gridLine: line, type: 'top' }
+           }
+           let d2 = Math.abs(theoreticalY2 - line)
+           if (d2 < SNAP_THRESHOLD && d2 < minDiffY) {
+              minDiffY = d2
+              bestSnapY = { gridLine: line, type: 'bottom' }
+           }
+           let dc = Math.abs(theoreticalYC - line)
+           if (dc < SNAP_THRESHOLD && dc < minDiffY) {
+              minDiffY = dc
+              bestSnapY = { gridLine: line, type: 'center' }
+           }
         }
 
         if (bestSnapY) {
           if (bestSnapY.type === 'top') snapDy = bestSnapY.gridLine - minY
-          else snapDy = bestSnapY.gridLine - groupHeight - minY
+          else if (bestSnapY.type === 'bottom') snapDy = bestSnapY.gridLine - groupHeight - minY
+          else snapDy = bestSnapY.gridLine - groupHeight / 2 - minY
+          newSnapLines.push({ y: bestSnapY.gridLine, orientation: 'horizontal', parentId: parent?.id || 'root' })
         }
+
+        setSnapLines(newSnapLines)
 
         setTree(prev => {
           let nextTree = prev
@@ -1177,12 +1321,16 @@ export default function RendererPage() {
       }
 
       // ── Drag end ────────────────────────────────────────────────────────────
-      if (!dragRef.current || !dragRef.current.nodes?.length) return
+      if (!dragRef.current || !dragRef.current.nodes?.length) {
+        setSnapLines([]) // Clear lines if mouse up without dragging
+        return
+      }
       
       const draggedNodes = dragRef.current.nodes
       
       dragRef.current = null 
       setDragOverId(null)
+      setSnapLines([]) // Clear lines
   
       
       // Tree was updated during onMove.
@@ -1216,11 +1364,16 @@ export default function RendererPage() {
     if (!node) return
     const parent = findParent(tree, id)
     const rn = resolveProperties(node, localVars, fullFlatNodes, parent)
+    const limitW = (parent && parent.type !== 'App') ? (parent.Width || 800) : canvasW
+    const limitH = (parent && parent.type !== 'App') ? (parent.Height || 600) : canvasH
+
     resizeRef.current = {
       id, dir,
       startMouseX: e.clientX, startMouseY: e.clientY,
       startX: rn.X, startY: rn.Y,
       startW: rn.Width, startH: rn.Height,
+      parentGridLinesX: [limitW * 0.25, limitW * 0.5, limitW * 0.75],
+      parentGridLinesY: [limitH * 0.25, limitH * 0.5, limitH * 0.75],
     }
     // Set a global cursor while resizing
     const cursorMap = { n:'n-resize', s:'s-resize', e:'e-resize', w:'w-resize', ne:'ne-resize', nw:'nw-resize', se:'se-resize', sw:'sw-resize' }
@@ -1585,7 +1738,23 @@ export default function RendererPage() {
             )}
           </button>
 
-          
+          <button
+            id="errors-trigger"
+            onClick={() => setShowErrorsPane(!showErrorsPane)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showErrorsPane ? 'bg-red/20 text-red border border-red/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
+            </svg>
+            Errors
+            {globalErrors.length > 0 && (
+               <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red text-white text-[9px] font-bold">
+                 {globalErrors.length}
+               </span>
+            )}
+          </button>
+
           <button
             id="yaml-trigger"
             onClick={() => setShowCodePane(!showCodePane)}
@@ -1795,6 +1964,7 @@ export default function RendererPage() {
                   depth={_depth}
                   isCollapsed={collapsedIds.has(node.id)}
                   toggleCollapse={toggleCollapse}
+                  hasError={globalErrors.some(err => err.nodeId === node.id)}
                 />
               ))}
               {tree.length === 0 && <div className="text-xs text-subtext/40 italic px-2 py-4">Canvas is empty</div>}
@@ -1876,18 +2046,74 @@ export default function RendererPage() {
                 onDrop={e => { e.preventDefault(); setDragOverId(null) }}
               >
                 {/* Global Toast Notification inside Canvas */}
-                {notification && (
-                  <div className="absolute top-4 left-4 right-4 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-                    <div className="bg-surface border border-overlay/40 shadow-xl shadow-black/20 rounded-xl px-4 py-2 flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                        <svg className="w-3.5 h-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
+                {notification && (() => {
+                  const type = notification.type || 'Information'
+                  const styles = {
+                    Success: {
+                      bg: 'bg-emerald-50/95',
+                      border: 'border-emerald-500/30',
+                      iconBg: 'bg-emerald-500',
+                      iconText: 'text-white',
+                      accent: 'bg-emerald-500',
+                      text: 'text-emerald-900',
+                      shadow: 'shadow-emerald-500/10'
+                    },
+                    Error: {
+                      bg: 'bg-red-50/95',
+                      border: 'border-red-500/30',
+                      iconBg: 'bg-red-500',
+                      iconText: 'text-white',
+                      accent: 'bg-red-500',
+                      text: 'text-red-900',
+                      shadow: 'shadow-red-500/10',
+                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    },
+                    Warning: {
+                      bg: 'bg-amber-50/95',
+                      border: 'border-amber-500/30',
+                      iconBg: 'bg-amber-500',
+                      iconText: 'text-white',
+                      accent: 'bg-amber-500',
+                      text: 'text-amber-900',
+                      shadow: 'shadow-amber-500/10',
+                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    },
+                    Information: {
+                      bg: 'bg-blue-50/95',
+                      border: 'border-blue-500/30',
+                      iconBg: 'bg-blue-500',
+                      iconText: 'text-white',
+                      accent: 'bg-blue-500',
+                      text: 'text-blue-900',
+                      shadow: 'shadow-blue-500/10',
+                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    }
+                  }
+                  
+                  const s = styles[type] || styles.Information
+                  
+                  return (
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
+                      <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
+                        <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
+                          {type === 'Success' ? (
+                            <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          ) : s.icon}
+                        </div>
+                        <div className="flex-1 pr-4">
+                          <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type}</p>
+                          <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
+                        </div>
+                        {/* Progress Bar background */}
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-black/5">
+                           <div className={`h-full ${s.accent} animate-toast-progress`} />
+                        </div>
                       </div>
-                      <p className="text-xs font-medium text-text">{notification.message}</p>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
                 {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
@@ -1899,7 +2125,7 @@ export default function RendererPage() {
                     <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
-                {(activeScreenNode?.children || []).map(rawComp => {
+                {[...(activeScreenNode?.children || [])].reverse().map(rawComp => {
                   const isSelected = selectedIds.includes(rawComp.id)
                   const comp = resolveProperties(rawComp, localVars, fullFlatNodes, activeScreenNode)
                   const sharedProps = {
@@ -1974,6 +2200,35 @@ export default function RendererPage() {
                     <ComboBoxRenderer key={comp.id} {...sharedProps} />
                   )
                   return null
+                })}
+                
+                {/* Snap Lines (Guides) */}
+                {snapLines.map((line, i) => {
+                  let absX = line.x || 0
+                  let absY = line.y || 0
+                  // If snapping inside a nested container, adjust coordinates to be relative to the active screen
+                  if (line.parentId && line.parentId !== activeScreenId && line.parentId !== 'root' && line.parentId !== 'app_root') {
+                    const parentPos = getNodeAbsolutePosition(tree, line.parentId, fullFlatNodes, localVars)
+                    if (line.orientation === 'vertical') absX += parentPos.x
+                    else absY += parentPos.y
+                  }
+
+                  return (
+                    <div
+                      key={`snap-${i}`}
+                      style={{
+                        position: 'absolute',
+                        left: line.orientation === 'vertical' ? absX : 0,
+                        top: line.orientation === 'horizontal' ? absY : 0,
+                        width: line.orientation === 'vertical' ? 1 : '100%',
+                        height: line.orientation === 'horizontal' ? 1 : '100%',
+                        backgroundColor: '#0078d4',
+                        zIndex: 10001,
+                        pointerEvents: 'none',
+                        boxShadow: '0 0 4px rgba(0, 120, 212, 0.4)'
+                      }}
+                    />
+                  )
                 })}
 
                 {/* Marquee Selection Box */}
@@ -2183,6 +2438,28 @@ export default function RendererPage() {
           </div>
         </div>
 
+        {/* Errors Pane */}
+        {showErrorsPane && (
+          <div className="relative flex shrink-0 border-r border-overlay/20">
+            {/* Resize Handle Errors */}
+            <div 
+              className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
+              onMouseDown={(e) => {
+                paneResizeRef.current = { side: 'errors', startMouseX: e.clientX, startWidth: errorsWidth }
+                document.body.style.cursor = 'col-resize'
+              }}
+            />
+            <ErrorsPane 
+              errors={globalErrors}
+              onSelectNode={(id) => {
+                setSelectedIds([id])
+                setShowErrorsPane(false) // Optional: close pane on select
+              }}
+              width={errorsWidth}
+            />
+          </div>
+        )}
+
         {/* Code Pane */}
         {showCodePane && (
           <div className="relative flex shrink-0">
@@ -2348,10 +2625,28 @@ export default function RendererPage() {
 
                   {(() => {
                     const originalName = selectedNode.name || ''
-                    // Check for duplicate live as user types
-                    const checkDuplicate = (val) => {
+                    // Check for duplicate and invalid characters live as user types
+                    const validateName = (val) => {
                       const trimmed = val.trim()
-                      if (!trimmed || trimmed.toLowerCase() === originalName.toLowerCase()) return null
+                      if (!trimmed) return "Name cannot be empty."
+                      
+                      // 1. Check for valid characters (alphanumeric and underscore only)
+                      if (!/^[A-Za-z0-9_]*$/.test(trimmed)) {
+                        return "Name can only contain letters, numbers, and underscores."
+                      }
+                      
+                      // 2. Check for leading number
+                      if (/^[0-9]/.test(trimmed)) {
+                        return "Name cannot start with a number."
+                      }
+
+                      // 3. Check for conflict with variables
+                      if (localVars[trimmed] !== undefined) {
+                        return `"${trimmed}" is already used as a variable name.`
+                      }
+
+                      if (trimmed.toLowerCase() === originalName.toLowerCase()) return null
+                      
                       const allNames = []
                       const collect = (nodes) => {
                         for (const n of nodes) {
@@ -2368,7 +2663,7 @@ export default function RendererPage() {
                       <NameInput
                         key={selectedNode.id}
                         initialValue={originalName}
-                        checkDuplicate={checkDuplicate}
+                        checkDuplicate={validateName}
                         onCommit={val => updateProp(selectedNode.id, 'name', val)}
                       />
                     )
