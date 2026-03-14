@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import GeneratorPage from './GeneratorPage/index.jsx'
 import RendererPage from './RendererPage/index.jsx'
 import DocumentationPage from './ComponentLibraryPage/index.jsx'
 import LandingPage from './LandingPage/index.jsx'
 import logo from './assets/logo.png'
+import { auth } from './firebase'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
 const GeneratorIcon = () => (
@@ -36,14 +38,36 @@ const TABS = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('generator')
-  const [hasStarted, setHasStarted] = useState(false)
+  const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
-  const handleStart = (tabId = 'generator') => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser ?? null)
+      setAuthLoading(false)
+    })
+    return unsubscribe
+  }, [])
+
+  const handleStart = (tabId = 'generator', signedInUser = null) => {
     setActiveTab(tabId)
-    setHasStarted(true)
+    if (signedInUser) setUser(signedInUser)
   }
 
-  if (!hasStarted) {
+  const handleSignOut = async () => {
+    await signOut(auth)
+    setUser(null)
+  }
+
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-base flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
     return <LandingPage onStart={handleStart} />
   }
 
@@ -80,10 +104,25 @@ export default function App() {
             ))}
           </div>
 
-          {/* Status Indicator */}
-          <div className="flex items-center gap-2 bg-surface/50 border border-overlay/40 rounded-full px-3 py-1.5">
-            <div className="w-2 h-2 rounded-full bg-green animate-pulse-slow" />
-            <span className="text-subtext text-xs font-medium">Gemini 3.1 Flash</span>
+          {/* Status + User */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-surface/50 border border-overlay/40 rounded-full px-3 py-1.5">
+              <div className="w-2 h-2 rounded-full bg-green animate-pulse-slow" />
+              <span className="text-subtext text-xs font-medium">Gemini 3.1 Flash</span>
+            </div>
+            {user && (
+              <div className="flex items-center gap-2">
+                {user.photoURL && (
+                  <img src={user.photoURL} alt={user.displayName ?? 'User'} className="w-7 h-7 rounded-full" referrerPolicy="no-referrer" />
+                )}
+                <button
+                  onClick={handleSignOut}
+                  className="text-subtext text-xs hover:text-text transition-colors cursor-pointer"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

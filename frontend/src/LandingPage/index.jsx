@@ -1,7 +1,37 @@
 import React from 'react';
 import logo from '../assets/logo.png';
+import { auth, googleProvider, db } from '../firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 export default function LandingPage({ onStart }) {
+  const handleGoogleSignIn = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      const userRef = doc(db, 'users', user.uid);
+      const existing = await getDoc(userRef);
+      await setDoc(
+        userRef,
+        {
+          uid: user.uid,
+          email: user.email || null,
+          displayName: user.displayName || null,
+          photoURL: user.photoURL || null,
+          providerId: user.providerData?.[0]?.providerId || 'google.com',
+          lastLoginAt: serverTimestamp(),
+          ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
+        },
+        { merge: true },
+      );
+
+      onStart('generator', user);
+    } catch (error) {
+      // For now just log; you can swap this for a toast/alert
+      console.error('Google sign-in failed', error);
+    }
+  };
   return (
     <div className="min-h-screen bg-base relative overflow-x-hidden font-sans selection:bg-accent/30 selection:text-white">
       
@@ -32,19 +62,17 @@ export default function LandingPage({ onStart }) {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-6 items-center">
           <button 
-            onClick={() => onStart('generator')}
+            onClick={handleGoogleSignIn}
             className="group relative px-8 py-4 bg-accent text-base font-bold rounded-2xl text-lg shadow-xl shadow-accent/20 hover:shadow-accent/40 hover:-translate-y-1 transition-all duration-300 overflow-hidden"
           >
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
             <span className="relative flex items-center gap-2 text-[#1e1e2e]">
-              Start for Free
+              Continue with Google
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 group-hover:translate-x-1 transition-transform" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
               </svg>
             </span>
           </button>
-
-
         </div>
 
         {/* Features Preview */}
@@ -122,10 +150,10 @@ export default function LandingPage({ onStart }) {
           <h2 className="text-4xl font-bold text-white mb-6 relative z-10">Ready to accelerate your workflow?</h2>
           <p className="text-xl text-subtext mb-10 relative z-10">Stop writing tedious YAML by hand. Let AI build your Power Apps UI.</p>
           <button 
-            onClick={onStart}
+            onClick={handleGoogleSignIn}
             className="relative z-10 px-8 py-4 bg-accent text-base font-bold rounded-2xl text-lg shadow-xl shadow-accent/20 hover:shadow-accent/40 hover:-translate-y-1 transition-all duration-300"
           >
-            Launch Velocity Canvas
+            Continue with Google
           </button>
         </div>
       </div>
