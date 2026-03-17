@@ -15,7 +15,7 @@ export default function GeneratorPage() {
   const [prompt, setPrompt] = useState('')
   const [tree, setTree] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [charCount, setCharCount] = useState(0)
   const textareaRef = useRef(null)

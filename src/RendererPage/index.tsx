@@ -22,7 +22,7 @@ import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 // ── Live-Validating Name Input ──────────────────────────────────────────────
 function NameInput({ initialValue, checkDuplicate, onCommit }) {
   const [val, setVal] = useState(initialValue)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { setVal(initialValue); setError(null) }, [initialValue])
 
@@ -52,7 +52,7 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
           if (e.key === 'Enter') (e.target as any).blur()
           if (e.key === 'Escape') {
             setVal(initialValue)
-            setError(null)
+            setError(null);
             (e.target as any).blur()
           }
         }}
@@ -278,7 +278,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     zIndex: 99998,
     transition: 'all 0.3s ease-in-out'
-  }
+  } as any
 
   // Position popup in the center of the screen
   const popupStyle = {
@@ -295,10 +295,10 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
     zIndex: 100001,
     boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-  }
+  } as any
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' } as any}>
       {/* Click Shield: Blocks all interaction with the app */}
       <div 
         style={{ 
@@ -308,7 +308,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
           backgroundColor: 'transparent', 
           pointerEvents: 'auto',
           cursor: 'default'
-        }} 
+        } as any} 
         onClick={(e) => e.stopPropagation()}
       />
 
@@ -334,7 +334,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
         pointerEvents: 'none',
         transition: 'all 0.3s ease-in-out',
         boxShadow: '0 0 20px rgba(255, 255, 255, 0.3)'
-      }} />
+      } as any} />
       
       <div style={{ ...popupStyle, pointerEvents: 'auto' }}>
         {/* Close Button */}
@@ -512,7 +512,7 @@ export default function RendererPage() {
   const effectiveIsPlaying = isPlaying || isAltPressed
 
   // ── Global App State ────────────────────────────────────────────────────────
-  const [localVars, setLocalVars] = useState({}) // { varName: value }
+  const [localVars, setLocalVars] = useState<Record<string, any>>({}) // { varName: value }
   const [notification, setNotification] = useState(null) // { message, id, timer }
 
   // Auto-extract and sync variables from the tree into localVars
@@ -1328,11 +1328,16 @@ export default function RendererPage() {
         return
       }
       
-      const draggedNodes = dragRef.current.nodes
+      const dragId = dragRef.current.id
+      const finalDragOverId = dragOverId
       
       dragRef.current = null 
       setDragOverId(null)
       setSnapLines([]) // Clear lines
+  
+      if (finalDragOverId && finalDragOverId !== '_canvas') {
+        setTree(prev => handleDropLogic(prev, dragId, finalDragOverId))
+      }
   
       
       // Tree was updated during onMove.
@@ -1596,7 +1601,7 @@ export default function RendererPage() {
       canvas_width: canvasW,
       canvas_height: canvasH,
       prompt_method: promptMethod
-    }
+    } as any
 
     if (imagePayload) {
       const [header, base64] = imagePayload.split(',')
@@ -2012,7 +2017,7 @@ export default function RendererPage() {
               // Handle Marquee Selection (Left Click only)
               if (effectiveIsPlaying) return; // Cannot marquee selection during play mode
               if (e.button !== 0) return; // Only allow left-clicks for marquee selection
-              const isBg = e.target.id === 'canvas-scroll-wrapper' || e.target.id === 'canvas-padding-wrapper' || e.target.id === 'canvas-root'
+              const isBg = (e.target as HTMLElement).id === 'canvas-scroll-wrapper' || (e.target as HTMLElement).id === 'canvas-padding-wrapper' || (e.target as HTMLElement).id === 'canvas-root'
               if (isBg) {
                 // console.log('--- MOUSE DOWN ON bg ---', e.target.id)
                 if (!e.shiftKey) setSelectedIds([activeScreenNode?.id].filter(Boolean))
@@ -2190,8 +2195,9 @@ export default function RendererPage() {
                   )
                   if (comp.type === 'Icon') {
                     // Inject the raw SVG string from the schema mapping so it displays accurately in Canvas
-                    const schemaOptionVal = SCHEMAS.Icon.properties.find(p => p.key === 'Icon').options.find(o => o.value === comp.Icon)
-                    const svgString = schemaOptionVal ? schemaOptionVal.svg : null
+                    const iconProp = SCHEMAS.Icon.properties.find((p: any) => p.key === 'Icon') as any;
+                    const schemaOptionVal = iconProp?.options?.find((o: any) => o?.value === comp.Icon);
+                    const svgString = schemaOptionVal ? schemaOptionVal.svg : null;
                     return <IconRenderer key={comp.id} {...sharedProps} comp={{...comp, _svg: svgString}} />
                   }
                   if (comp.type === 'HtmlText') return (
@@ -2467,8 +2473,6 @@ export default function RendererPage() {
             <CodePane 
               node={selectedNode}
               tree={tree}
-              canvasW={canvasW}
-              canvasH={canvasH}
               isTweaking={isTweaking}
               setIsTweaking={setIsTweaking}
               tweakInput={tweakInput}
