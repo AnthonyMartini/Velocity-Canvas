@@ -30,8 +30,8 @@ export function createFromSpec(spec) {
 }
 
 // ── Extract powerFx variables from a component tree ───────────────────────────
-export function extractVariables(tree) {
-  const vars = new Set()
+export function extractVariables(tree: any[]): string[] {
+  const vars = new Set<string>()
   
   // PowerFx Set() regex: looks for Set(VariableName , Value)
   // We only want the first argument

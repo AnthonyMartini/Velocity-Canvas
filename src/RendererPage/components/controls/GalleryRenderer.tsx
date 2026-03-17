@@ -12,7 +12,11 @@ import ComboBoxRenderer from './ComboBoxRenderer'
 import ContainerRenderer from './ContainerRenderer'
 import { resolveProperties } from '../../../common/helpers'
 
-export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick }) {
+export default function GalleryRenderer({ 
+  comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
+  updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
+  onDropInto, dragOverId, setDragOverId
+}) {
   const style: any = {
     position: 'absolute',
     left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
@@ -28,7 +32,12 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
       : 'none',
     transition: 'box-shadow 0.12s',
     zIndex: selected ? 10 : 1,
-    overflow: 'hidden'
+    overflow: 'hidden',
+  }
+
+  if (dragOverId === comp.id) {
+    style.outline = '4px solid rgba(236,72,153,0.5)'
+    style.outlineOffset = '2px'
   }
 
   // Determine if vertical or horizontal based on the selected Variant
@@ -42,6 +51,11 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
       data-container-id={comp.id}
       onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
       onClick={onClick}
+      onDragOver={(e) => {
+        if (isPlaying) return
+        e.preventDefault()
+        if (dragOverId !== comp.id) setDragOverId(comp.id)
+      }}
     >
       <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: '#ec4899', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}>
         Gallery Template
@@ -62,6 +76,7 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
             parentNode: comp,
             onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
             onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
+            onDropInto, dragOverId, setDragOverId,
           }
           if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
           if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
@@ -78,6 +93,9 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
               key={child.id} {...childProps}
               onChildMouseDown={onChildMouseDown}
               onChildClick={onChildClick}
+              onDropInto={onDropInto}
+              dragOverId={dragOverId}
+              setDragOverId={setDragOverId}
             />
           )
           if (child.type === 'Gallery') return (
@@ -85,6 +103,9 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
               key={child.id} {...childProps}
               onChildMouseDown={onChildMouseDown}
               onChildClick={onChildClick}
+              onDropInto={onDropInto}
+              dragOverId={dragOverId}
+              setDragOverId={setDragOverId}
             />
           )
           return null
@@ -96,7 +117,12 @@ export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds
         {[...(comp.children || [])].reverse().map(rawChild => {
           const child = resolveProperties(rawChild, localVars, flatNodes, comp)
           const isChildSelected = selectedIds.includes(child.id)
-          const childProps = { comp: child, selected: isChildSelected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode: comp, onMouseDown: () => {}, onClick: () => {} }
+          const childProps = { 
+            comp: child, selected: isChildSelected, isPlaying, selectedIds, 
+            localVars, setLocalVars, flatNodes, notify, navigate, updateProp, 
+            parentNode: comp, onMouseDown: () => {}, onClick: () => {},
+            onDropInto, dragOverId, setDragOverId,
+          }
           if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
           if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
           if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
@@ -135,4 +161,7 @@ GalleryRenderer.propTypes = {
   onClick: PropTypes.func.isRequired,
   onChildMouseDown: PropTypes.func.isRequired,
   onChildClick: PropTypes.func.isRequired,
+  onDropInto: PropTypes.func,
+  dragOverId: PropTypes.string,
+  setDragOverId: PropTypes.func,
 }

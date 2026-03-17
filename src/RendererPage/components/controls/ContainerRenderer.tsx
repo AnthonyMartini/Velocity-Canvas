@@ -13,7 +13,11 @@ import ComboBoxRenderer from './ComboBoxRenderer'
 import { CSS_BORDER_STYLE } from './cssProps'
 import { resolveProperties } from '../../../common/helpers'
 
-export default function ContainerRenderer({ comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick }) {
+export default function ContainerRenderer({ 
+  comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
+  updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
+  onDropInto, dragOverId, setDragOverId 
+}) {
   const shadowMap = {
     'DropShadow.None': 'none',
     'DropShadow.Light': '0 2px 4px rgba(0,0,0,0.1)',
@@ -37,8 +41,12 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
     boxShadow: selected
       ? '0 0 0 3px rgba(0,120,212,0.25)'
       : (shadowMap[comp.DropShadow] || 'none'),
-    transition: 'box-shadow 0.12s, border-radius 0.12s',
     zIndex: selected ? 10 : 1,
+  }
+
+  if (dragOverId === comp.id) {
+    style.outline = '4px solid rgba(0,120,212,0.5)'
+    style.outlineOffset = '2px'
   }
 
   return (
@@ -47,6 +55,18 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
       data-container-id={comp.id}
       onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
       onClick={onClick}
+      onDragOver={(e) => {
+        if (isPlaying) return
+        e.preventDefault()
+        if (dragOverId !== comp.id) setDragOverId(comp.id)
+      }}
+      onMouseUp={(e) => {
+        if (isPlaying) return
+        // If we are dragging something and mouse up over this container, 
+        // the index.tsx onUp handles the actual tree move, but we could also 
+        // trigger it here if index.tsx didn't. 
+        // For now, index.tsx handles the final drop logic using dragOverId.
+      }}
     >
       {/* Container label badge */}
       {!comp.children?.length && (
@@ -69,6 +89,7 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
           parentNode: comp,
           onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
           onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
+          onDropInto, dragOverId, setDragOverId,
         }
         if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
         if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
@@ -85,6 +106,9 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
             key={child.id} {...childProps}
             onChildMouseDown={onChildMouseDown}
             onChildClick={onChildClick}
+            onDropInto={onDropInto}
+            dragOverId={dragOverId}
+            setDragOverId={setDragOverId}
           />
         )
         if (child.type === 'Gallery') return (
@@ -92,6 +116,9 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
             key={child.id} {...childProps}
             onChildMouseDown={onChildMouseDown}
             onChildClick={onChildClick}
+            onDropInto={onDropInto}
+            dragOverId={dragOverId}
+            setDragOverId={setDragOverId}
           />
         )
         return null
@@ -126,4 +153,7 @@ ContainerRenderer.propTypes = {
   onClick: PropTypes.func.isRequired,
   onChildMouseDown: PropTypes.func.isRequired,
   onChildClick: PropTypes.func.isRequired,
+  onDropInto: PropTypes.func,
+  dragOverId: PropTypes.string,
+  setDragOverId: PropTypes.func,
 }
