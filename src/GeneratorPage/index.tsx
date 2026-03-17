@@ -205,9 +205,17 @@ export default function GeneratorPage() {
                  >
                   {tree.map(comp => {
                     const sharedProps = {
-                      comp, selected: false,
-                      onMouseDown: (e) => e.preventDefault(),
-                      onClick: (e) => e.preventDefault(),
+                      comp, 
+                      selected: false,
+                      isPlaying: false,
+                      localVars: {},
+                      setLocalVars: () => {},
+                      notify: () => {},
+                      navigate: () => {},
+                      flatNodes: tree,
+                      parentNode: null,
+                      onMouseDown: (e: any) => e.preventDefault(),
+                      onClick: (e: any) => e.preventDefault(),
                     }
                     if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
                     if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
