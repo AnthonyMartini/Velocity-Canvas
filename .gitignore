@@ -1,3 +1,7 @@
+# next.js
+.next/
+
+
 # Dependency directories
 node_modules/
 venv/
