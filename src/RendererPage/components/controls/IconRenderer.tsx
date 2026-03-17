@@ -26,7 +26,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
   // We'll use a data URI or dangerouslySetInnerHTML.
 
 
-  const containerStyle = {
+  const containerStyle: any = {
     position: 'absolute',
     left: comp.X,
     top: comp.Y,

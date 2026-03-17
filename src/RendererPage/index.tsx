@@ -27,7 +27,7 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
   useEffect(() => { setVal(initialValue); setError(null) }, [initialValue])
 
   const handleChange = (e) => {
-    const v = e.target.value
+    const v = (e.target as any).value
     setVal(v)
     setError(checkDuplicate(v))
   }
@@ -49,11 +49,11 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
         onChange={handleChange}
         onBlur={handleCommit}
         onKeyDown={e => {
-          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Enter') (e.target as any).blur()
           if (e.key === 'Escape') {
             setVal(initialValue)
             setError(null)
-            e.target.blur()
+            (e.target as any).blur()
           }
         }}
         placeholder="Component name"

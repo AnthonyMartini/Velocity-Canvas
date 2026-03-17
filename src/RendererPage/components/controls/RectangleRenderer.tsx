@@ -12,7 +12,7 @@ export default function RectangleRenderer({
     }
   }
 
-  const containerStyle = {
+  const containerStyle: any = {
     position: 'absolute',
     left: comp.X,
     top: comp.Y,

@@ -45,7 +45,7 @@ export default function HtmlTextRenderer({
   }
 
   // Build the styles map for the actual container
-  const baseStyle = {
+  const baseStyle: any = {
     position: 'absolute',
     left: comp.X,
     top: comp.Y,

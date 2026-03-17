@@ -1,37 +1,38 @@
-import { useState, useRef, useEffect } from 'react'
+import * as React from 'react'
 import PropTypes from 'prop-types'
 import FormulaInput from './FormulaInput'
 import { flattenTree, findParent, validateProperty } from '../../common/helpers'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
 function ValidatedNumberInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
-  const [tempValue, setTempValue] = useState(String(value))
-  const [error, setError] = useState(null)
+  const [tempValue, setTempValue] = React.useState(String(value))
+  const [nError, setNError] = React.useState<any>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
     setTempValue(String(value))
-    setError(validate(String(value)))
-  }, [value, localVars, flatNodes, parentNode, selfNode]) // Re-validate if dependencies or value changes
-
-  const validate = (val) => {
-    return validateProperty(
+    setNError(validateProperty(
       selfNode,
       { name: "Value", type: "number" },
-      val,
+      String(value),
       localVars,
       flatNodes,
       parentNode
-    )
-  }
+    ))
+  }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const handleChange = (v) => {
     setTempValue(v)
-    setError(validate(v))
+    setNError(validateProperty(
+      selfNode,
+      { name: "Value", type: "number" },
+      v,
+      localVars,
+      flatNodes,
+      parentNode
+    ))
   }
 
   const handleBlur = () => {
-    // Save the input even if it has an error, so the user doesn't lose their formula.
-    // The red highlight and tooltip will persist.
     if (tempValue.trim().startsWith('=')) {
       onChange(tempValue.trim())
     } else {
@@ -50,49 +51,52 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
-        onKeyDown={e => {
+        hasError={!!nError}
+        onKeyDown={(e: any) => {
           if (e.key === 'Enter') e.target.blur()
           if (e.key === 'Escape') {
             setTempValue(String(value))
-            setError(null)
+            setNError(null)
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${nError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
+      {nError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{nError}</span>}
     </div>
   )
 }
 
 // ── Validated Event Input ──────────────────────────────────────────────────
 function ValidatedEventInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
-  const [tempValue, setTempValue] = useState(String(value || ""))
-  const [error, setError] = useState(null)
+  const [tempValue, setTempValue] = React.useState(String(value || ""))
+  const [eError, setEError] = React.useState<any>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
     setTempValue(String(value || ""))
-    setError(validate(String(value || "")))
-  }, [value, localVars, flatNodes, parentNode, selfNode])
-
-  const validate = (val) => {
-    return validateProperty(
+    setEError(validateProperty(
       selfNode,
       { name: "OnSelect", type: "string" },
-      val,
+      String(value || ""),
       localVars,
       flatNodes,
       parentNode
-    )
-  }
+    ))
+  }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const handleChange = (v) => {
     setTempValue(v)
-    setError(validate(v))
+    setEError(validateProperty(
+      selfNode,
+      { name: "OnSelect", type: "string" },
+      v,
+      localVars,
+      flatNodes,
+      parentNode
+    ))
   }
 
   const handleBlur = () => {
-    // Keep the value even if invalid so they don't lose their formula
     onChange(tempValue.trim())
   }
 
@@ -102,49 +106,52 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
-        onKeyDown={e => {
+        hasError={!!eError}
+        onKeyDown={(e: any) => {
           if (e.key === "Enter") e.target.blur()
           if (e.key === "Escape") {
             setTempValue(String(value || ""))
-            setError(null)
+            setEError(null)
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${eError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
+      {eError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{eError}</span>}
     </div>
   )
 }
 
 // ── Validated String Input ─────────────────────────────────────────────────
 function ValidatedStringInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
-  const [tempValue, setTempValue] = useState(String(value || ""))
-  const [error, setError] = useState(null)
+  const [tempValue, setTempValue] = React.useState(String(value || ""))
+  const [sError, setSError] = React.useState<any>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
     setTempValue(String(value || ""))
-    setError(validate(String(value || "")))
-  }, [value, localVars, flatNodes, parentNode, selfNode])
-
-  const validate = (val) => {
-    return validateProperty(
+    setSError(validateProperty(
       selfNode,
-      { name: "Text", type: "string" }, // Just treating as string for validateProperty
-      val,
+      { name: "Text", type: "string" },
+      String(value || ""),
       localVars,
       flatNodes,
       parentNode
-    )
-  }
+    ))
+  }, [value, localVars, flatNodes, parentNode, selfNode])
 
   const handleChange = (v) => {
     setTempValue(v)
-    setError(validate(v))
+    setSError(validateProperty(
+      selfNode,
+      { name: "Text", type: "string" },
+      v,
+      localVars,
+      flatNodes,
+      parentNode
+    ))
   }
 
   const handleBlur = () => {
-    // Keep the value even if invalid so they don't lose their formula
     onChange(tempValue.trim())
   }
 
@@ -154,41 +161,56 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
-        onKeyDown={e => {
+        hasError={!!sError}
+        onKeyDown={(e: any) => {
           if (e.key === "Enter") e.target.blur()
           if (e.key === "Escape") {
             setTempValue(String(value || ""))
-            setError(null)
+            setSError(null)
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${sError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
       />
-      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
+      {sError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{sError}</span>}
     </div>
   )
 }
 
-export default function PropField({ prop, value, onChange, localVars = {}, flatNodes = [], parentNode = null, selfNode = null }) {
+export default function PropField({ prop, value, onChange, localVars = {}, flatNodes = [], parentNode = null, selfNode = null }: any) {
   if (prop.type === 'boolean') {
     const isFormula = typeof value === 'string' && value.startsWith('=')
     
     return (
       <div className="flex flex-col py-1.5 gap-1">
         <div className="flex items-center justify-between">
-          <label className="text-xs text-subtext">{prop.label}</label>
-          {!isFormula && (
-            <button onClick={() => onChange(!value)}
-              className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${value ? 'bg-accent' : 'bg-overlay'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${value ? 'translate-x-4' : 'translate-x-0'}`} />
-            </button>
+          <label className="text-xs text-subtext shrink-0">{prop.label}</label>
+          {!isFormula ? (
+            <input
+              type="checkbox"
+              checked={value === true || value === 'true'}
+              onChange={e => onChange(e.target.checked)}
+              className="w-4 h-4 rounded border-overlay/40 text-accent focus:ring-accent"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-accent font-mono">=</span>
+              <button 
+                onClick={() => onChange(false)}
+                className="text-[9px] text-subtext/40 hover:text-red hover:bg-red/10 px-1 rounded transition-colors"
+              >
+                Reset to static
+              </button>
+            </div>
           )}
         </div>
-        {(isFormula || typeof value === 'string' && value.trim() === '') && (
+        {isFormula && (
           <FormulaInput
             value={value}
             onChange={onChange}
             onBlur={() => {}}
+            hasError={false}
+            onKeyDown={() => {}}
             className="w-full bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60"
             localVars={localVars}
             flatNodes={flatNodes}
@@ -200,13 +222,13 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
     )
   }
   if (prop.type === 'color') {
-    const [showPopover, setShowPopover] = useState(false)
-    const popoverRef = useRef(null)
+    const [showPopover, setShowPopover] = React.useState(false)
+    const popoverRef = React.useRef<HTMLDivElement>(null)
 
     // Close on outside click
-    useEffect(() => {
+    React.useEffect(() => {
       if (!showPopover) return
-      const handleClick = (e) => {
+      const handleClick = (e: any) => {
         if (popoverRef.current && !popoverRef.current.contains(e.target)) {
           setShowPopover(false)
         }
@@ -216,7 +238,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
     }, [showPopover])
 
     // Improved parsing for RGBA support
-    const parse = (c) => {
+    const parse = (c: any) => {
       const fallback = { r: 255, g: 255, b: 255, a: 1, hex: '#ffffff' }
       if (!c || c === 'transparent') return { ...fallback, a: 0 }
       
@@ -237,12 +259,12 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
            const g = Math.round(parseFloat(parts[1]))
            const b = Math.round(parseFloat(parts[2]))
            const a = parts[3] !== undefined ? parseFloat(parts[3]) : 1
-           const toHex = (n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')
+           const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')
            return { r, g, b, a, hex: `#${toHex(r)}${toHex(g)}${toHex(b)}` }
          }
       }
       
-      return fallback // variable or unknown string
+      return fallback 
     }
 
     const { r, g, b, a, hex } = parse(value)
@@ -256,19 +278,17 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
              <input type="text" value={value} onChange={e => onChange(e.target.value)}
               className="w-32 bg-base border border-overlay/40 rounded-md px-2 py-1 text-[10px] font-mono text-text focus:outline-none focus:border-accent/60 text-right" 
             />
-            {/* The Swatch Toggle */}
             <button 
               onClick={() => setShowPopover(!showPopover)}
               className="relative w-6 h-6 rounded-md border border-overlay/50 shrink-0 overflow-hidden shadow-sm hover:scale-105 transition-transform cursor-pointer"
               style={{ 
                 backgroundColor: value,
                 backgroundImage: isTransparent ? 'repeating-conic-gradient(#aaa 0% 25%, white 0% 50%) 0 0 / 6px 6px' : 'none' 
-              }}
+              } as any}
             />
           </div>
         </div>
 
-        {/* The Color Popover */}
         {showPopover && (
           <div ref={popoverRef} 
             className="absolute right-0 top-9 w-56 bg-surface border border-overlay/40 rounded-xl shadow-2xl shadow-black/40 z-[100] p-3 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200"
@@ -280,7 +300,6 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
               </button>
             </div>
 
-            {/* Hex Picker Box */}
             <div className="relative h-20 w-full rounded-lg border border-overlay/20 overflow-hidden shadow-inner group">
               <div 
                 className="absolute inset-0 transition-colors duration-200" 
@@ -301,7 +320,6 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
               </div>
             </div>
 
-            {/* Opacity Slider */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-subtext/60 font-medium uppercase tracking-tight">Opacity</span>
@@ -329,13 +347,12 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
               </div>
             </div>
 
-            {/* Precision Inputs */}
             <div className="grid grid-cols-4 gap-1.5">
               {[
-                { label: 'R', val: r, max: 255, step: 1, key: 'r' },
-                { label: 'G', val: g, max: 255, step: 1, key: 'g' },
-                { label: 'B', val: b, max: 255, step: 1, key: 'b' },
-                { label: 'A', val: a, max: 1,   step: 0.01, key: 'a' }
+                { label: 'R', val: r, max: 255, step: 1, key: 'r' as const },
+                { label: 'G', val: g, max: 255, step: 1, key: 'g' as const },
+                { label: 'B', val: b, max: 255, step: 1, key: 'b' as const },
+                { label: 'A', val: a, max: 1,   step: 0.01, key: 'a' as const }
               ].map(field => (
                 <div key={field.label} className="flex flex-col gap-1">
                   <span className="text-[9px] text-subtext/40 font-bold text-center">{field.label}</span>
@@ -347,12 +364,15 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
                       onChange(`RGBA(${update.r}, ${update.g}, ${update.b}, ${update.a})`)
                     }}
                     className="w-full bg-base border border-overlay/20 rounded p-1 text-[10px] text-center text-text focus:outline-none focus:border-accent appearance-none m-0"
+                    localVars={localVars}
+                    flatNodes={flatNodes}
+                    parentNode={parentNode}
+                    selfNode={selfNode}
                   />
                 </div>
               ))}
             </div>
 
-            {/* Presets/Hex Display */}
             <div className="flex items-center gap-2 bg-base/50 p-2 rounded-lg border border-overlay/10">
                <button onClick={() => onChange('#ffffff')} className="w-4 h-4 rounded border border-overlay/40 bg-white cursor-pointer hover:scale-110 transition-transform" />
                <button onClick={() => onChange('#000000')} className="w-4 h-4 rounded border border-overlay/40 bg-black cursor-pointer hover:scale-110 transition-transform" />
@@ -372,7 +392,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
         <label className="text-xs text-subtext shrink-0">{prop.label}</label>
         <select value={value} onChange={e => onChange(e.target.value)}
           className="bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 cursor-pointer">
-          {prop.options.map((o, i) => (
+          {prop.options?.map((o: any, i: number) => (
             <option key={o} value={o}>
               {prop.optionLabels ? prop.optionLabels[i] : (String(o).includes('.') ? o.split('.').pop() : o)}
             </option>
@@ -386,7 +406,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
       <div className="flex flex-col py-2 gap-2 border-t border-overlay/10 mt-1">
         <label className="text-xs font-semibold text-text">{prop.label}</label>
         <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto pr-1">
-          {prop.options.map((o) => {
+          {prop.options?.map((o: any) => {
             const isSelected = value === o.value;
             return (
               <button
@@ -451,15 +471,4 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
       />
     </div>
   )
-}
-
-PropField.propTypes = {
-  prop: PropTypes.shape({
-    type: PropTypes.string.isRequired,
-    label: PropTypes.string.isRequired,
-    options: PropTypes.arrayOf(PropTypes.any),
-    optionLabels: PropTypes.arrayOf(PropTypes.string),
-  }).isRequired,
-  value: PropTypes.any,
-  onChange: PropTypes.func.isRequired,
 }

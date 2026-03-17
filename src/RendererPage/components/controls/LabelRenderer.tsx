@@ -4,7 +4,7 @@ import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 
 export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
-  const style = {
+  const style: any = {
     position: 'absolute',
     left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
     backgroundColor: comp.Fill === 'transparent' ? 'transparent' : comp.Fill,

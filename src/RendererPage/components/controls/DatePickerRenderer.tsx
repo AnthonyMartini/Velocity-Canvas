@@ -61,7 +61,7 @@ export default function DatePickerRenderer({
   }
 
   // The outer wrapper styling
-  const wrapperStyle = {
+  const wrapperStyle: any = {
     position: 'absolute',
     left: comp.X,
     top: comp.Y,
@@ -83,7 +83,7 @@ export default function DatePickerRenderer({
   }
 
   // Native input styling
-  const inputStyle = {
+  const inputStyle: any = {
     flex: 1,
     height: '100%',
     width: '100%',
@@ -104,7 +104,7 @@ export default function DatePickerRenderer({
   }
 
   // Date icon area styling
-  const iconAreaStyle = {
+  const iconAreaStyle: any = {
     width: Math.max(comp.Height, 40), // Typically square based on height
     height: '100%',
     display: 'flex',

@@ -81,7 +81,7 @@ export default function ComboBoxRenderer({
   }
 
   // Container styling
-  const wrapperStyle = {
+  const wrapperStyle: any = {
     position: 'absolute',
     left: comp.X,
     top: comp.Y,

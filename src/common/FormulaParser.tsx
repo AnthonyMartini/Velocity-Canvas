@@ -381,7 +381,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       }
 
       // Invoke the function dynamically with unpacked args, passing the runtime context at the end
-      const result = funcDef.function(...evaluatedArgs, context)
+      const result = (funcDef.function as any)(...evaluatedArgs, context)
 
       const finalRes = (result && result.status) 
         ? (result.status === "error" ? handleError(result.message) : result.message)

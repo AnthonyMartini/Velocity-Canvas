@@ -2,7 +2,19 @@ import { useState, useRef } from 'react'
 import Editor from 'react-simple-code-editor'
 import { FUNCTIONS } from '../Functions'
 
-export default function FormulaInput({ value, onChange, onBlur, className = "", placeholder = "", onKeyDown, hasError }) {
+export default function FormulaInput({ 
+  value, 
+  onChange, 
+  onBlur, 
+  className = "", 
+  placeholder = "", 
+  onKeyDown, 
+  hasError,
+  localVars = {},
+  flatNodes = [],
+  parentNode = null,
+  selfNode = null
+}) {
   const [isFocused, setIsFocused] = useState(false)
   const editorRef = useRef(null)
 

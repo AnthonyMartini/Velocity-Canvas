@@ -13,7 +13,7 @@ import ContainerRenderer from './ContainerRenderer'
 import { resolveProperties } from '../../../common/helpers'
 
 export default function GalleryRenderer({ comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick }) {
-  const style = {
+  const style: any = {
     position: 'absolute',
     left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,

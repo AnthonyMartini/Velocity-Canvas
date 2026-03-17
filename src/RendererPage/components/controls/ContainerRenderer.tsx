@@ -21,7 +21,7 @@ export default function ContainerRenderer({ comp, selected, isPlaying, selectedI
     'DropShadow.Heavy': '0 8px 16px rgba(0,0,0,0.2)'
   }
 
-  const style = {
+  const style: any = {
     position: 'absolute',
     left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
