@@ -1,0 +1,188 @@
+[
+  {
+    "propertyName": "Align",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["Align.Center", "Align.Justify", "Align.Left", "Align.Right"]
+  },
+  {
+    "propertyName": "AllItems",
+    "propertyType": "Output",
+    "dataType": "Table"
+  },
+  {
+    "propertyName": "AllItemsCount",
+    "propertyType": "Output",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "AllowEmptySelection",
+    "propertyType": "Input",
+    "dataType": "Boolean",
+    "options": [true, false]
+  },
+  {
+    "propertyName": "BorderColor",
+    "propertyType": "Input",
+    "dataType": "Color"
+  },
+  {
+    "propertyName": "BorderStyle",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["BorderStyle.Dashed", "BorderStyle.Dotted", "BorderStyle.None", "BorderStyle.Solid"]
+  },
+  {
+    "propertyName": "BorderThickness",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "CheckboxSize",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "Color",
+    "propertyType": "Input",
+    "dataType": "Color"
+  },
+  {
+    "propertyName": "DisplayMode",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["DisplayMode.Disabled", "DisplayMode.Edit", "DisplayMode.View"]
+  },
+  {
+    "propertyName": "DropShadow",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["DropShadow.None", "DropShadow.Light", "DropShadow.Medium", "DropShadow.Heavy"]
+  },
+  {
+    "propertyName": "Fill",
+    "propertyType": "Input",
+    "dataType": "Color"
+  },
+  {
+    "propertyName": "FocusedBorderColor",
+    "propertyType": "Input",
+    "dataType": "Color"
+  },
+  {
+    "propertyName": "FontWeight",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["FontWeight.Bold", "FontWeight.Lighter", "FontWeight.Normal", "FontWeight.Semibold"]
+  },
+  {
+    "propertyName": "Format (Date)",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["DateTimeFormat.LongDate", "DateTimeFormat.ShortDate"]
+  },
+  {
+    "propertyName": "Format (Text)",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["TextFormat.Number", "TextFormat.Text"]
+  },
+  {
+    "propertyName": "Height / Width",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "Icon",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["Icon.Add", "Icon.Cancel", "Icon.Check", "Icon.Edit", "Icon.Search"]
+  },
+  {
+    "propertyName": "IsSearchable",
+    "propertyType": "Input",
+    "dataType": "Boolean",
+    "options": [true, false]
+  },
+  {
+    "propertyName": "Italic",
+    "propertyType": "Input",
+    "dataType": "Boolean",
+    "options": [true, false]
+  },
+  {
+    "propertyName": "Items",
+    "propertyType": "Input",
+    "dataType": "Table"
+  },
+  {
+    "propertyName": "Mode (Text)",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["TextMode.Multiline", "TextMode.Password", "TextMode.SingleLine"]
+  },
+  {
+    "propertyName": "OnChange",
+    "propertyType": "Event",
+    "dataType": "Formula"
+  },
+  {
+    "propertyName": "OnSelect",
+    "propertyType": "Event",
+    "dataType": "Formula"
+  },
+  {
+    "propertyName": "Padding (Top/Bottom/...)",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "Selected",
+    "propertyType": "Output",
+    "dataType": "Record"
+  },
+  {
+    "propertyName": "Size",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "Radius (TopLeft/TopRight/...)",
+    "propertyType": "Input",
+    "dataType": "Number"
+  },
+  {
+    "propertyName": "StartOfWeek",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["StartOfWeek.Sunday", "StartOfWeek.Monday", "StartOfWeek.Tuesday"]
+  },
+  {
+    "propertyName": "Text",
+    "propertyType": "Input",
+    "dataType": "String"
+  },
+  {
+    "propertyName": "Underline",
+    "propertyType": "Input",
+    "dataType": "Boolean",
+    "options": [true, false]
+  },
+  {
+    "propertyName": "VerticalAlign",
+    "propertyType": "Input",
+    "dataType": "Enum",
+    "options": ["VerticalAlign.Bottom", "VerticalAlign.Middle", "VerticalAlign.Top"]
+  },
+  {
+    "propertyName": "Visible",
+    "propertyType": "Input",
+    "dataType": "Boolean",
+    "options": [true, false]
+  },
+  {
+    "propertyName": "X / Y",
+    "propertyType": "Input",
+    "dataType": "Number"
+  }
+]

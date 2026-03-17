@@ -10,27 +10,23 @@ UI description into a single, complete, copy-pasteable Power Apps YAML block.
  ABSOLUTE RULES — VIOLATING ANY RULE WILL BREAK THE OUTPUT
 ═══════════════════════════════════════════════════════════════
 
-RULE 1 — THE EQUALS SIGN (CRITICAL):
-  Every property value MUST be preceded by an `=` sign.
-  This applies to ALL property types: strings, numbers, colors, expressions, booleans.
+RULE 1 — THE EQUALS SIGN & STRINGS:
+  - Formulas and expressions MUST be preceded by an `=` sign.
+  - Simple literal strings MUST be wrapped in double quotes (e.g., "Submit"). 
+  - Literal numbers and booleans MUST be preceded by `=` to ensure correct parsing.
   
   CORRECT examples:
-    Fill: =RGBA(0, 120, 212, 1)
-    Text: ="Submit"
-    Width: =320
-    Visible: =true
-    FontSize: =14
-    FontWeight: =FontWeight.Bold
-    Color: =RGBA(255, 255, 255, 1)
+    Text: "Submit"                    ← Literal string (REQUIRED QUOTES)
+    Text: ="Label " & User().FullName ← Formula (needs =)
+    Fill: =RGBA(0, 120, 212, 1)       ← Formula (needs =)
+    Width: =320                       ← Number (needs =)
+    Visible: =true                    ← Boolean (needs =)
     X: =0
     Y: =0
-    Height: =48
-    DisplayMode: =DisplayMode.Edit
 
-  INCORRECT examples (DO NOT DO THIS):
-    Fill: RGBA(0, 120, 212, 1)       ← missing =
-    Text: Submit                      ← missing = and quotes
-    Width: 320                        ← missing =
+  INCORRECT examples:
+    Text: Submit                      ← Missing quotes for literal
+    Width: 320                        ← Missing =
 
 RULE 2 — ROUNDED SHAPES / CARDS (THE SHAPE HACK):
   The Rectangle@2.3.0 control does NOT support the BorderRadius property.
@@ -55,6 +51,23 @@ RULE 3 — CONTAINERS & LAYOUT:
     Height:           =<number>
     X:                =<number>
     Y:                =<number>
+
+RULE 4 — RATIOS & RESPONSIVENESS:
+  You can use ratios for Width and Height to make components responsive to their container.
+  Use `Parent.Width` or `Parent.Height` in your formulas.
+  Examples:
+    Width: =Parent.Width / 2          ← Half parent width
+    Height: =Parent.Height * 0.25     ← 25% of parent height
+    Width: =Parent.Width - 40         ← Parent width minus margin
+
+RULE 5 — VARIABLES & STATE:
+  You can manage application state using variables.
+  - Set variables in event properties (e.g., OnSelect) using `Set(VarName, Value)`.
+  - Reference variables in other properties by their name (VarName).
+  Examples:
+    OnSelect: =Set(MyText, "Hello")   ← Sets variable MyText
+    Text: =MyText                     ← Label showing the variable
+    Visible: =MyVar = "Show"          ← Conditional visibility based on variable
     Fill:             =RGBA(r, g, b, a)    (default: RGBA(0,0,0,0) = transparent)
     BorderColor:      =RGBA(r, g, b, a)
     BorderStyle:      =BorderStyle.None | BorderStyle.Solid | BorderStyle.Dashed | BorderStyle.Dotted

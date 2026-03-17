@@ -12,6 +12,28 @@ from typing import Dict, Any, Optional
 from prompts import SYSTEM_PROMPT, TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT
 
 # ── Logging Utility ──────────────────────────────────────────────────────────
+def parse_json_robustly(text: str) -> Any:
+    """Isolates and parses a JSON object from text that may contain chatter."""
+    # Find first '{' and last '}'
+    start_idx = text.find('{')
+    if start_idx == -1:
+        raise ValueError("No JSON object found in text.")
+    
+    # Simple search for the last curly brace
+    end_idx = text.rfind('}')
+    if end_idx == -1:
+        raise ValueError("Incomplete JSON object in text.")
+    
+    json_str = text[start_idx:end_idx + 1]
+    
+    # Try parsing
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        # If standard parsing fails, try cleaning some common issues (like unescaped quotes in descriptions)
+        # For now, we'll just re-raise but with better context
+        raise ValueError(f"Failed to parse extracted JSON: {str(e)} at pos {e.pos}")
+
 def log_llm_interaction(endpoint: str, input_prompt: str, response_text: str, usage: Any):
     try:
         # Use absolute path for robustness
@@ -85,6 +107,7 @@ class RendererChatRequest(BaseModel):
     image_data: Optional[str] = None
     image_mime_type: Optional[str] = None
     chat_history: list[dict] = []
+    prompt_method: str = "Direct"
 
 class RendererChatResponse(BaseModel):
     reply: str
@@ -181,7 +204,12 @@ def tweak_component(request: TweakComponentRequest):
         print(f"Tweak Component Tokens: Input={usage.prompt_token_count}, Output={usage.candidates_token_count}")
 
         # Return the modified component object dict directly
-        return json_module.loads(cleaned)
+        try:
+            return parse_json_robustly(raw_text)
+        except ValueError as e:
+            print(f"JSON Extraction Error in /tweak-component: {e}")
+            # Fallback to simple load if extraction fails (maybe it's already clean)
+            return json_module.loads(cleaned)
 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(exc)}")
@@ -219,7 +247,14 @@ def renderer_chat(request: RendererChatRequest):
     else:
         canvas_ctx += "The canvas is currently empty."
 
-    full_prompt = f"{canvas_ctx}\n\nUser prompt: {request.message.strip()}"
+    # Prepend method-specific instructions
+    method_instructions = ""
+    if request.prompt_method == "Chain of Thought":
+        method_instructions = "THINKING PROCESS REQUIRED: Before providing any JSON or code, you MUST think step-by-step about the user's request. Analyze the current canvas state and explain your design decisions. Use <thinking> blocks for your internal monologue. After your analysis, provide the final JSON output.\n\n"
+    elif request.prompt_method == "Creative Designer":
+        method_instructions = "DESIGN FOCUS: You are a world-class UI/UX designer. Focus on premium aesthetics, perfect spacing, vibrant but harmonious color palettes (using RGBA), and high-end modern layout principles. Use subtle micro-animations or hover effects if appropriate via property bindings. Avoid basic or generic designs. WOW the user with your visual excellence.\n\n"
+    
+    full_prompt = f"{method_instructions}{canvas_ctx}\n\nUser prompt: {request.message.strip()}"
 
     contents: list[Dict[str, Any]] = []
     
@@ -251,11 +286,16 @@ def renderer_chat(request: RendererChatRequest):
         response = renderer_chat_model.generate_content(contents)
         raw_text: str = response.text
 
-        # Strip markdown fences if present
+        # Strip markdown fences if present (for fallback)
         cleaned = re.sub(r"^```[a-zA-Z]*\n?", "", raw_text.strip())
         cleaned = re.sub(r"\n?```$", "", cleaned.strip())
 
-        parsed = json_module.loads(cleaned)
+        # Robust JSON extraction
+        try:
+            parsed = parse_json_robustly(raw_text)
+        except ValueError as e:
+            print(f"JSON Extraction Error in /renderer-chat: {e}")
+            parsed = json_module.loads(cleaned)
         usage = response.usage_metadata
         return RendererChatResponse(
             reply=parsed.get("reply", ""),
