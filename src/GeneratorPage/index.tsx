@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useRef, useCallback } from 'react'
-import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer } from '../RendererPage/components/controls'
+import { 
+  ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, 
+  GalleryRenderer, CheckboxRenderer, RectangleRenderer, IconRenderer, HtmlTextRenderer, 
+  DatePickerRenderer, ComboBoxRenderer 
+} from '../RendererPage/components/controls'
 import { screenToYaml } from '../RendererPage/helpers'
 import { SparkleIcon, CopyIcon, CheckIcon, SendIcon, EXAMPLE_PROMPTS } from './constants'
 import { fetchComponents } from './helpers'
@@ -208,29 +212,31 @@ export default function GeneratorPage() {
                       comp, 
                       selected: false,
                       isPlaying: false,
+                      selectedIds: [],
                       localVars: {},
                       setLocalVars: () => {},
                       notify: () => {},
                       navigate: () => {},
+                      updateProp: () => {},
                       flatNodes: tree,
                       parentNode: null,
                       onMouseDown: (e: any) => e.preventDefault(),
                       onClick: (e: any) => e.preventDefault(),
+                      onChildMouseDown: () => {},
+                      onChildClick: () => {},
                     }
                     if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
                     if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
                     if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
                     if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
-                    if (comp.type === 'Container') return (
-                      <ContainerRenderer key={comp.id} {...sharedProps}
-                        selectedIds={[]}
-                        onChildMouseDown={(e)=>e.preventDefault()}
-                        onChildClick={(e)=>e.preventDefault()}
-                        onDropInto={()=>{}}
-                        dragOverId={null}
-                        setDragOverId={()=>{}}
-                      />
-                    )
+                    if (comp.type === 'Checkbox') return <CheckboxRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Rectangle') return <RectangleRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Icon') return <IconRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'HtmlText') return <HtmlTextRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'DatePicker') return <DatePickerRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'ComboBox') return <ComboBoxRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Container') return <ContainerRenderer key={comp.id} {...sharedProps} />
+                    if (comp.type === 'Gallery') return <GalleryRenderer key={comp.id} {...sharedProps} />
                     return null
                   })}
                  </div>
