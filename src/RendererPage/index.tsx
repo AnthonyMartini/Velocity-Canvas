@@ -517,7 +517,7 @@ export default function RendererPage() {
 
   // Auto-extract and sync variables from the tree into localVars
   useEffect(() => {
-    const extractedNames = extractVariables(tree)
+    const extractedNames = extractVariables(tree) as string[]
     
     setLocalVars(prev => {
       let changed = false
