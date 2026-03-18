@@ -6,6 +6,7 @@ frontend:
         - npm ci --cache .npm --prefer-offline
     build:
       commands:
+        - echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next

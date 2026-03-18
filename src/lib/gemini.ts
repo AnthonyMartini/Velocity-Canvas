@@ -9,7 +9,13 @@ function getGenAI() {
     const key = process.env.GEMINI_API_KEY;
     
     if (!key) {
-      console.error("CRITICAL: Gemini API key is missing! Checked GEMINI_API_KEY, GOOGLE_API_KEY, and NEXT_PUBLIC_GEMINI_API_KEY.");
+      const envKeys = Object.keys(process.env);
+      console.log("Safe Env Dump (Keys Only):", {
+        hasGeminiKey: envKeys.includes('GEMINI_API_KEY'),
+        totalKeys: envKeys.length,
+        nodeEnv: process.env.NODE_ENV
+      });
+      console.error("CRITICAL: Gemini API key is missing! Checked GEMINI_API_KEY");
       throw new Error("Missing Gemini API Key. Please ensure it is set in your AWS Amplify Environment Variables.");
     }
 
