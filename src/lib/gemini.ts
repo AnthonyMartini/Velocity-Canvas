@@ -6,7 +6,7 @@ let genAIInstance: GoogleGenerativeAI | null = null;
 
 function getGenAI() {
   if (!genAIInstance) {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const key = process.env.GEMINI_API_KEY;
     
     if (!key) {
       console.error("CRITICAL: Gemini API key is missing! Checked GEMINI_API_KEY, GOOGLE_API_KEY, and NEXT_PUBLIC_GEMINI_API_KEY.");
