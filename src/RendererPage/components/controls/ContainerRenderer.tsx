@@ -76,7 +76,7 @@ export default function ContainerRenderer({
       )}
 
       {/* Children */}
-      {[...(comp.children || [])].reverse().map(rawChild => {
+      {(comp.children || []).map(rawChild => {
         const isChildSelected = selectedIds.includes(rawChild.id)
         const child = resolveProperties(rawChild, localVars, flatNodes, comp)
         const childProps = {

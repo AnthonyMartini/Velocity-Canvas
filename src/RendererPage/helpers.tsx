@@ -21,12 +21,35 @@ export function createComponent(schema, overrides = {}) {
 
 // ── Create from LLM spec (merge with defaults) ────────────────────────────────
 export function createFromSpec(spec) {
-  const schema = SCHEMAS[spec.type]
-  if (!schema) return null
+  if (!spec || !spec.type) return null
+
+  // Normalize type lookup (e.g., handle "CONTAINER", "container", "Container")
+  const typeKey = Object.keys(SCHEMAS).find(
+    k => k.toLowerCase() === spec.type.toLowerCase()
+  )
+  
+  const schema = typeKey ? SCHEMAS[typeKey] : null
+  if (!schema) {
+    console.warn(`No schema found for type: ${spec.type}`)
+    return null
+  }
+
   const base = JSON.parse(JSON.stringify(schema.defaults))
-  const { children, ...rest } = spec
-  const processedChildren = (children || []).map(c => createFromSpec(c)).filter(Boolean)
-  return { ...base, ...rest, id: uid(), type: schema.type, name: spec.name || nextName(schema.type), children: processedChildren }
+  
+  // Flatten children/Children
+  const childrenList = spec.children || spec.Children || []
+  const { children, Children, ...rest } = spec
+  
+  const processedChildren = childrenList.map(c => createFromSpec(c)).filter(Boolean)
+  
+  return { 
+    ...base, 
+    ...rest, 
+    id: spec.id || uid(), 
+    type: schema.type, 
+    name: spec.name || nextName(schema.type), 
+    children: processedChildren 
+  }
 }
 
 // ── Extract powerFx variables from a component tree ───────────────────────────
@@ -164,8 +187,11 @@ export function componentToYaml(node, col = 0) {
     const isQuoted = (valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))
     const isNumeric = !isNaN(Number(valStr)) && valStr !== ''
     const isBoolean = valStr === 'true' || valStr === 'false'
-    
-    if (isQuoted) {
+    // Enums look like Object.Member (e.g. Icon.Add, FontWeight.Bold)
+    const isEnum = /^[A-Z][a-zA-Z0-9]*\.[A-Z][a-zA-Z0-9]*$/.test(valStr) || 
+                   ['DisplayMode.Edit', 'DisplayMode.View', 'DisplayMode.Disabled', 'BorderStyle.Solid', 'BorderStyle.None', 'BorderStyle.Dashed', 'BorderStyle.Dotted'].includes(valStr)
+
+    if (isQuoted || isEnum) {
       lines.push(`${sp(col + 6)}${k}: ${valStr}`)
     } else if (isNumeric || isBoolean) {
       // Numbers and booleans still get the '=' prefix

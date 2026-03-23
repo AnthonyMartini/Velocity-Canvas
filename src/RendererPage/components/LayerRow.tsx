@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 
-export default function LayerRow({ node, selectedIds, onSelect, depth, isCollapsed, toggleCollapse }) {
+export default function LayerRow({ node, selectedIds, onSelect, onReorder, depth, isCollapsed, toggleCollapse }) {
   const isContainer = node.type === 'Container' || node.type === 'Gallery'
   const hasChildren = isContainer && node.children?.length > 0
   const isSelected = selectedIds.includes(node.id)
@@ -11,7 +11,7 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
 
   return (
     <div 
-      className={`flex items-center gap-1 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
+      className={`group flex items-center gap-1 w-full text-left text-xs px-2 py-1.5 rounded-lg transition-all duration-100 ${
         isSelected
           ? 'bg-accent/15 text-accent border border-accent/30'
           : 'text-subtext hover:bg-overlay/30 border border-transparent'
@@ -45,8 +45,27 @@ export default function LayerRow({ node, selectedIds, onSelect, depth, isCollaps
           {Icon && <Icon className="w-3.5 h-3.5" />}
         </span>
         <span className="truncate">{node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type))}</span>
-        
       </button>
+
+      {/* Reorder Buttons (Visible on Hover) */}
+      {node.type !== 'App' && node.type !== 'Screen' && (
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto pl-1">
+          <button 
+            onClick={(e) => { e.stopPropagation(); onReorder(node.id, 'down'); }}
+            title="Move Down"
+            className="p-1 rounded hover:bg-accent/20 text-subtext/40 hover:text-accent transition-colors"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onReorder(node.id, 'up'); }}
+            title="Move Up"
+            className="p-1 rounded hover:bg-accent/20 text-subtext/40 hover:text-accent transition-colors"
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

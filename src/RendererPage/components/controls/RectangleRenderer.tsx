@@ -26,7 +26,8 @@ export default function RectangleRenderer({
     cursor: isPlaying ? (comp.DisplayMode === 'DisplayMode.Disabled' ? 'default' : 'pointer') : 'move',
     userSelect: 'none',
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    zIndex: selected ? 10 : 1
   }
 
   return (

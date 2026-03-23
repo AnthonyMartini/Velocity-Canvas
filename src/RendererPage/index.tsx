@@ -16,7 +16,7 @@ import ChatMessage from './components/ChatMessage'
 import LayerRow from './components/LayerRow'
 import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
-import { findNode, updateNode, removeNode, insertNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
+import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 
 // ── Live-Validating Name Input ──────────────────────────────────────────────
@@ -380,7 +380,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
 // ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
-export default function RendererPage() {
+export default function RendererPage({ user, onCreditDeduction }: { user: any, onCreditDeduction?: () => void }) {
   const [canvasW, setCanvasW] = useState(1366)
   const [canvasH, setCanvasH] = useState(768)
   const [canvasWInput, setCanvasWInput] = useState('1366')
@@ -793,6 +793,15 @@ export default function RendererPage() {
       const next = updateNode(prev, id, () => ({ [key]: val }))
       // Debounce history saving for text inputs and numbers to avoid creating too many history states, but for now we'll just save every change
       // Alternatively, we save after a short delay or blur, but let's just save.
+      saveHistory(next)
+      return next
+    })
+  }, [saveHistory])
+
+  // ── Reorder a node in z-space ─────────────────────────────────────────────
+  const handleReorder = useCallback((id, direction) => {
+    setTree(prev => {
+      const next = reorderNode(prev, id, direction)
       saveHistory(next)
       return next
     })
@@ -1503,9 +1512,13 @@ export default function RendererPage() {
 
     setTweakLoading(true)
     try {
+      const idToken = await user.getIdToken()
       const res = await fetch('/api/tweak-component', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify({
           prompt: msg,
           component: currentNode,
@@ -1513,7 +1526,12 @@ export default function RendererPage() {
           canvas_height: canvasH,
         }),
       })
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Error ${res.status}`) }
+      if (!res.ok) { 
+        const e = await res.json().catch(() => ({})); 
+        throw new Error(e.error || `Error ${res.status}`) 
+      }
+
+      if (onCreditDeduction) onCreditDeduction()
 
       const modifiedComponent = await res.json()
 
@@ -1613,12 +1631,21 @@ export default function RendererPage() {
     }
 
     try {
+      const idToken = await user.getIdToken()
       const res = await fetch('/api/renderer-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Error ${res.status}`) }
+      if (!res.ok) { 
+        const e = await res.json().catch(() => ({})); 
+        throw new Error(e.error || `Error ${res.status}`) 
+      }
+      
+      if (onCreditDeduction) onCreditDeduction()
       const data = await res.json()
 
       setChatLoading(false)
@@ -1970,6 +1997,7 @@ export default function RendererPage() {
                     setSelectedIds(newSelectedIds)
                     setShowErrorsPane(false)
                   }}
+                  onReorder={handleReorder}
                   depth={_depth}
                   isCollapsed={collapsedIds.has(node.id)}
                   toggleCollapse={toggleCollapse}
@@ -2134,7 +2162,7 @@ export default function RendererPage() {
                     <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
-                {[...(activeScreenNode?.children || [])].reverse().map(rawComp => {
+                {(activeScreenNode?.children || []).map(rawComp => {
                   const isSelected = selectedIds.includes(rawComp.id)
                   const comp = resolveProperties(rawComp, localVars, fullFlatNodes, activeScreenNode)
                   const sharedProps = {
@@ -2370,7 +2398,7 @@ export default function RendererPage() {
                   </svg>
                 </div>
                 <span className="text-xs font-semibold text-text">AI Canvas Assistant</span>
-                <span className="text-[10px] text-subtext/50 bg-overlay/30 px-1.5 py-0.5 rounded-full">Gemini 3.1 Flash</span>
+                <span className="text-[10px] text-subtext/50 bg-overlay/30 px-1.5 py-0.5 rounded-full">{process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'}</span>
               </div>
               <button onClick={() => setChatOpen(false)}
                 className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer">
@@ -2583,14 +2611,32 @@ export default function RendererPage() {
                     <span className="text-[10px] bg-accent/15 text-accent border border-accent/25 px-2 py-0.5 rounded-full font-medium">
                       {schema.control}
                     </span>
-                    <button 
-                      onClick={() => setIsTweaking(!isTweaking)}
-                      className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors border ${
-                        isTweaking || tweakOriginalNode ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-surface/50 text-subtext/70 border-overlay/40 hover:text-accent hover:border-accent/40'
-                      }`}
-                    >
-                      ✨ Tweak
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {/* Layer Actions */}
+                      <div className="flex items-center gap-0.5 bg-overlay/10 rounded-lg p-0.5 border border-overlay/20 mr-1">
+                        <button onClick={() => handleReorder(selectedNode.id, 'back')} title="Send to Back" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+                        </button>
+                        <button onClick={() => handleReorder(selectedNode.id, 'down')} title="Move Backward" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <button onClick={() => handleReorder(selectedNode.id, 'up')} title="Move Forward" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
+                        </button>
+                        <button onClick={() => handleReorder(selectedNode.id, 'front')} title="Bring to Front" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/></svg>
+                        </button>
+                      </div>
+
+                      <button 
+                        onClick={() => setIsTweaking(!isTweaking)}
+                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors border ${
+                          isTweaking || tweakOriginalNode ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-surface/50 text-subtext/70 border-overlay/40 hover:text-accent hover:border-accent/40'
+                        }`}
+                      >
+                        ✨ Tweak
+                      </button>
+                    </div>
                   </div>
                   
                   {isTweaking && !tweakOriginalNode && (

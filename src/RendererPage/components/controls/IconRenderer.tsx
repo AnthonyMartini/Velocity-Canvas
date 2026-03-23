@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
+import { SCHEMAS } from '../../constants'
 
 export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
   const handleActionClick = (e) => {
@@ -11,20 +12,12 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     }
   }
 
-  // Find the exact SVG code by matching the selected icon value
-  // We can extract this directly from the comp itself if the builder passed it through,
-  // or we can statically import the schema. For this generic renderer, 
-  // since we inject the raw SVG string as a property during generation if we want to be clean,
-  // we can also let the Renderer just render it if we parse it.
-
-  // The 'icon' property holds the PA enum like "Icon.Search".
-  // We need to look up the SVG string from the schema's options.
-  
-  // A cleaner way is to inject the SVG data directly into the renderer if we don't want to import the schema here,
-  // but importing the schema is standard and safe since it's local.
-  // Actually, a safer way to parse arbitrary SVGs and allow color overrides:
-  // We'll use a data URI or dangerouslySetInnerHTML.
-
+  // Resolve the SVG based on the comp.Icon property.
+  // We prioritize the schema mapping over the injected comp._svg for better reactivity during manual edits.
+  const iconSchema = SCHEMAS.Icon as any;
+  const iconProp = iconSchema.properties.find((p: any) => p.key === 'Icon') as any;
+  const schemaOptionVal = iconProp?.options?.find((o: any) => o?.value === comp.Icon);
+  const resolvedSvg = schemaOptionVal ? schemaOptionVal.svg : (comp._svg || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>`);
 
   const containerStyle: any = {
     position: 'absolute',
@@ -40,7 +33,8 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    zIndex: selected ? 10 : 1
   }
 
   return (
@@ -52,7 +46,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     >
       <div 
         className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-current [&>svg]:fill-none"
-        dangerouslySetInnerHTML={{ __html: comp._svg || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>` }} 
+        dangerouslySetInnerHTML={{ __html: resolvedSvg }} 
       />
     </div>
   )

@@ -8,7 +8,7 @@ import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderSt
 
 
 
-export default function DocumentationPage() {
+export default function DocumentationPage({ user }: { user: any }) {
   const [activeSection, setActiveSection] = useState('components') // 'components' or 'functions'
   const [expanded, setExpanded] = useState({})
 

@@ -2,8 +2,31 @@ import { NextResponse } from "next/server";
 import { rendererChatModel } from "@/lib/gemini";
 import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
 
+import { adminAuth, verifyIdToken, checkAndDeductCredit } from "@/lib/firebase-admin";
+
 export async function POST(req) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized: Missing ID Token" }, { status: 401 });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    const uid = await verifyIdToken(idToken);
+    
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
+    }
+
+    // Check and deduct credit
+    const creditResult = await checkAndDeductCredit(uid, "Canvas Editor AI Chat");
+    if (!creditResult.success) {
+      return NextResponse.json({ 
+        error: creditResult.error || "Insufficient credits", 
+        credits: creditResult.credits 
+      }, { status: 403 });
+    }
+
     const { message, canvas_components, canvas_width, canvas_height, image_data, image_mime_type, chat_history } = await req.json();
 
     if (!message) {
@@ -54,7 +77,24 @@ export async function POST(req) {
     });
 
     const responseText = result.response.text();
-    return NextResponse.json(JSON.parse(responseText));
+    
+    // Robust JSON extraction
+    const start = responseText.indexOf("{");
+    const end = responseText.lastIndexOf("}");
+    
+    if (start === -1 || end === -1 || end < start) {
+      console.error("No valid JSON object found in renderer-chat response.");
+      return NextResponse.json({ error: "Invalid JSON from AI", raw: responseText }, { status: 500 });
+    }
+
+    const cleaned = responseText.substring(start, end + 1).trim();
+
+    try {
+      return NextResponse.json(JSON.parse(cleaned));
+    } catch (parseError) {
+      console.error("Failed to parse JSON in renderer-chat:", parseError);
+      return NextResponse.json({ error: "Parse error", raw: cleaned }, { status: 500 });
+    }
 
   } catch (error) {
     console.error("Gemini API error:", error);

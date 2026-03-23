@@ -3,22 +3,18 @@ import { createFromSpec } from '../RendererPage/helpers'
 
 
 /**
- * Calls the /renderer-chat endpoint and returns a shaped component tree.
- * Throws on network or server errors so the caller can handle state.
- *
- * @param {string} prompt   - User's plain-English description
- * @returns {Array}         - Array of component tree nodes
+ * Calls the /api/generate endpoint and returns a shaped component tree.
  */
-export async function fetchComponents(prompt) {
-  const response = await fetch('/api/renderer-chat', {
+export async function fetchComponents(prompt, user) {
+  const idToken = await user.getIdToken()
+  const response = await fetch('/api/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
     body: JSON.stringify({
-      message: prompt.trim(),
-      canvas_width: 1366,
-      canvas_height: 768,
-      canvas_components: [],
-      chat_history: [], // Added empty chat history
+      prompt: prompt.trim(),
     }),
   })
 
@@ -28,5 +24,29 @@ export async function fetchComponents(prompt) {
   }
 
   const data = await response.json()
-  return (data.components_to_add || []).map(createFromSpec).filter(Boolean)
+  
+  // Adapter: Convert { RootNodes: [ { Name, Control, Properties, Children } ] }
+  // to [ { id, type, name, children, ...props } ]
+  if (!data.json_data || !data.json_data.RootNodes) return []
+
+  const adaptNode = (node: any) => {
+    // Extract type from "Label@2.5.1" -> "Label"
+    const type = node.Control.split('@')[0].split('/').pop() || 'Label'
+    
+    const props = { ...(node.Properties || {}), ...(node.Properties.AdditionalProps || {}) }
+    delete props.AdditionalProps
+
+    const children = (node.Children || []).map(adaptNode)
+
+    // Use createFromSpec to get default properties and unique IDs
+    return createFromSpec({
+      type,
+      ...props,
+      name: node.Name,
+      children
+    })
+  }
+
+  const tree = (data.json_data.RootNodes || []).map(adaptNode).filter(Boolean)
+  return { tree, yaml: data.yaml_code }
 }

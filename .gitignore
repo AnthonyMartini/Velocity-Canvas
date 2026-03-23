@@ -1,6 +1,8 @@
 # next.js
 .next/
 
+#legacy
+legacy/
 
 # Dependency directories
 node_modules/

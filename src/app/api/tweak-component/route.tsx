@@ -1,8 +1,31 @@
 import { NextResponse } from "next/server";
 import { tweakModel } from "@/lib/gemini";
 
+import { verifyIdToken, checkAndDeductCredit } from "@/lib/firebase-admin";
+
 export async function POST(req) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized: Missing ID Token" }, { status: 401 });
+    }
+
+    const idToken = authHeader.split("Bearer ")[1];
+    const uid = await verifyIdToken(idToken);
+    
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
+    }
+
+    // Check and deduct credit
+    const creditResult = await checkAndDeductCredit(uid, "Component Tweak");
+    if (!creditResult.success) {
+      return NextResponse.json({ 
+        error: creditResult.error || "Insufficient credits", 
+        credits: creditResult.credits 
+      }, { status: 403 });
+    }
+
     const { prompt, component, canvas_width, canvas_height } = await req.json();
 
     if (!prompt) {
@@ -16,12 +39,23 @@ export async function POST(req) {
     const response = await tweakModel.generateContent(fullPrompt);
     const rawText = response.response.text();
 
-    const cleaned = rawText
-      .replace(/^```[a-zA-Z]*\n?/, "")
-      .replace(/\n?```$/, "")
-      .trim();
+    // Robust JSON extraction
+    const start = rawText.indexOf("{");
+    const end = rawText.lastIndexOf("}");
+    
+    if (start === -1 || end === -1 || end < start) {
+      console.error("No valid JSON object found in tweak-component response.");
+      return NextResponse.json({ error: "Invalid JSON from AI", raw: rawText }, { status: 500 });
+    }
 
-    return NextResponse.json(JSON.parse(cleaned));
+    const cleaned = rawText.substring(start, end + 1).trim();
+
+    try {
+      return NextResponse.json(JSON.parse(cleaned));
+    } catch (parseError) {
+      console.error("Failed to parse JSON in tweak-component:", parseError);
+      return NextResponse.json({ error: "Parse error", raw: cleaned }, { status: 500 });
+    }
   } catch (error) {
     console.error("Gemini API error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

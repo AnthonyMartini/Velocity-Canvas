@@ -11,56 +11,59 @@ import { SparkleIcon, CopyIcon, CheckIcon, SendIcon, EXAMPLE_PROMPTS } from './c
 import { fetchComponents } from './helpers'
 import { copyToClipboard, highlightYamlLine } from '../common/helpers'
 
-export default function GeneratorPage() {
+export default function GeneratorPage({ user, onCreditDeduction }: { user: any, onCreditDeduction?: () => void }) {
   const [prompt, setPrompt] = useState('')
   const [tree, setTree] = useState([])
+  const [yamlOutput, setYamlOutput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [charCount, setCharCount] = useState(0)
   const textareaRef = useRef(null)
-
+ 
   const handlePromptChange = useCallback((e) => {
     setPrompt(e.target.value)
     setCharCount(e.target.value.length)
   }, [])
-
+ 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim() || isLoading) return
     setIsLoading(true)
     setError(null)
     setTree([])
+    setYamlOutput('')
     setCopied(false)
     try {
-      const newTree = await fetchComponents(prompt)
-      setTree(newTree)
+      const { tree, yaml } = await fetchComponents(prompt, user) as { tree: any[], yaml: string }
+      setTree(tree)
+      setYamlOutput(yaml)
+      if (onCreditDeduction) onCreditDeduction()
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.')
     } finally {
       setIsLoading(false)
     }
   }, [prompt, isLoading])
-
+ 
   const handleKeyDown = useCallback((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       handleGenerate()
     }
   }, [handleGenerate])
-
+ 
   const handleCopy = useCallback(async () => {
     if (!yamlOutput) return
     await copyToClipboard(yamlOutput)
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
-  }, [tree])
-
+  }, [yamlOutput])
+ 
   const handleExampleClick = useCallback((ex) => {
     setPrompt(ex)
     setCharCount(ex.length)
     textareaRef.current?.focus()
   }, [])
-
-  const yamlOutput = tree.length > 0 ? screenToYaml(tree) : ''
+ 
   const lineCount = yamlOutput ? yamlOutput.split('\n').length : 0
 
   return (

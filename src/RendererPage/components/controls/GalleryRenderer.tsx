@@ -63,7 +63,7 @@ export default function GalleryRenderer({
 
       {/* Actual Template Wrapper */}
       <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
-        {[...(comp.children || [])].reverse().map(rawChild => {
+        {(comp.children || []).map(rawChild => {
           const isChildSelected = selectedIds.includes(rawChild.id)
           const child = resolveProperties(rawChild, localVars, flatNodes, comp)
           const childProps = {
@@ -114,7 +114,7 @@ export default function GalleryRenderer({
 
       {/* Ghost repeating templates for visual effect only */}
       <div style={{ position: 'absolute', top: isVertical ? tSize + padding : 0, left: isVertical ? 0 : tSize + padding, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
-        {[...(comp.children || [])].reverse().map(rawChild => {
+        {(comp.children || []).map(rawChild => {
           const child = resolveProperties(rawChild, localVars, flatNodes, comp)
           const isChildSelected = selectedIds.includes(child.id)
           const childProps = { 

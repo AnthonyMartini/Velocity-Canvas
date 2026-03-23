@@ -108,9 +108,9 @@ export function removeNode(nodes, id) {
 
 /** Insert a node as a child of parentId (or at root if parentId is null) */
 export function insertNode(nodes, node, parentId) {
-  if (!parentId) return [node, ...nodes]
+  if (!parentId) return [...nodes, node] // Append so it's drawn last (on top)
   return nodes.map(n => {
-    if (n.id === parentId) return { ...n, children: [node, ...(n.children || [])] }
+    if (n.id === parentId) return { ...n, children: [...(n.children || []), node] } 
     if (n.children?.length) return { ...n, children: insertNode(n.children, node, parentId) }
     return n
   })
@@ -119,7 +119,9 @@ export function insertNode(nodes, node, parentId) {
 /** Flatten tree to a list (for layers panel) with depth info */
 export function flattenTree(nodes, collapsedIds = new Set(), depth = 0) {
   const result = []
-  for (const n of nodes) {
+  // Iterate backwards so the front-most (last in array) appears at the top of the list
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i]
     result.push({ ...n, _depth: depth })
     if (n.children?.length && !collapsedIds.has(n.id)) {
       result.push(...flattenTree(n.children, collapsedIds, depth + 1))
@@ -186,6 +188,32 @@ export function handleDropLogic(prevTree, dragId, targetContainerId) {
     const placed = { ...removed, X: 10, Y: 10 }
     return insertNode(without, placed, targetContainerId)
   }
+}
+
+/** 
+ * Reorders a node within its parent's sibling list.
+ * direction: 'up' (one step to front), 'down' (one step to back), 'front' (top of stack), 'back' (bottom of stack)
+ */
+export function reorderNode(nodes, id, direction) {
+  const index = nodes.findIndex(n => n.id === id)
+  if (index !== -1) {
+    const newNodes = [...nodes]
+    const node = newNodes.splice(index, 1)[0]
+    if (direction === 'up') {
+      newNodes.splice(Math.min(nodes.length - 1, index + 1), 0, node)
+    } else if (direction === 'down') {
+      newNodes.splice(Math.max(0, index - 1), 0, node)
+    } else if (direction === 'front') {
+      newNodes.push(node)
+    } else if (direction === 'back') {
+      newNodes.unshift(node)
+    }
+    return newNodes
+  }
+  return nodes.map(n => {
+    if (n.children?.length) return { ...n, children: reorderNode(n.children, id, direction) }
+    return n
+  })
 }
 
 /**

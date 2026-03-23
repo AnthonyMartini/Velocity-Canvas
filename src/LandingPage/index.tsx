@@ -26,7 +26,10 @@ export default function LandingPage({ onStart }) {
           photoURL: user.photoURL || null,
           providerId: user.providerData?.[0]?.providerId || 'google.com',
           lastLoginAt: serverTimestamp(),
-          ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
+          ...(existing.exists() ? {} : { 
+            createdAt: serverTimestamp(),
+            credits: 100 
+          }),
         },
         { merge: true },
       );
@@ -98,7 +101,7 @@ export default function LandingPage({ onStart }) {
         {/* Features Preview */}
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'backwards' }}>
            {[
-             { title: 'AI Powered', desc: 'Generate complete YAML structures instantly with Gemini 3.1 Flash.' },
+             { title: 'AI Powered', desc: `Generate complete YAML structures instantly with ${process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'}.` },
              { title: 'Live Preview', desc: 'Instantly visualize your Power Apps components before exporting.' },
              { title: 'Component Library', desc: 'Manage and reuse your custom UI elements efficiently.' }
            ].map((item, i) => (
@@ -122,7 +125,7 @@ export default function LandingPage({ onStart }) {
             </div>
             <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">Generate UI from plain English</h2>
             <p className="text-lg text-subtext/90 leading-relaxed">
-              Describe the component you need. Our integration with Gemini 3.1 Flash instantly analyzes your request and writes production-ready Power Apps YAML. No more tedious manual dragging and dropping.
+              Describe the component you need. Our integration with {process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'} instantly analyzes your request and writes production-ready Power Apps YAML. No more tedious manual dragging and dropping.
             </p>
           </div>
           <div className="flex-1 w-full">

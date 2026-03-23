@@ -42,7 +42,7 @@ const createModel = (modelName: string, systemInstruction: string) => {
   };
 };
 
-const MODEL_NAME = "gemini-3.1-flash-lite-preview";
+const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite-preview";
 
 export const model = createModel(MODEL_NAME, SYSTEM_PROMPT);
 export const tweakModel = createModel(MODEL_NAME, TWEAK_SYSTEM_PROMPT);

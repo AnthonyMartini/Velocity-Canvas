@@ -48,6 +48,7 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     boxSizing: 'border-box',
     padding: '4px 8px',
+    zIndex: selected ? 10 : 1
   }
 
   // To simulate the PA checkbox closely we might need custom styling, 
