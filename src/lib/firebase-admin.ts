@@ -5,28 +5,36 @@ if (!admin.apps.length) {
     const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccount) {
+      console.log('FIREBASE_SERVICE_ACCOUNT found, attempting to initialize...');
       const sanitized = serviceAccount.trim().replace(/^['"]|['"]$/g, '');
       
       let cert;
-      if (sanitized.startsWith('{')) {
-        cert = JSON.parse(sanitized);
-      } else {
-        cert = JSON.parse(Buffer.from(sanitized, 'base64').toString());
+      try {
+        if (sanitized.startsWith('{')) {
+          cert = JSON.parse(sanitized);
+        } else {
+          cert = JSON.parse(Buffer.from(sanitized, 'base64').toString());
+        }
+      } catch (parseError: any) {
+        console.error('CRITICAL: Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', parseError.message);
+        throw parseError;
       }
 
       if (cert.private_key) {
+        // Fix for escaped newlines in env variables
         cert.private_key = cert.private_key.replace(/\\n/g, '\n');
       }
 
       admin.initializeApp({
         credential: admin.credential.cert(cert),
+        projectId: cert.project_id
       });
-      console.log('Firebase Admin SDK initialized successfully.');
+      console.log('Firebase Admin SDK initialized successfully for project:', cert.project_id);
     } else {
-      console.warn('FIREBASE_SERVICE_ACCOUNT not found. Server-side auth verification will be disabled.');
+      console.warn('FIREBASE_SERVICE_ACCOUNT not found in environment variables. Server-side auth verification will be disabled.');
     }
-  } catch (error) {
-    console.error('Error initializing Firebase Admin SDK:', error);
+  } catch (error: any) {
+    console.error('Error initializing Firebase Admin SDK:', error.message || error);
   }
 }
 
@@ -38,12 +46,15 @@ export const adminDb = admin.apps.length ? admin.firestore() : null;
  * Returns null if verification fails or Admin SDK is not initialized.
  */
 export async function verifyIdToken(token: string): Promise<string | null> {
-  if (!adminAuth) return null;
+  if (!adminAuth) {
+    console.error('verifyIdToken: adminAuth is not initialized. Check FIREBASE_SERVICE_ACCOUNT.');
+    return null;
+  }
   try {
     const decodedToken = await adminAuth.verifyIdToken(token);
     return decodedToken.uid;
-  } catch (error) {
-    console.error('Error verifying ID token:', error);
+  } catch (error: any) {
+    console.error('Error verifying ID token:', error.code || error.message || error);
     return null;
   }
 }
