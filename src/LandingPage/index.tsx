@@ -79,7 +79,7 @@ export default function LandingPage({ onStart }) {
         
         <p className="text-xl md:text-2xl text-subtext/80 mb-12 max-w-2xl font-light leading-relaxed">
           The next-generation <span className="text-accent font-medium">Power Apps UI Generator</span>. 
-          Design, preview, and export breathtaking components at the speed of thought, powered by Gemini AI.
+          Design, preview, and export breathtaking components at the speed of thought, powered by AI.
         </p>
 
         {/* Action Buttons */}
@@ -101,7 +101,7 @@ export default function LandingPage({ onStart }) {
         {/* Features Preview */}
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'backwards' }}>
            {[
-             { title: 'AI Powered', desc: `Generate complete YAML structures instantly with ${process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'}.` },
+             { title: 'AI Powered', desc: 'Generate complete YAML structures instantly with AI.' },
              { title: 'Live Preview', desc: 'Instantly visualize your Power Apps components before exporting.' },
              { title: 'Component Library', desc: 'Manage and reuse your custom UI elements efficiently.' }
            ].map((item, i) => (
@@ -125,7 +125,7 @@ export default function LandingPage({ onStart }) {
             </div>
             <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">Generate UI from plain English</h2>
             <p className="text-lg text-subtext/90 leading-relaxed">
-              Describe the component you need. Our integration with {process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'} instantly analyzes your request and writes production-ready Power Apps YAML. No more tedious manual dragging and dropping.
+              Describe the component you need. Our AI integration instantly analyzes your request and writes production-ready Power Apps YAML. No more tedious manual dragging and dropping.
             </p>
           </div>
           <div className="flex-1 w-full">

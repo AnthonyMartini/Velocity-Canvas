@@ -33,16 +33,9 @@ const LibraryIcon = () => (
   </svg>
 );
 
-const PlansIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path d="M12 9a3.75 3.75 0 1 0 0 7.5A3.75 3.75 0 0 0 12 9Z" />
-    <path fillRule="evenodd" d="M9.344 3.071a49.52 49.52 0 0 1 5.312 0c.967.052 1.83.585 2.332 1.39l.821 1.317c.24.383.645.643 1.11.71.386.054.77.113 1.152.177 1.432.239 2.429 1.493 2.429 2.909V18a3 3 0 0 1-3 3h-15a3 3 0 0 1-3-3V9.574c0-1.416.997-2.67 2.429-2.909.382-.064.766-.123 1.151-.178a1.56 1.56 0 0 0 1.11-.71l.822-1.315a2.91 2.91 0 0 1 2.332-1.39ZM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Zm4.5-1.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
-  </svg>
-);
-
 const TABS = [
   { id: 'generator', label: 'Component Generator', Icon: GeneratorIcon },
-  { id: 'renderer', label: 'Canvas Editor', Icon: RendererIcon },
+  { id: 'renderer', label: 'Projects', Icon: RendererIcon },
   { id: 'library', label: 'Documentation', Icon: LibraryIcon },
 ];
 
@@ -50,7 +43,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('generator');
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [credits, setCredits] = useState<number | string | null>(null);
+  const [activeProject, setActiveProject] = useState<any>(null);
 
   const fetchCredits = async (firebaseUser) => {
     try {
@@ -59,11 +53,16 @@ export default function Home() {
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
       const data = await res.json();
+      if (!res.ok || data.error) {
+        setCredits('Error');
+        return;
+      }
       if (data.credits !== undefined) {
         setCredits(data.credits);
       }
     } catch (error) {
       console.error('Error fetching credits:', error);
+      setCredits('Error');
     }
   };
 
@@ -106,15 +105,15 @@ export default function Home() {
     <div className="h-screen bg-base flex flex-col overflow-hidden">
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="border-b border-surface/60 backdrop-blur-sm sticky top-0 z-10 bg-base/90 shrink-0">
-        <div className="max-w-none px-6 py-3 flex items-center justify-between">
+        <div className="max-w-none px-6 py-3 flex items-center justify-between relative">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <Image 
               src={logo} 
               alt="Velocity Canvas Logo" 
-              width={36}
-              height={36}
-              className="w-9 h-9 rounded-xl object-cover shadow-lg shadow-accent/30" 
+              width={45}
+              height={45}
+              className="w-11 h-11" 
             />
             <div>
               <h1 className="text-white font-bold text-lg leading-tight tracking-tight">Velocity Canvas</h1>
@@ -122,8 +121,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-xl p-1">
+          {/* Tab Navigation — absolutely centered */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-xl p-1">
             {TABS.map(({ id, label, Icon }) => (
               <button
                 key={id}
@@ -142,10 +141,7 @@ export default function Home() {
 
           {/* Status + User */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-surface/50 border border-overlay/40 rounded-full px-3 py-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" style={{ animationDuration: '3s' }} />
-              <span className="text-subtext text-xs font-medium">{process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'}</span>
-            </div>
+
             
             {credits !== null && (
               <div 
@@ -156,10 +152,7 @@ export default function Home() {
                     : 'bg-accent/10 border-accent/20 hover:bg-accent/20 hover:border-accent/30'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3.5 h-3.5 ${activeTab === 'plans' ? 'text-base' : 'text-accent animate-pulse-slow'}`}>
-                  <path d="M10 2a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 2ZM10 15a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 10 15ZM10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM15.657 4.343a.75.75 0 0 1 0 1.06l-1.061 1.06a.75.75 0 1 1-1.06-1.06l1.06-1.06a.75.75 0 0 1 1.062 0ZM5.404 14.596a.75.75 0 0 1 0 1.06l-1.06 1.06a.75.75 0 1 1-1.061-1.06l1.06-1.06a.75.75 0 0 1 1.06 0ZM18 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 18 10ZM5 10a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 5 10ZM15.657 15.657a.75.75 0 0 1-1.06 0l-1.061-1.06a.75.75 0 1 1 1.06-1.06l1.061 1.06a.75.75 0 0 1 0 1.06ZM5.404 5.404a.75.75 0 0 1-1.06 0l-1.06-1.06a.75.75 0 0 1 1.06-1.06l1.061 1.06a.75.75 0 0 1 0 1.06Z" />
-                </svg>
-                <div className="flex flex-col items-start leading-none">
+                <div className="flex flex-col items-center leading-none">
                   <span className={`text-[10px] uppercase font-bold tracking-wider ${activeTab === 'plans' ? 'text-base/70' : 'text-accent/70'}`}>Credits</span>
                   <span className={`text-sm font-black ${activeTab === 'plans' ? 'text-base' : 'text-text'}`}>{credits}</span>
                 </div>
@@ -188,18 +181,26 @@ export default function Home() {
       </header>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className={`flex-1 flex flex-col ${activeTab === 'renderer' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== 'renderer' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
         {activeTab === 'generator' && <GeneratorPage user={user} onCreditDeduction={() => fetchCredits(user)} />}
-        {activeTab === 'renderer' && <RendererPage user={user} onCreditDeduction={() => fetchCredits(user)} />}
+        {/* RendererPage stays mounted to preserve activeProject state; hidden via CSS when not active */}
+        <div className={activeTab === 'renderer' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
+          <RendererPage
+            user={user}
+            onCreditDeduction={() => fetchCredits(user)}
+            activeProject={activeProject}
+            setActiveProject={setActiveProject}
+          />
+        </div>
         {activeTab === 'library' && <ComponentLibraryPage user={user} />}
-        {activeTab === 'plans' && <PlansPage user={user} />}
+        {activeTab === 'plans' && <PlansPage user={user} onRefreshCredits={() => fetchCredits(user)} />}
 
         {/* ── Footer (Generator only) ──────────────────────────────────────────── */}
         {activeTab === 'generator' && (
           <footer className="mt-auto border-t border-surface/60 py-5 px-6 shrink-0">
             <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-subtext/40">
               <span>Velocity Canvas — Power Apps YAML Generator</span>
-              <span>Powered by {process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'} · pa.yaml v3.0</span>
+              
             </div>
           </footer>
         )}

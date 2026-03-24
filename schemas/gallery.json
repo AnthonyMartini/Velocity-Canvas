@@ -3,7 +3,7 @@
   "control": "Gallery@2.15.0",
   "defaults": {
     "Default": "null",
-    "Items": "SortByColumns(Search(Table({Title:\"Sample 1\", Subtitle:\"Details 1\"}), \"\", \"Title\"), \"Title\", SortOrder.Ascending)",
+    "Items": "Table({Title:\"Sample 1\", Subtitle:\"Details 1\"},{Title:\"Sample 2\", Subtitle:\"Details 2\"},{Title:\"Sample 3\", Subtitle:\"Details 3\"})",
     "Selected": "null",
     "AccessibleLabel": "\"\"",
     "AllItems": "null",
@@ -31,7 +31,7 @@
     "Variant": "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0"
   },
   "properties": [
-    { "key": "Items",             "label": "Items",             "type": "text",    "propertyType": "Input" },
+    { "key": "Items",             "label": "Items",             "type": "table",   "propertyType": "Input" },
     { "key": "X",                 "label": "X",                 "type": "number",  "propertyType": "Input" },
     { "key": "Y",                 "label": "Y",                 "type": "number",  "propertyType": "Input" },
     { "key": "Width",             "label": "Width",             "type": "number",  "propertyType": "Input" },

@@ -54,7 +54,41 @@ export async function POST(req) {
     const cleaned = rawText.substring(start, end + 1).trim();
 
     try {
-      const jsonData = JSON.parse(cleaned);
+      console.log("Cleaned JSON from Generator:", cleaned);
+      let jsonData = JSON.parse(cleaned);
+      
+      const singleTickRe = /^'([\s\S]*)'$/;
+
+      function convertSingleTickLiterals(value: any): any {
+        if (typeof value === "string") {
+          const m = value.match(singleTickRe);
+          if (m) {
+            return `"${m[1]}"`;
+          }
+          return value;
+        }
+        if (Array.isArray(value)) {
+          return value.map(convertSingleTickLiterals);
+        }
+        if (value !== null && typeof value === "object") {
+          const out: Record<string, any> = {};
+          for (const [k, v] of Object.entries(value)) {
+            out[k] = convertSingleTickLiterals(v);
+          }
+          return out;
+        }
+        return value;
+      }
+      
+      jsonData = convertSingleTickLiterals(jsonData);
+      
+      if (!jsonData || !jsonData.RootNodes) {
+         return NextResponse.json({ 
+          error: "The AI did not return a valid component tree structure (missing RootNodes). Please try again.",
+          raw_response: rawText 
+        }, { status: 500 });
+      }
+
       const yamlCode = jsonToYaml(jsonData);
       
       if (!yamlCode || yamlCode.trim() === "") {

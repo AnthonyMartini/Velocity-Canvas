@@ -4,7 +4,7 @@ import FormulaInput from './FormulaInput'
 import { flattenTree, findParent, validateProperty } from '../../common/helpers'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
-function ValidatedNumberInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedNumberInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
   const [tempValue, setTempValue] = React.useState(String(value))
   const [nError, setNError] = React.useState<any>(null)
 
@@ -12,19 +12,19 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
     setTempValue(String(value))
     setNError(validateProperty(
       selfNode,
-      { name: "Value", type: "number" },
+      prop || { name: "Value", type: "number" },
       String(value),
       localVars,
       flatNodes,
       parentNode
     ))
-  }, [value, localVars, flatNodes, parentNode, selfNode])
+  }, [value, localVars, flatNodes, parentNode, selfNode, prop])
 
   const handleChange = (v) => {
     setTempValue(v)
     setNError(validateProperty(
       selfNode,
-      { name: "Value", type: "number" },
+      prop || { name: "Value", type: "number" },
       v,
       localVars,
       flatNodes,
@@ -68,7 +68,7 @@ function ValidatedNumberInput({ value, onChange, className = "", localVars, flat
 }
 
 // ── Validated Event Input ──────────────────────────────────────────────────
-function ValidatedEventInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedEventInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
   const [tempValue, setTempValue] = React.useState(String(value || ""))
   const [eError, setEError] = React.useState<any>(null)
 
@@ -76,19 +76,19 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
     setTempValue(String(value || ""))
     setEError(validateProperty(
       selfNode,
-      { name: "OnSelect", type: "string" },
+      prop || { name: "OnSelect", type: "string" },
       String(value || ""),
       localVars,
       flatNodes,
       parentNode
     ))
-  }, [value, localVars, flatNodes, parentNode, selfNode])
+  }, [value, localVars, flatNodes, parentNode, selfNode, prop])
 
   const handleChange = (v) => {
     setTempValue(v)
     setEError(validateProperty(
       selfNode,
-      { name: "OnSelect", type: "string" },
+      prop || { name: "OnSelect", type: "string" },
       v,
       localVars,
       flatNodes,
@@ -123,7 +123,7 @@ function ValidatedEventInput({ value, onChange, className = "", localVars, flatN
 }
 
 // ── Validated String Input ─────────────────────────────────────────────────
-function ValidatedStringInput({ value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedStringInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
   const [tempValue, setTempValue] = React.useState(String(value || ""))
   const [sError, setSError] = React.useState<any>(null)
 
@@ -131,19 +131,19 @@ function ValidatedStringInput({ value, onChange, className = "", localVars, flat
     setTempValue(String(value || ""))
     setSError(validateProperty(
       selfNode,
-      { name: "Text", type: "string" },
+      prop || { name: "Text", type: "string" },
       String(value || ""),
       localVars,
       flatNodes,
       parentNode
     ))
-  }, [value, localVars, flatNodes, parentNode, selfNode])
+  }, [value, localVars, flatNodes, parentNode, selfNode, prop])
 
   const handleChange = (v) => {
     setTempValue(v)
     setSError(validateProperty(
       selfNode,
-      { name: "Text", type: "string" },
+      prop || { name: "Text", type: "string" },
       v,
       localVars,
       flatNodes,
@@ -357,6 +357,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
                 <div key={field.label} className="flex flex-col gap-1">
                   <span className="text-[9px] text-subtext/40 font-bold text-center">{field.label}</span>
                   <ValidatedNumberInput 
+                    prop={{ name: field.key, type: "number" }}
                     value={field.val}
                     onChange={v => {
                       const update = { r, g, b, a }
@@ -429,6 +430,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
       <div className="flex items-center justify-between py-1.5 gap-2">
         <label className="text-xs text-subtext shrink-0">{prop.label}</label>
         <ValidatedNumberInput
+          prop={prop}
           value={value}
           onChange={onChange}
           className="w-20 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right"
@@ -441,11 +443,13 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
     )
   }
 
-  if (prop.type === 'string' && prop.name.startsWith('On')) {
+  const isEvent = prop.propertyType === 'Event' || (prop.type === 'string' && prop.name?.startsWith('On')) || prop.type === 'event' || prop.key?.startsWith('On')
+  if (isEvent) {
     return (
       <div className="flex items-center justify-between py-1.5 gap-2">
         <label className="text-xs text-subtext shrink-0">{prop.label}</label>
         <ValidatedEventInput
+          prop={prop}
           value={value}
           onChange={onChange}
           className="flex-1 min-w-0 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60"
@@ -461,6 +465,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
     <div className="flex items-center justify-between py-1.5 gap-2">
       <label className="text-xs text-subtext shrink-0">{prop.label}</label>
       <ValidatedStringInput
+        prop={prop}
         value={value}
         onChange={onChange}
         className="flex-1 min-w-0 bg-base border border-overlay/40 rounded-md text-xs text-text focus-within:outline-none focus-within:border-accent/60"

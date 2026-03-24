@@ -1,5 +1,6 @@
 import React from 'react'
 import { parseFormula, evaluateAST } from './FormulaParser'
+import { ALL_ENUM_VALUES } from '../RendererPage/Functions'
 
 /**
  * Copies `text` to the clipboard.
@@ -57,8 +58,7 @@ export function highlightYamlLine(line, index) {
 // Tree Helpers (Immutable Node Operations)
 // ──────────────────────────────────────────────────────────────────────────────
 
-let _id = 0
-export const uid = () => `comp_${++_id}`
+export const uid = () => `comp_${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`
 
 /** Find a node anywhere in the tree by id */
 export function findNode(nodes, id) {
@@ -331,16 +331,53 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
     const isAction = isEvent
     // Events don't expect a return value
     const ast = parseFormula(valStr, true)
-    const context = { isControl: (name) => flatNodes.some(n => n.name === name) }
+    const context: any = { 
+      isControl: (name: any) => flatNodes.some((n: any) => n.name === name),
+      screens: flatNodes.filter((n: any) => n.type === 'Screen'),
+      isActionContext: isAction
+    }
     
     // Evaluate the AST strictly to catch type/syntax errors
     const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, node, context, true)
     
     if (evaluated instanceof Error) return evaluated.message
 
+    // If it's a string property but the evaluated result is a native JS function (like from an action),
+    // or if the parsed formula was an ActionSequence but this isn't an event, return an error.
+    if (!isEvent && ast.type === 'ActionSequence') {
+      return "Actions cannot be used in property formulas"
+    }
+
     if (propDef.type === 'number') {
       const n = Number(evaluated)
       if (isNaN(n)) return "Must evaluate to a number"
+    }
+
+    // 'table' type accepts arrays, objects, or strings — no further type check needed
+    if (propDef.type === 'table') {
+      return null
+    }
+
+    if (!isEvent && (propDef.type === 'string' || propDef.type === 'text')) {
+
+      if (typeof evaluated === 'string' && ALL_ENUM_VALUES.has(evaluated)) {
+        return "Enum values cannot be used in text properties"
+      }
+      // Arrays come from Table() / [...] expressions — don't flag them as text errors.
+      // They only appear in table-typed properties like Gallery.Items.
+      if (Array.isArray(evaluated)) return null
+      if (evaluated !== null && evaluated !== undefined && typeof evaluated !== 'string') {
+        return "Must evaluate to a text value"
+      }
+    }
+
+    // Additional check: If the value looks like a formula (e.g. contains a function call pattern)
+    // but evaluateAST returned the raw string because it failed to resolve but wasn't caught by strict mode,
+    // we should flag it if it's identical to the input and looks like a typo.
+    // However, strict mode evaluateAST *should* return an Error for unresolved functions now.
+    // So this check mainly ensures that if it returns an Error object, we catch it.
+    if (evaluated && typeof evaluated === 'object' && evaluated instanceof Error) {
+       return evaluated.message;
     }
 
   } catch (e) {
@@ -426,7 +463,7 @@ export function executeAction(formula, localVars, setLocalVars, notify, navigate
   }
 
   // Set up the context for the evaluator
-  const context = { notify, navigate, setVariable: setLocalVars }
+  const context: any = { notify, navigate, setVariable: setLocalVars, screens: flatNodes.filter((n: any) => n.type === 'Screen'), isActionContext: true }
 
   // We can just parse the formula and execute it directly, because the AST evaluator 
   // supports ActionSequence and FunctionCall execution natively now.

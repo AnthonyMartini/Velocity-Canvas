@@ -27,7 +27,9 @@ export async function fetchComponents(prompt, user) {
   
   // Adapter: Convert { RootNodes: [ { Name, Control, Properties, Children } ] }
   // to [ { id, type, name, children, ...props } ]
-  if (!data.json_data || !data.json_data.RootNodes) return []
+  if (!data.json_data || !data.json_data.RootNodes || data.json_data.RootNodes.length === 0) {
+    throw new Error("No components were generated. The AI may not have understood your request. Please try rephrasing.")
+  }
 
   const adaptNode = (node: any) => {
     // Extract type from "Label@2.5.1" -> "Label"

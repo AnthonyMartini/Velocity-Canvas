@@ -14,6 +14,7 @@ import { SCHEMAS } from './constants'
 import PropField from './components/PropField'
 import ChatMessage from './components/ChatMessage'
 import LayerRow from './components/LayerRow'
+import ProjectsDashboard from './ProjectsDashboard'
 import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
@@ -380,11 +381,14 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
 // ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
-export default function RendererPage({ user, onCreditDeduction }: { user: any, onCreditDeduction?: () => void }) {
+export default function RendererPage({ user, onCreditDeduction, activeProject, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, setActiveProject: (p: any) => void }) {
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSavedState, setLastSavedState] = useState('')
   const [canvasW, setCanvasW] = useState(1366)
   const [canvasH, setCanvasH] = useState(768)
   const [canvasWInput, setCanvasWInput] = useState('1366')
   const [canvasHInput, setCanvasHInput] = useState('768')
+  
   const [tree, setTree] = useState([
     {
       id: 'app_root',
@@ -415,7 +419,6 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
   ])
   const [chatLoading, setChatLoading] = useState(false)
   const [chatImage, setChatImage] = useState(null)
-  const [promptMethod, setPromptMethod] = useState('Direct')
   const fileInputRef = useRef(null)
 
   // Tour State
@@ -450,9 +453,14 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
   const saveHistory = useCallback((newTree) => {
     if (!Array.isArray(newTree)) return
     setHistoryState(prev => {
+      // Don't save duplicate states (e.g., clicking without dragging pushes the exact same tree)
+      const currentTreeString = JSON.stringify(prev.items[prev.index]);
+      const newTreeString = JSON.stringify(newTree);
+      if (currentTreeString === newTreeString) return prev;
+
       // If we are not at the end of the history, slice off the future states
       const newItems = prev.items.slice(0, prev.index + 1)
-      newItems.push(JSON.parse(JSON.stringify(newTree))) // Deep clone to prevent mutations
+      newItems.push(JSON.parse(newTreeString)) // Deep clone to prevent mutations
       return {
         items: newItems,
         index: newItems.length - 1
@@ -639,19 +647,100 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
   const panRef = useRef(null)
   const canvasSizeRef = useRef({ w: 1366, h: 768 })
 
+  // Synchronize state when activeProject changes
+  useEffect(() => {
+    if (activeProject === 'new') {
+      const blankTree = [{
+        id: 'app_root',
+        type: 'App',
+        name: 'App',
+        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
+      }];
+      setTree(blankTree);
+      setCanvasW(1366);
+      setCanvasH(768);
+      setCanvasWInput('1366');
+      setCanvasHInput('768');
+      setHistoryState({ items: [blankTree], index: 0 });
+      setSelectedIds([]);
+      setCollapsedIds(new Set());
+      setLocalVars({});
+      setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768 }));
+    } else if (activeProject && typeof activeProject === 'object') {
+      const savedTree = activeProject.tree?.length ? activeProject.tree : [{
+        id: 'app_root',
+        type: 'App',
+        name: 'App',
+        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
+      }];
+      setTree(savedTree);
+      const loadedW = activeProject.canvasW || 1366;
+      const loadedH = activeProject.canvasH || 768;
+      if (activeProject.canvasW) { setCanvasW(loadedW); setCanvasWInput(String(loadedW)); }
+      if (activeProject.canvasH) { setCanvasH(loadedH); setCanvasHInput(String(loadedH)); }
+      setHistoryState({ items: [savedTree], index: 0 });
+      setSelectedIds([]);
+      setCollapsedIds(new Set());
+      setLastSavedState(JSON.stringify({ tree: savedTree, canvasW: loadedW, canvasH: loadedH }));
+    }
+  }, [activeProject]);
+
+  const handleSaveProject = async () => {
+    try {
+      setIsSaving(true);
+      const payload = {
+        projectId: typeof activeProject === 'object' ? activeProject.id : null,
+        name: typeof activeProject === 'object' ? activeProject.name : 'Untitled Project',
+        tree,
+        canvasW,
+        canvasH
+      };
+      
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      
+      notify('Project saved to cloud!', 'Success');
+      setLastSavedState(JSON.stringify({ tree, canvasW, canvasH }));
+      
+      // Update activeProject with the new ID so future queries act as 'updates'
+      if (activeProject === 'new' || !activeProject?.id) {
+        setActiveProject({ ...payload, id: data.projectId });
+      }
+    } catch (err: any) {
+      notify(err.message, 'Error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const hasUnsavedChanges = useMemo(() => {
+    return JSON.stringify({ tree, canvasW, canvasH }) !== lastSavedState;
+  }, [tree, canvasW, canvasH, lastSavedState]);
+
   // Auto-scroll to center of padded canvas on initial load
   const [initialScrollDone, setInitialScrollDone] = useState(false)
+  
+  useEffect(() => {
+    if (activeProject) setInitialScrollDone(false)
+  }, [activeProject])
+
   useEffect(() => {
     if (!initialScrollDone) {
       const wrapper = document.getElementById('canvas-scroll-wrapper')
-      // Wait until the wrapper has actual scrollWidth (meaning content has rendered)
       if (wrapper && wrapper.scrollWidth > wrapper.clientWidth) {
         wrapper.scrollLeft = (wrapper.scrollWidth - wrapper.clientWidth) / 2
         wrapper.scrollTop = (wrapper.scrollHeight - wrapper.clientHeight) / 2
         setInitialScrollDone(true)
       }
     }
-  }, [initialScrollDone, canvasW, canvasH])
+  }, [initialScrollDone, canvasW, canvasH, activeProject])
 
   // Derived
   const selectedNode = selectedIds.length === 1 ? findNode(tree, selectedIds[0]) : null
@@ -737,19 +826,28 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
   // ── Add component to root or into selected container ──────────────────────
   const addComponent = useCallback((sch) => {
     let parentId = null
-    if (selectedNode?.type === 'Container') {
+    let isGallery = false
+    if (selectedNode?.type === 'Container' || selectedNode?.type === 'Gallery') {
       parentId = selectedNode.id
+      isGallery = selectedNode.type === 'Gallery'
     } else if (selectedNode?.type === 'Screen') {
       parentId = selectedNode.id
+    } else if (selectedNode) {
+      const parent = findParent(tree, selectedNode.id)
+      if (parent && (parent.type === 'Container' || parent.type === 'Gallery')) {
+        parentId = parent.id
+        isGallery = parent.type === 'Gallery'
+      } else {
+        parentId = activeScreenNode?.id || null
+      }
     } else {
-      // Component is selected — use the active screen (which follows the selection)
       parentId = activeScreenNode?.id || null
     }
-    
+
     const offset = totalCount * 16
     const comp = createComponent(sch, {
-      X: 20,
-      Y: 20 + offset,
+      X: isGallery ? 0 : 20,
+      Y: isGallery ? 0 : 20 + offset,
     })
     
     setTree(prev => {
@@ -1206,8 +1304,17 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
             let limitW = canvasW
             let limitH = canvasH
             if (parent && parent.type !== 'App') {
-              limitW = parent.width || limitW
-              limitH = parent.height || limitH
+              const grandParent = findParent(nextTree, parent.id)
+              const resolvedParent = resolveProperties(parent, localVars, fullFlatNodes, grandParent)
+              limitW = resolvedParent.Width || limitW
+              limitH = resolvedParent.Height || limitH
+              
+              if (parent.type === 'Gallery') {
+                const isVertical = resolvedParent.Variant ? resolvedParent.Variant.includes('Vertical') : resolvedParent.Height > resolvedParent.Width
+                const tSize = resolvedParent.TemplateSize || 100
+                if (isVertical) limitH = tSize
+                else limitW = tSize
+              }
             }
 
             let targetX = Math.round(draggedNode.startX + snapDx)
@@ -1618,7 +1725,7 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
       canvas_components: activeScreenNode?.children || [],
       canvas_width: canvasW,
       canvas_height: canvasH,
-      prompt_method: promptMethod
+      prompt_method: 'Direct'
     } as any
 
     if (imagePayload) {
@@ -1719,12 +1826,28 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
   }, [])
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  if (!activeProject) {
+    return <ProjectsDashboard user={user} onOpenProject={setActiveProject} />;
+  }
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
 
       {/* Top Bar */}
       <div id="top-menu" className="flex items-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0">
-        <span className="text-xs font-semibold text-subtext uppercase tracking-wider">Canvas</span>
+        {/* Editable Project Name */}
+        <input
+          type="text"
+          value={typeof activeProject === 'object' && activeProject?.name ? activeProject.name : 'Untitled Project'}
+          onChange={e => {
+            const newName = e.target.value;
+            setActiveProject((prev: any) => typeof prev === 'object' ? { ...prev, name: newName } : prev);
+          }}
+          onFocus={e => (e.target as HTMLInputElement).select()}
+          className="text-sm font-semibold text-text bg-transparent border-b border-transparent hover:border-overlay/60 focus:border-accent/60 focus:outline-none px-0.5 py-0.5 max-w-[200px] transition-colors"
+          placeholder="Untitled Project"
+          title="Click to rename project"
+        />
         <div className="flex items-center gap-2">
           <label className="text-xs text-subtext">W</label>
           <input type="number" value={canvasWInput} onChange={e => setCanvasWInput(e.target.value)}
@@ -1743,6 +1866,56 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
         </div>
         {/* Toolbar Right */}
         <div className="flex items-center ml-auto">
+          {/* Cloud Save & Exit Buttons */}
+          <button
+            onClick={() => {
+              const dataStr = JSON.stringify({ tree, canvasW, canvasH }, null, 2);
+              const blob = new Blob([dataStr], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${typeof activeProject === 'object' && activeProject?.name ? activeProject.name : 'Untitled'}-export.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+            title="Export Project JSON"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-2 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export JSON
+          </button>
+          
+          <button
+            onClick={() => setActiveProject(null)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-2 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text"
+            title="Exit Project without saving"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v.5"/></svg>
+            Exit
+          </button>
+
+          <button
+            onClick={handleSaveProject}
+            disabled={isSaving}
+            title="Save to Cloud"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${
+              isSaving
+                ? 'bg-accent/50 text-white cursor-not-allowed opacity-70'
+                : hasUnsavedChanges
+                  ? 'bg-accent text-white hover:bg-accent-hover shadow-lg shadow-accent/20'
+                  : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            }`}
+          >
+            {isSaving ? (
+              <div className="w-3.5 h-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            )}
+            Save
+          </button>
+
           {/* Play / Pause Button */}
           <button
             onClick={() => {
@@ -2127,20 +2300,20 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
                     }
                   }
                   
-                  const s = styles[type] || styles.Information
+                  const s = styles[type?.replace('NotificationType.', '')] || styles.Information
                   
                   return (
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
                       <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
                         <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
-                          {type === 'Success' ? (
+                          {type === 'NotificationType.Success' ? (
                             <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                           ) : s.icon}
                         </div>
                         <div className="flex-1 pr-4">
-                          <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type}</p>
+                          <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type?.replace('NotificationType.', '')}</p>
                           <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
                         </div>
                         {/* Progress Bar background */}
@@ -2398,7 +2571,6 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
                   </svg>
                 </div>
                 <span className="text-xs font-semibold text-text">AI Canvas Assistant</span>
-                <span className="text-[10px] text-subtext/50 bg-overlay/30 px-1.5 py-0.5 rounded-full">{process.env.NEXT_PUBLIC_GEMINI_MODEL_DISPLAY || 'Gemini 3.1 Flash'}</span>
               </div>
               <button onClick={() => setChatOpen(false)}
                 className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer">
@@ -2445,16 +2617,7 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                 </button>
 
-                <select 
-                  value={promptMethod}
-                  onChange={(e) => setPromptMethod(e.target.value)}
-                  className="w-32 bg-base border border-overlay/40 rounded-xl px-2 h-9 text-[10px] font-semibold text-subtext focus:outline-none focus:border-violet-500/50 transition-all shadow-sm shrink-0 cursor-pointer appearance-none text-center hover:border-accent/40"
-                >
-                  <option value="Direct">Direct</option>
-                  <option value="Chain of Thought">Chain of Thought</option>
-                  <option value="Creative Designer">Creative Designer</option>
-                </select>
-                
+
                 <input ref={chatInputRef} type="text" value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
@@ -2741,7 +2904,11 @@ export default function RendererPage({ user, onCreditDeduction }: { user: any, o
                   )}
                   <div className="divide-y divide-overlay/20">
                     {schema.properties
-                      .filter(p => p.propertyType === 'Input' || p.propertyType === 'Event' || p.propertyType === 'Output')
+                      .filter(p => {
+                        // Screens should not have editable width/height in the props panel as they follow the canvas
+                        if (selectedNode.type === 'Screen' && (p.key === 'Width' || p.key === 'Height')) return false;
+                        return p.propertyType === 'Input' || p.propertyType === 'Event' || p.propertyType === 'Output';
+                      })
                       .map(prop => (
                         <PropField 
                           key={prop.key} 

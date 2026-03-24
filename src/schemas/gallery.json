@@ -31,7 +31,8 @@
     "Variant": "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0"
   },
   "properties": [
-    { "key": "Items",             "label": "Items",             "type": "text",    "propertyType": "Input" },
+    { "key": "Items",             "label": "Items",             "type": "table",   "propertyType": "Input" },
+
     { "key": "X",                 "label": "X",                 "type": "number",  "propertyType": "Input" },
     { "key": "Y",                 "label": "Y",                 "type": "number",  "propertyType": "Input" },
     { "key": "Width",             "label": "Width",             "type": "number",  "propertyType": "Input" },

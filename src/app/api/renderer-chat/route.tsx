@@ -89,12 +89,46 @@ export async function POST(req) {
 
     const cleaned = responseText.substring(start, end + 1).trim();
 
+    let parsed: any;
     try {
-      return NextResponse.json(JSON.parse(cleaned));
+      console.log("Cleaned JSON:", cleaned);
+      parsed = JSON.parse(cleaned);
     } catch (parseError) {
       console.error("Failed to parse JSON in renderer-chat:", parseError);
       return NextResponse.json({ error: "Parse error", raw: cleaned }, { status: 500 });
     }
+
+    // Post-process: convert single-tick string literals ('value') → "value" (PowerApps format).
+    // The model is instructed to wrap literal strings in single quotes to avoid the
+    // JSON-escaping issues that arise from double-quotes-within-double-quotes.
+    // We walk the entire object and translate every string value of the form 'foo' → "foo".
+    // Keys that hold layout numerics (X, Y, Width, Height, etc.) are exempt because the
+    // model never wraps numbers in single ticks; the check is purely on string content.
+    const singleTickRe = /^'([\s\S]*)'$/;
+
+    function convertSingleTickLiterals(value: any): any {
+      if (typeof value === "string") {
+        const m = value.match(singleTickRe);
+        if (m) {
+          // Replace with PowerApps double-quote format: surround with actual " characters
+          return `"${m[1]}"`;
+        }
+        return value;
+      }
+      if (Array.isArray(value)) {
+        return value.map(convertSingleTickLiterals);
+      }
+      if (value !== null && typeof value === "object") {
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(value)) {
+          out[k] = convertSingleTickLiterals(v);
+        }
+        return out;
+      }
+      return value;
+    }
+
+    return NextResponse.json(convertSingleTickLiterals(parsed));
 
   } catch (error) {
     console.error("Gemini API error:", error);

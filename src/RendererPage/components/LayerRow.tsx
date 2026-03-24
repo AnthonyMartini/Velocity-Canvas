@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 
 export default function LayerRow({ node, selectedIds, onSelect, onReorder, depth, isCollapsed, toggleCollapse }) {
-  const isContainer = node.type === 'Container' || node.type === 'Gallery'
+  const isContainer = node.type === 'Container' || node.type === 'Gallery' || node.type === 'Screen'
   const hasChildren = isContainer && node.children?.length > 0
   const isSelected = selectedIds.includes(node.id)
 

@@ -9,10 +9,10 @@ export const Type = {
 }
 
 export const NotificationType = {
-    Information: "Information",
-    Warning: "Warning",
-    Success: "Success",
-    Error: "Error"
+    Information: "NotificationType.Information",
+    Warning: "NotificationType.Warning",
+    Success: "NotificationType.Success",
+    Error: "NotificationType.Error"
 }
 
 export const Align = {
@@ -134,6 +134,20 @@ export const Icon = {
     Printing3D: "Icon.Printing3D"
 }
 
+export const ALL_ENUM_VALUES = new Set([
+    ...Object.values(NotificationType),
+    ...Object.values(Align),
+    ...Object.values(VerticalAlign),
+    ...Object.values(FontWeight),
+    ...Object.values(BorderStyle),
+    ...Object.values(DisplayMode),
+    ...Object.values(Overflow),
+    ...Object.values(DropShadow),
+    ...Object.values(TextMode),
+    ...Object.values(TextFormat),
+    ...Object.values(Icon)
+])
+
 // These are the available functions that can be used in the formulas within our app. 
 // The app needs to verify the type of the property that invokes these functions matchs the type of the function. 
 // For example, if a property is of type "text", it should not be able to invoke a function of type "number". App should return an error message. 
@@ -177,14 +191,30 @@ export const FUNCTIONS = [
         name: "Navigate",
         type: Type.EVENT,
         description: "Navigates to a different screen.",
-        example: 'Navigate("Screen2")',
+        example: 'Navigate(Screen2)',
         args: [{ name: "screen", type: Type.TEXT }],
         function: (screen, context)=>{
-            //Type check for screen
-            if(typeof screen !== "string"){
-                return {status: "error", message: "Screen name must be a string"}
+            // Helper to check if it's a valid screen
+            const isValidScreen = (val) => {
+                if (!val) return false;
+                // In strict mode (validation), evaluateAST returns the component object
+                if (typeof val === 'object' && val.type === 'Screen') return true;
+                // In non-strict mode (runtime), evaluateAST returns the string name
+                if (typeof val === 'string' && context?.screens) {
+                    return context.screens.some(s => s.name === val);
+                }
+                return false;
+            };
+
+            if (!isValidScreen(screen)) {
+                return { 
+                    status: "error", 
+                    message: `"${typeof screen === 'string' ? screen : (screen?.name || 'Unknown')}" is not a valid screen name.` 
+                }
             }
-            if (context && context.navigate) context.navigate(screen)
+
+            const screenName = typeof screen === 'string' ? screen : screen.name;
+            if (context && context.navigate) context.navigate(screenName)
             return {status: "success", message: "Navigated to screen"}
         }
     },
@@ -286,6 +316,7 @@ export const FUNCTIONS = [
             { name: "falseValue", type: Type.ANY }
         ],
         function: (condition, trueValue, falseValue, context) => {
+
             if (typeof condition !== "boolean") {
                 return { status: "error", message: "First argument to If must be a boolean" }
             }
@@ -307,6 +338,26 @@ export const FUNCTIONS = [
                 }
                 return condition ? trueValue : falseValue;
             }
+        }
+    },
+    {
+        name: "Table",
+        type: Type.ANY,
+        description: "Creates a table from one or more records. Plain arrays are auto-wrapped as {Value: item}.",
+        example: 'Table({Col1:"Hello"},{Col1:"World"})',
+        args: [], // variadic
+        function: (...args) => {
+            // evaluateAST always appends the runtime context as the last argument.
+            // Context objects have well-known action keys — filter them out.
+            const isContext = (a) => a && typeof a === 'object' && ('notify' in a || 'navigate' in a || 'setVariable' in a || 'isActionContext' in a)
+            const rows = args
+                .filter(a => !isContext(a))
+                .flatMap(a => {
+                    if (Array.isArray(a)) return a.map(v => ({ Value: v }))
+                    if (a !== null && typeof a === 'object') return [a]
+                    return [{ Value: a }]
+                })
+            return { status: "success", message: rows }
         }
     }
 ]

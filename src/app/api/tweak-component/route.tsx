@@ -50,12 +50,31 @@ export async function POST(req) {
 
     const cleaned = rawText.substring(start, end + 1).trim();
 
+    let parsed: any;
     try {
-      return NextResponse.json(JSON.parse(cleaned));
+      parsed = JSON.parse(cleaned);
     } catch (parseError) {
       console.error("Failed to parse JSON in tweak-component:", parseError);
       return NextResponse.json({ error: "Parse error", raw: cleaned }, { status: 500 });
     }
+
+    // Convert single-tick string literals ('value') → "value" (PowerApps double-quote format).
+    const singleTickRe = /^'([\s\S]*)'$/;
+    function convertSingleTickLiterals(value: any): any {
+      if (typeof value === "string") {
+        const m = value.match(singleTickRe);
+        return m ? `"${m[1]}"` : value;
+      }
+      if (Array.isArray(value)) return value.map(convertSingleTickLiterals);
+      if (value !== null && typeof value === "object") {
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(value)) out[k] = convertSingleTickLiterals(v);
+        return out;
+      }
+      return value;
+    }
+
+    return NextResponse.json(convertSingleTickLiterals(parsed));
   } catch (error) {
     console.error("Gemini API error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

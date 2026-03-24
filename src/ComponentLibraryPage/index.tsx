@@ -126,36 +126,61 @@ export default function DocumentationPage({ user }: { user: any }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-text">Global Enums</h3>
-                  <p className="text-sm text-subtext/80 text-balance">Available global enumerations for formulas.</p>
+                  <p className="text-sm text-subtext/80 text-balance">Available global enumerations for formulas. Click an enum to view its values.</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
-                  { name: 'NotificationType', data: NotificationType, color: 'purple' },
-                  { name: 'Align', data: Align, color: 'blue' },
-                  { name: 'VerticalAlign', data: VerticalAlign, color: 'indigo' },
-                  { name: 'FontWeight', data: FontWeight, color: 'emerald' },
-                   { name: 'BorderStyle', data: BorderStyle, color: 'amber' },
-                  { name: 'DisplayMode', data: DisplayMode, color: 'rose' },
-                  { name: 'Overflow', data: Overflow, color: 'cyan' },
-                  { name: 'DropShadow', data: DropShadow, color: 'slate' },
-                  { name: 'TextMode', data: TextMode, color: 'orange' },
-                  { name: 'TextFormat', data: TextFormat, color: 'teal' },
-                  { name: 'Icon', data: Icon, color: 'sky' }
-                ].map(enm => (
-                  <div key={enm.name} className="bg-base/40 rounded-xl p-4 border border-overlay/10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-mono text-sm font-bold text-accent">{enm.name}</span>
-                      <span className={`text-[10px] font-bold bg-${enm.color}-500/10 text-${enm.color}-500 px-2 py-0.5 rounded border border-${enm.color}-500/20 uppercase`}>Enum</span>
+                  { name: 'NotificationType', data: NotificationType },
+                  { name: 'Align', data: Align },
+                  { name: 'VerticalAlign', data: VerticalAlign },
+                  { name: 'FontWeight', data: FontWeight },
+                  { name: 'BorderStyle', data: BorderStyle },
+                  { name: 'DisplayMode', data: DisplayMode },
+                  { name: 'Overflow', data: Overflow },
+                  { name: 'DropShadow', data: DropShadow },
+                  { name: 'TextMode', data: TextMode },
+                  { name: 'TextFormat', data: TextFormat },
+                  { name: 'Icon', data: Icon }
+                ].map(enm => {
+                  const isEnumExpanded = expanded[`enum_${enm.name}`] || false
+                  return (
+                    <div key={enm.name} className="flex flex-col bg-base/40 rounded-xl border border-overlay/10 overflow-hidden h-fit transition-all duration-300">
+                      <button 
+                        onClick={() => toggleExpanded(`enum_${enm.name}`)}
+                        className="flex items-center justify-between p-4 hover:bg-overlay/5 transition-colors text-left"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-mono text-sm font-bold text-accent">{enm.name}</span>
+                          <span className="text-[10px] text-subtext/60 font-mono italic">
+                            {Object.keys(enm.data).length} values
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-bold bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded border border-indigo-500/20 uppercase`}>Enum</span>
+                          <svg 
+                            className={`w-4 h-4 text-subtext/40 transition-transform duration-300 ${isEnumExpanded ? 'rotate-180' : ''}`} 
+                            viewBox="0 0 20 20" fill="currentColor"
+                          >
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </button>
+                      
+                      {isEnumExpanded && (
+                        <div className="px-4 pb-4 pt-1 flex flex-col gap-1.5 max-h-60 overflow-y-auto border-t border-overlay/5">
+                          {Object.entries(enm.data).map(([key, val]) => (
+                            <div key={key} className="flex items-center justify-between gap-4 py-1 border-b border-overlay/5 last:border-0 group/val">
+                              <span className="font-mono text-[11px] text-text/80">{key}</span>
+                              <span className="font-mono text-[10px] text-subtext/40 break-all text-right">{String(val)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-subtext/60 font-mono italic">
-                        {Object.keys(enm.data).length} values
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 

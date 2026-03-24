@@ -19,7 +19,7 @@ export function parseFormula(formula, strict = false) {
   // Tokenizer
   const tokens = []
   // Updated regex to include # for hex colors and maybe some basic logical operators
-  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|])/g
+  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:])/g
   let match
   
   while ((match = regex.exec(text)) !== null) {
@@ -138,6 +138,40 @@ export function parseFormula(formula, strict = false) {
       return { type: 'PropertyAccess', value: token.value }
     }
 
+    // Record literal: { Key: expr, Key2: expr2 }
+    if (token.type === 'Symbol' && token.value === '{') {
+      const fields: Record<string, any> = {}
+      while (peek() && peek().value !== '}') {
+        // key can be an Identifier
+        const keyToken = consume()
+        if (!keyToken) break
+        const fieldName = keyToken.value
+        // consume ':'
+        if (peek() && peek().value === ':') consume()
+        fields[fieldName] = parseExpression()
+        // consume optional ','
+        if (peek() && peek().value === ',') consume()
+      }
+      if (peek() && peek().value === '}') consume() // consume '}'
+      else if (strict) throw new Error("Syntax Error: Missing closing brace '}'")
+      return { type: 'RecordLiteral', fields }
+    }
+
+    // Array literal: [expr, expr, ...]
+    if (token.type === 'Symbol' && token.value === '[') {
+      const elements: any[] = []
+      if (peek() && peek().value !== ']') {
+        elements.push(parseExpression())
+        while (peek() && peek().value === ',') {
+          consume()
+          elements.push(parseExpression())
+        }
+      }
+      if (peek() && peek().value === ']') consume() // consume ']'
+      else if (strict) throw new Error("Syntax Error: Missing closing bracket ']'")
+      return { type: 'ArrayLiteral', elements }
+    }
+
     if (token.type === 'Identifier') {
       // Check if it's a function call
       if (peek() && peek().value === '(') {
@@ -208,7 +242,7 @@ export function parseFormula(formula, strict = false) {
  * @param {boolean} strict If true, throws errors instead of swallowing them.
  * @returns {any} Result of evaluation
  */
-export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new Set(), parentNode = null, selfNode = null, context = {}, strict = false) {
+export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new Set(), parentNode = null, selfNode = null, context: any = {}, strict = false) {
   if (!node) return strict ? null : ""
 
   const handleError = (msg) => {
@@ -236,7 +270,55 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     else if (compName === 'DropShadow') targetNode = DropShadow
     else if (compName === 'TextMode') targetNode = TextMode
     else if (compName === 'TextFormat') targetNode = TextFormat
+    else if (compName === 'ThisItem') {
+      const item = localVars['ThisItem']
+
+      // ── Runtime: GalleryRenderer injected ThisItem for this row ───────────
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return propName in item ? item[propName] : ''
+      }
+
+      // ── Validation time: ThisItem not in localVars yet.
+      //    Find the nearest Gallery ancestor and evaluate its Items formula so we
+      //    know which columns actually exist.
+      const hasDescendant = (children, targetId) =>
+        !!children?.some(c => c.id === targetId || hasDescendant(c.children, targetId))
+
+      const galleryNode =
+        parentNode?.type === 'Gallery' ? parentNode
+        : flatNodes.find(n => n.type === 'Gallery' && hasDescendant(n.children, selfNode?.id))
+
+      if (galleryNode?.Items) {
+        try {
+          // Evaluate Items non-strictly so partial formulas fail gracefully
+          const itemsAst = parseFormula(String(galleryNode.Items))
+          const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set(), null, galleryNode, {}, false)
+          const firstRecord: any =
+            Array.isArray(itemsResult) && itemsResult.length > 0 ? itemsResult[0]
+            : (itemsResult && typeof itemsResult === 'object' && !Array.isArray(itemsResult)) ? itemsResult
+            : null
+
+          if (firstRecord && typeof firstRecord === 'object') {
+            if (propName in firstRecord) {
+              // Known column — return its value as a type hint for validation
+              return firstRecord[propName] !== undefined ? firstRecord[propName] : ''
+            }
+            const cols = Object.keys(firstRecord).join(', ')
+            return handleError(`"${propName}" is not a column in ThisItem. Available: ${cols || '(none)'}`)
+          }
+        } catch {
+          // Items formula failed to evaluate — fall through to placeholder
+        }
+      }
+
+      // No gallery context found — return placeholder (safe, no error)
+      return ''
+    }
+
+    // Allow other localVars entries that are plain objects
+    else if (localVars[compName] !== undefined && typeof localVars[compName] === 'object' && !Array.isArray(localVars[compName])) targetNode = localVars[compName]
     else targetNode = flatNodes.find(n => n.name === compName)
+
 
     if (targetNode && targetNode[propName] !== undefined) {
       const rawVal = targetNode[propName]
@@ -307,6 +389,18 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     case 'PropertyAccess':
       return resolvePropertyPath(node.value)
 
+    case 'RecordLiteral': {
+      const record: Record<string, any> = {}
+      for (const [key, fieldAst] of Object.entries(node.fields)) {
+        record[key] = evaluateAST(fieldAst, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      }
+      return record
+    }
+
+    case 'ArrayLiteral': {
+      return node.elements.map(el => evaluateAST(el, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
+    }
+
     case 'ActionSequence': {
       evaluateAST(node.left, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
       return evaluateAST(node.right, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
@@ -356,6 +450,11 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       if (!funcDef) {
          if (!strict) return ""
          return handleError(`Unresolved function: ${node.name}`)
+      }
+
+      if (funcDef.type === 'event' && !context.isActionContext) {
+         if (strict) return handleError(`Behavior function '${funcDef.name}' cannot be used in a property formula`)
+         return ""
       }
 
       // Special case for Set() - the first argument is an identifier referring to the variable name,
