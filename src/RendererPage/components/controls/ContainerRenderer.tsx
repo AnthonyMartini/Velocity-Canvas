@@ -41,7 +41,7 @@ export default function ContainerRenderer({
     boxShadow: selected
       ? '0 0 0 3px rgba(0,120,212,0.25)'
       : (shadowMap[comp.DropShadow] || 'none'),
-    zIndex: selected ? 10 : 1,
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
   }
 
   if (dragOverId === comp.id) {

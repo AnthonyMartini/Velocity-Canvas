@@ -26,7 +26,7 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : '0 1px 3px rgba(0,0,0,0.15)',
     transition: 'box-shadow 0.1s, outline 0.1s',
-    zIndex: selected ? 10 : 1,
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
   }
   const handleClick = (e) => {
     onClick(e)

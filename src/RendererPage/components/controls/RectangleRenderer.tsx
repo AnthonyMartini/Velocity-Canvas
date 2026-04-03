@@ -27,7 +27,7 @@ export default function RectangleRenderer({
     userSelect: 'none',
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     boxSizing: 'border-box',
-    zIndex: selected ? 10 : 1
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
   }
 
   return (

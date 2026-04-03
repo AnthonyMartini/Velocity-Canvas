@@ -112,7 +112,7 @@ function ErrorsPane({ errors, onSelectNode, width }) {
 }
 
 // ── Code Pane ─────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width }) {
+function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
@@ -129,6 +129,17 @@ function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakI
 
   const handleCopy = () => {
     if (!yaml) return
+
+    // Prevent copying if there are validation errors in the selected node (or whole screen if none selected)
+    const hasErrors = node 
+      ? globalErrors.some(err => err.nodeId === node.id || isDescendant(tree, err.nodeId, node.id))
+      : globalErrors.length > 0;
+
+    if (hasErrors) {
+      notify("Cannot copy YAML with validation errors. Please fix them in the Errors pane first.", "Error");
+      return;
+    }
+
     navigator.clipboard.writeText(yaml).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
@@ -192,6 +203,8 @@ function CodePane({ node, tree, isTweaking, setIsTweaking, tweakInput, setTweakI
 CodePane.propTypes = {
   node: PropTypes.object, // Can be null for screen mode
   tree: PropTypes.array.isRequired,
+  globalErrors: PropTypes.array.isRequired,
+  notify: PropTypes.func.isRequired,
   isTweaking: PropTypes.bool.isRequired,
   setIsTweaking: PropTypes.func.isRequired,
   tweakInput: PropTypes.string.isRequired,
@@ -411,6 +424,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [zoom, setZoom] = useState(1) // Canvas zoom level
   const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
   const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
+  const [showPropertiesPane, setShowPropertiesPane] = useState(false) // Toggle visibility of Properties Pane
+  const showLayerNames = true // Always show layer names/full size
 
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
@@ -435,7 +450,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [tweakLoading, setTweakLoading] = useState(false)
   
   // Sidebar/Pane Resizing state
-  const [leftWidth, setLeftWidth] = useState(256)
   const [rightWidth, setRightWidth] = useState(256)
   const [chatHeight, setChatHeight] = useState(240)
   const [codeWidth, setCodeWidth] = useState(288)
@@ -561,6 +575,17 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [])
 
+  // Clear chat when project is closed
+  useEffect(() => {
+    if (!activeProject) {
+      setChatMessages([
+        { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+      ])
+      setChatImage(null)
+      setChatInput('')
+    }
+  }, [activeProject])
+
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -649,11 +674,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   // Synchronize state when activeProject changes
   useEffect(() => {
-    if (activeProject === 'new') {
+    if (activeProject === 'new' || (typeof activeProject === 'object' && activeProject?.isNew)) {
+      const projectName = typeof activeProject === 'object' ? activeProject.name : 'Untitled Project';
       const blankTree = [{
         id: 'app_root',
         type: 'App',
-        name: 'App',
+        name: projectName,
         children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
       }];
       setTree(blankTree);
@@ -666,11 +692,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setCollapsedIds(new Set());
       setLocalVars({});
       setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768 }));
+
+      // If it was the temporary `{name, isNew}` object, finalize it into a proper project state
+      if (typeof activeProject === 'object' && activeProject?.isNew) {
+        setActiveProject({ name: projectName, tree: blankTree, canvasW: 1366, canvasH: 768 });
+      }
     } else if (activeProject && typeof activeProject === 'object') {
       const savedTree = activeProject.tree?.length ? activeProject.tree : [{
         id: 'app_root',
         type: 'App',
-        name: 'App',
+        name: activeProject.name || 'App',
         children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
       }];
       setTree(savedTree);
@@ -970,16 +1001,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       // ── Pane Resizing ────────────────────────────────────────────────────────
       if (paneResizeRef.current) {
         const { side, startMouseX, startMouseY, startWidth, startHeight } = paneResizeRef.current
-        if (side === 'left') {
-          const deltaX = e.clientX - startMouseX
-          const newWidth = Math.max(200, Math.min(window.innerWidth * 0.4, startWidth + deltaX))
-          setLeftWidth(newWidth)
-          
-          const wrapper = document.getElementById('canvas-scroll-wrapper')
-          if (wrapper && paneResizeRef.current.startScrollX !== undefined) {
-             wrapper.scrollLeft = paneResizeRef.current.startScrollX + (newWidth - startWidth)
-          }
-        } else if (side === 'right') {
+
+        if (side === 'right') {
           const deltaX = startMouseX - e.clientX
           setRightWidth(Math.max(200, Math.min(window.innerWidth * 0.4, startWidth + deltaX)))
         } else if (side === 'code') {
@@ -1757,7 +1780,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
       setChatLoading(false)
 
-      if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length) {
+      if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length || data.components_to_reparent?.length) {
         setTree(prev => {
           let nextTree = prev
           // 1. Removals
@@ -1767,21 +1790,47 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               nextTree = t
             })
           }
-          // 2. Updates
+          // 2. Reparents (must run BEFORE updates so handleDropLogic's default X/Y can be overridden)
+          if (data.components_to_reparent?.length) {
+            data.components_to_reparent.forEach(r => {
+              if (r.id && r.newParentId) {
+                nextTree = handleDropLogic(nextTree, r.id, r.newParentId)
+              }
+            })
+          }
+          // 3. Updates
           if (data.components_to_update?.length) {
             data.components_to_update.forEach(u => {
               if (u.id) {
                 const { id, ...changes } = u
+                // Prevent duplicate names
+                if (changes.name) {
+                  const currentNames = flattenTree(nextTree).filter(n => n.id !== id).map(n => n.name)
+                  if (currentNames.includes(changes.name)) {
+                    changes.name = getNextAvailableName(changes.name, currentNames)
+                  }
+                }
                 // prevent id changes
                 nextTree = updateNode(nextTree, id, () => changes)
               }
             })
           }
-          // 3. Additions
+          // 4. Additions
           if (data.components_to_add?.length) {
+            // Collect all current IDs to ensure uniqueness
+            const allIds = new Set(flattenTree(nextTree).map(n => n.id))
             data.components_to_add.forEach(spec => {
-              const comp = createFromSpec(spec)
-              if (comp) nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
+              const comp = createFromSpec(spec, allIds)
+              if (comp) {
+                // Prevent duplicate names in newly generated components
+                if (comp.name) {
+                  const currentNames = flattenTree(nextTree).map(n => n.name)
+                  if (currentNames.includes(comp.name)) {
+                    comp.name = getNextAvailableName(comp.name, currentNames)
+                  }
+                }
+                nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
+              }
             })
           }
 
@@ -1800,7 +1849,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       if (lastId) setTimeout(() => setSelectedIds([lastId]), 10)
 
       const addsCount = (data.components_to_add || []).length
-      const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length
+      const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length + (data.components_to_reparent || []).length
 
       setChatMessages(prev => [...prev, {
         role: 'assistant',
@@ -1831,7 +1880,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden relative">
 
       {/* Top Bar */}
       <div id="top-menu" className="flex items-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0">
@@ -1867,25 +1916,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         {/* Toolbar Right */}
         <div className="flex items-center ml-auto">
           {/* Cloud Save & Exit Buttons */}
-          <button
-            onClick={() => {
-              const dataStr = JSON.stringify({ tree, canvasW, canvasH }, null, 2);
-              const blob = new Blob([dataStr], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `${typeof activeProject === 'object' && activeProject?.name ? activeProject.name : 'Untitled'}-export.json`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            }}
-            title="Export Project JSON"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-2 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text cursor-pointer"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export JSON
-          </button>
+
           
           <button
             onClick={() => setActiveProject(null)}
@@ -1975,7 +2006,28 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
           <button
             onClick={() => {
+              setShowPropertiesPane(v => !v)
+              if (!showPropertiesPane) {
+                setShowLocalData(false)
+                setShowErrorsPane(false)
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showPropertiesPane ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+              }`}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+            Properties
+          </button>
+
+          <button
+            onClick={() => {
               setShowLocalData(v => !v)
+              if (!showLocalData) {
+                setShowPropertiesPane(false)
+                setShowErrorsPane(false)
+              }
               setSelectedIds([])
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showLocalData ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
@@ -2089,27 +2141,17 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left Toolbar */}
-        <div id="left-toolbar" style={{ width: leftWidth }} className="shrink-0 border-r border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
-          {/* Resize Handle Left */}
-          <div 
-            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
-            onMouseDown={(e) => {
-              const wrapper = document.getElementById('canvas-scroll-wrapper')
-              paneResizeRef.current = { 
-                side: 'left', 
-                startMouseX: e.clientX, 
-                startWidth: leftWidth,
-                startScrollX: wrapper?.scrollLeft
-              }
-              document.body.style.cursor = 'col-resize'
-            }}
-          />
+        <div id="left-toolbar" style={{ width: 256 }} className="shrink-0 border-r border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
+
           {/* Component Library */}
           <div className="max-h-[50%] flex flex-col overflow-hidden border-b border-overlay/20">
-            <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest px-3 pt-3 pb-2 shrink-0">
-              {selectedNode?.type === 'Container' ? 'Add To Container' : 'Add Component'}
-            </p>
-            <div className="overflow-y-auto flex-1 px-3 pb-3">
+            <div className="flex items-center pt-3 pb-2 px-3 justify-between shrink-0 border-b border-overlay/20 shadow-sm bg-surface/30">
+              <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest truncate mr-1">
+                {selectedNode?.type === 'Container' ? 'Add To Container' : 'Add Component'}
+              </p>
+
+            </div>
+            <div className={`overflow-y-auto flex-1 pb-3 ${showLayerNames ? 'px-3 pt-2' : 'px-2 pt-2'}`}>
               <div className="flex flex-col gap-1.5">
               {Object.entries(SCHEMAS)
                 .filter(([label]) => label !== 'Screen')
@@ -2119,15 +2161,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   return (
                     <button key={label} onClick={() => !isPlaying && addComponent(sch)}
                       disabled={isPlaying}
-                      className={`flex items-center gap-2 w-full text-left border text-xs px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                      title={!showLayerNames ? label : undefined}
+                      className={`flex items-center gap-2 w-full text-left border rounded-lg transition-all duration-150 ${showLayerNames ? 'px-3 py-2.5 text-xs' : 'py-2.5 px-3 justify-start'} ${
                         isPlaying
                           ? 'bg-base/30 border-overlay/15 text-subtext/30 cursor-not-allowed'
                           : 'bg-base/60 border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext cursor-pointer'
                       }`}>
-                      <span className={`w-8 h-8 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
-                        {Icon && <Icon className="w-5 h-5" />}
+                      <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
+                        {Icon && <Icon className="w-4 h-4" />}
                       </span>
-                      <span className="font-medium">{label}</span>
+                      {showLayerNames && <span className="font-medium truncate">{label}</span>}
                     </button>
                   )
                 })}
@@ -2142,15 +2185,17 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
           {/* Layers */}
           <div className="flex-1 max-h-[50%] flex flex-col overflow-hidden">
-            <div id="layers-panel" className="p-2 border-b border-overlay/30 bg-surface flex items-center justify-between shrink-0">
-              <span className="text-xs font-medium text-text px-2">Layers</span>
-              {tree.length > 0 && (
-                <button onClick={() => setCollapsedIds(new Set())} className="text-[10px] text-accent/80 hover:text-accent font-medium px-2 py-1 rounded hover:bg-accent/10 transition-colors">
+            <div id="layers-panel" className="p-2 border-b border-overlay/30 bg-surface flex items-center justify-between shrink-0 border-t border-overlay/20">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-text px-2">Layers</span>
+              </div>
+              {showLayerNames && tree.length > 0 && (
+                <button onClick={() => setCollapsedIds(new Set())} className="text-[10px] text-accent/80 hover:text-accent font-medium px-2 py-1 rounded hover:bg-accent/10 transition-colors shrink-0">
                   Expand All
                 </button>
               )}
             </div>
-            <div className="p-3 overflow-y-auto flex-1 pb-16 space-y-0.5">
+            <div className={`overflow-y-auto flex-1 pb-16 space-y-0.5 ${showLayerNames ? 'p-3' : 'px-2 py-3'}`}>
               {flatNodes.map(({ _depth, ...node }) => (
                 <LayerRow
                   key={node.id}
@@ -2174,22 +2219,90 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   depth={_depth}
                   isCollapsed={collapsedIds.has(node.id)}
                   toggleCollapse={toggleCollapse}
+                  showNames={showLayerNames}
                 />
               ))}
               {tree.length === 0 && <div className="text-xs text-subtext/40 italic px-2 py-4">Canvas is empty</div>}
               <div className="pt-2 px-1">
                 <button 
                   onClick={addScreen}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-overlay/40 text-subtext/80 hover:text-text hover:border-accent/40 hover:bg-accent/5 transition-colors text-xs font-medium"
+                  title={!showLayerNames ? 'Add Screen' : undefined}
+                  className={`w-full flex items-center justify-center gap-2 border border-dashed border-overlay/40 text-subtext/80 hover:text-text hover:border-accent/40 hover:bg-accent/5 transition-colors font-medium rounded-lg ${showLayerNames ? 'px-3 py-1.5 text-xs' : 'py-2'}`}
                 >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  Add Screen
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  {showLayerNames && <span>Add Screen</span>}
                 </button>
-              </div>
             </div>
           </div>
+        </div>
       </div>    {/* Center: Canvas + Chat */}
-        <div className="flex-1 bg-[#1e1e2e] relative overflow-hidden">
+      <div className="flex-1 bg-[#1e1e2e] relative overflow-hidden">
+          {/* Notification Toast centered inside Canvas Workspace */}
+          {notification && (() => {
+            const type = notification.type || 'Information'
+            const styles = {
+              Success: {
+                bg: 'bg-emerald-50/95',
+                border: 'border-emerald-500/30',
+                iconBg: 'bg-emerald-500',
+                iconText: 'text-white',
+                accent: 'bg-emerald-500',
+                text: 'text-emerald-900',
+                shadow: 'shadow-emerald-500/10'
+              },
+              Error: {
+                bg: 'bg-red-50/95',
+                border: 'border-red-500/30',
+                iconBg: 'bg-red-500',
+                iconText: 'text-white',
+                accent: 'bg-red-500',
+                text: 'text-red-900',
+                shadow: 'shadow-red-500/10',
+                icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              },
+              Warning: {
+                bg: 'bg-amber-50/95',
+                border: 'border-amber-500/30',
+                iconBg: 'bg-amber-500',
+                iconText: 'text-white',
+                accent: 'bg-amber-500',
+                text: 'text-amber-900',
+                shadow: 'shadow-amber-500/10',
+                icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              },
+              Information: {
+                bg: 'bg-blue-50/95',
+                border: 'border-blue-500/30',
+                iconBg: 'bg-blue-500',
+                iconText: 'text-white',
+                accent: 'bg-blue-500',
+                text: 'text-blue-900',
+                shadow: 'shadow-blue-500/10',
+                icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              }
+            }
+            const s = styles[type?.replace('NotificationType.', '')] || styles.Information
+            return (
+              <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[100000] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
+                <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
+                  <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
+                    {type === 'NotificationType.Success' ? (
+                      <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    ) : s.icon}
+                  </div>
+                  <div className="flex-1 pr-4">
+                    <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type?.replace('NotificationType.', '')}</p>
+                    <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
+                  </div>
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-black/5">
+                     <div className={`h-full ${s.accent} animate-toast-progress`} />
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
           <div
             id="canvas-scroll-wrapper"
             className="absolute inset-0 overflow-auto bg-[#f0f0f0]"
@@ -2255,75 +2368,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
                 onDrop={e => { e.preventDefault(); setDragOverId(null) }}
               >
-                {/* Global Toast Notification inside Canvas */}
-                {notification && (() => {
-                  const type = notification.type || 'Information'
-                  const styles = {
-                    Success: {
-                      bg: 'bg-emerald-50/95',
-                      border: 'border-emerald-500/30',
-                      iconBg: 'bg-emerald-500',
-                      iconText: 'text-white',
-                      accent: 'bg-emerald-500',
-                      text: 'text-emerald-900',
-                      shadow: 'shadow-emerald-500/10'
-                    },
-                    Error: {
-                      bg: 'bg-red-50/95',
-                      border: 'border-red-500/30',
-                      iconBg: 'bg-red-500',
-                      iconText: 'text-white',
-                      accent: 'bg-red-500',
-                      text: 'text-red-900',
-                      shadow: 'shadow-red-500/10',
-                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    },
-                    Warning: {
-                      bg: 'bg-amber-50/95',
-                      border: 'border-amber-500/30',
-                      iconBg: 'bg-amber-500',
-                      iconText: 'text-white',
-                      accent: 'bg-amber-500',
-                      text: 'text-amber-900',
-                      shadow: 'shadow-amber-500/10',
-                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                    },
-                    Information: {
-                      bg: 'bg-blue-50/95',
-                      border: 'border-blue-500/30',
-                      iconBg: 'bg-blue-500',
-                      iconText: 'text-white',
-                      accent: 'bg-blue-500',
-                      text: 'text-blue-900',
-                      shadow: 'shadow-blue-500/10',
-                      icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    }
-                  }
-                  
-                  const s = styles[type?.replace('NotificationType.', '')] || styles.Information
-                  
-                  return (
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
-                      <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
-                        <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
-                          {type === 'NotificationType.Success' ? (
-                            <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          ) : s.icon}
-                        </div>
-                        <div className="flex-1 pr-4">
-                          <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type?.replace('NotificationType.', '')}</p>
-                          <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
-                        </div>
-                        {/* Progress Bar background */}
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-black/5">
-                           <div className={`h-full ${s.accent} animate-toast-progress`} />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })()}
                 {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
@@ -2495,6 +2539,41 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   )
                 })()}
 
+                {/* Error Indicators */}
+                {(() => {
+                  const errorNodeIds = new Set(globalErrors.map(e => e.nodeId));
+                  return Array.from(errorNodeIds).map(nodeId => {
+                    const comp = findNode(tree, nodeId);
+                    if (!comp || comp.type === 'Screen' || comp.type === 'App') return null;
+                    
+                    const { x, y } = getNodeAbsolutePosition(tree, comp.id, fullFlatNodes, localVars);
+                    const parent = findParent(tree, comp.id);
+                    const resolvedComp = resolveProperties(comp, localVars, fullFlatNodes, parent);
+                    const { Width: w } = resolvedComp;
+                    
+                    return (
+                      <div
+                        key={`error-icon-${nodeId}`}
+                        title="This component has validation errors"
+                        style={{
+                          position: 'absolute',
+                          left: x + (w || 0) - 10,
+                          top: y - 10,
+                          zIndex: 10005
+                        }}
+                        className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-xs shadow-md border-2 border-[#1a1b2e] animate-pulse cursor-pointer hover:bg-red-600 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedIds([nodeId]);
+                          if (!showErrorsPane) setShowErrorsPane(true);
+                        }}
+                      >
+                        !
+                      </div>
+                    );
+                  });
+                })()}
+
                 {/* Resize handles for selected root-level component */}
                 {/* Resize handles — hidden in preview mode */}
                 {selectedNode && selectedIds.length === 1 && !effectiveIsPlaying && selectedNode.type !== 'Screen' && selectedNode.type !== 'App' && (() => {
@@ -2618,26 +2697,32 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 </button>
 
 
-                <input ref={chatInputRef} type="text" value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
-                  onPaste={e => {
-                    const items = e.clipboardData?.items
-                    if (!items) return
-                    for (const item of items) {
-                      if (item.type.startsWith('image/')) {
-                        e.preventDefault()
-                        const file = item.getAsFile()
-                        if (!file) return
-                        const reader = new FileReader()
-                        reader.onload = (ev) => compressImageDataUrl(ev.target.result, setChatImage)
-                        reader.readAsDataURL(file)
-                        return
+                <div className="flex-1 relative flex items-center">
+                  <input ref={chatInputRef} type="text" value={chatInput}
+                    maxLength={1000}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
+                    onPaste={e => {
+                      const items = e.clipboardData?.items
+                      if (!items) return
+                      for (const item of items) {
+                        if (item.type.startsWith('image/')) {
+                          e.preventDefault()
+                          const file = item.getAsFile()
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = (ev) => compressImageDataUrl(ev.target.result, setChatImage)
+                          reader.readAsDataURL(file)
+                          return
+                        }
                       }
-                    }
-                  }}
-                  placeholder="Describe what to build — or paste a screenshot"
-                  className="flex-1 bg-base border border-overlay/40 rounded-xl px-4 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
+                    }}
+                    placeholder="Describe what to build — or paste a screenshot"
+                    className="w-full bg-base border border-overlay/40 rounded-xl px-4 pr-12 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
+                  <span className={`absolute right-3 text-[9px] font-bold transition-colors ${chatInput.length >= 900 ? 'text-amber-500' : 'text-subtext/30'}`}>
+                    {chatInput.length}/1000
+                  </span>
+                </div>
                 <button onClick={handleChatSubmit} disabled={(!chatInput.trim() && !chatImage) || chatLoading}
                   className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center shrink-0 shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer">
                   <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
@@ -2664,6 +2749,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             <CodePane 
               node={selectedNode}
               tree={tree}
+              globalErrors={globalErrors}
+              notify={notify}
               isTweaking={isTweaking}
               setIsTweaking={setIsTweaking}
               tweakInput={tweakInput}
@@ -2757,7 +2844,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               )}
             </div>
           </div>
-        ) : (
+        ) : showPropertiesPane ? (
           <div id="props-panel" style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 
@@ -2935,7 +3022,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
       {isTourActive && (
         <TourOverlay 

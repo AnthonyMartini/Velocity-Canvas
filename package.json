@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
+    "@google/genai": "^1.48.0",
     "autoprefixer": "^10.4.27",
     "clsx": "^2.1.1",
     "firebase": "^10.14.1",

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { rendererChatModel } from "@/lib/gemini";
-import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
-
-import { adminAuth, verifyIdToken, checkAndDeductCredit } from "@/lib/firebase-admin";
+import { rendererChatModel, MODEL_NAME } from "@/lib/gemini";
+import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 
 export async function POST(req) {
   try {
@@ -37,17 +35,17 @@ export async function POST(req) {
     let canvas_ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
     if (canvas_components && canvas_components.length > 0) {
       const comp_lines = [];
-      const processComponent = (c, indent = "") => {
-        let line = `${indent}- ID: "${c.id}", Type: "${c.type}", x=${c.x || 0}, y=${c.y || 0}, w=${c.width || 0}, h=${c.height || 0}`;
+      const processComponent = (c, indent = "", siblingIndex = 0, parentId = "screen") => {
+        let line = `${indent}- ID: "${c.id}", Type: "${c.type}", siblingIndex=${siblingIndex}, parentId="${parentId}", ZIndex=${c.ZIndex ?? 1}, x=${c.x || 0}, y=${c.y || 0}, w=${c.width || 0}, h=${c.height || 0}`;
         if (c.text) line += `, text="${c.text}"`;
         if (c.name) line += `, name="${c.name}"`;
         comp_lines.push(line);
         if (c.children) {
-          c.children.forEach(child => processComponent(child, indent + "  "));
+          c.children.forEach((child, i) => processComponent(child, indent + "  ", i, c.id));
         }
       };
-      canvas_components.forEach(c => processComponent(c));
-      canvas_ctx += "Current components on canvas:\n" + comp_lines.join("\n");
+      canvas_components.forEach((c, i) => processComponent(c, "", i, "screen"));
+      canvas_ctx += "Current components (siblingIndex: higher = rendered in front within same parent):\n" + comp_lines.join("\n");
     } else {
       canvas_ctx += "The canvas is currently empty.";
     }
@@ -76,7 +74,18 @@ export async function POST(req) {
       }
     });
 
-    const responseText = result.response.text();
+    const usage = result.response.usageMetadata;
+    console.log("Usage metadata:", usage);  
+    if (usage) {
+      logTokenUsage(
+        uid,
+        MODEL_NAME,
+        usage.promptTokenCount || 0,
+        usage.candidatesTokenCount || 0,
+        usage.cachedContentTokenCount || 0
+      ).catch(console.error);
+    }
+    const responseText = (result.response as any).text();
     
     // Robust JSON extraction
     const start = responseText.indexOf("{");
@@ -91,7 +100,6 @@ export async function POST(req) {
 
     let parsed: any;
     try {
-      console.log("Cleaned JSON:", cleaned);
       parsed = JSON.parse(cleaned);
     } catch (parseError) {
       console.error("Failed to parse JSON in renderer-chat:", parseError);

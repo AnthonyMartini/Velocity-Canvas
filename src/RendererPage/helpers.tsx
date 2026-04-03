@@ -1,8 +1,7 @@
 import { SCHEMAS, BORDER_MAP } from './constants'
 
 // ── Unique ID ─────────────────────────────────────────────────────────────────
-let _id = 0
-export const uid = () => `comp_${++_id}`
+export const uid = () => `comp_${Math.random().toString(36).substring(2, 11)}`
 
 // ── Name counter per type ────────────────────────────────────────────────────
 // Pre-seed Screen to 1 because the initial tree already contains Screen1
@@ -20,7 +19,7 @@ export function createComponent(schema, overrides = {}) {
 }
 
 // ── Create from LLM spec (merge with defaults) ────────────────────────────────
-export function createFromSpec(spec) {
+export function createFromSpec(spec, usedIds?: Set<string>) {
   if (!spec || !spec.type) return null
 
   // Normalize type lookup (e.g., handle "CONTAINER", "container", "Container")
@@ -40,12 +39,20 @@ export function createFromSpec(spec) {
   const childrenList = spec.children || spec.Children || []
   const { children, Children, ...rest } = spec
   
-  const processedChildren = childrenList.map(c => createFromSpec(c)).filter(Boolean)
+  const processedChildren = childrenList.map(c => createFromSpec(c, usedIds)).filter(Boolean)
   
+  let finalId = spec.id || uid()
+  if (usedIds) {
+    while (usedIds.has(finalId)) {
+      finalId = uid()
+    }
+    usedIds.add(finalId)
+  }
+
   return { 
     ...base, 
     ...rest, 
-    id: spec.id || uid(), 
+    id: finalId, 
     type: schema.type, 
     name: spec.name || nextName(schema.type), 
     children: processedChildren 

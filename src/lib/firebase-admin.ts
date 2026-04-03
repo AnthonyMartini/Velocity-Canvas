@@ -211,3 +211,45 @@ export async function updateUserCredits(uid: string, credits: number): Promise<v
     console.error('Error updating user credits:', error);
   }
 }
+
+/**
+ * Checks if a user has the admin role.
+ */
+export async function checkUserIsAdmin(uid: string): Promise<boolean> {
+  if (!adminDb) return false;
+  try {
+    const userDoc = await adminDb.collection('users').doc(uid).get();
+    return userDoc.exists && userDoc.data()?.role === 'admin';
+  } catch (error) {
+    console.error('Error checking user admin status:', error);
+    return false;
+  }
+}
+
+/**
+ * Logs token usage for a user to Firestore.
+ * @param cachedTokens - tokens served from context cache (0 if caching not used)
+ */
+export async function logTokenUsage(
+  uid: string,
+  modelName: string,
+  inputTokens: number,
+  outputTokens: number,
+  cachedTokens: number = 0
+): Promise<void> {
+  if (!adminDb) return;
+  try {
+    const totalTokens = inputTokens + outputTokens;
+    await adminDb.collection('token_usage').add({
+      uid,
+      modelName,
+      inputTokens,
+      outputTokens,
+      cachedTokens,
+      totalTokens,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error logging token usage:', error);
+  }
+}

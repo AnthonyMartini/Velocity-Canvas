@@ -34,7 +34,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: selected ? 10 : 1
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
   }
 
   return (

@@ -43,7 +43,7 @@ export default function GalleryRenderer({
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(236, 72, 153, 0.25)' : 'none',
     transition: 'box-shadow 0.12s',
-    zIndex: selected ? 10 : 1,
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
     overflow: 'hidden',
   }
 

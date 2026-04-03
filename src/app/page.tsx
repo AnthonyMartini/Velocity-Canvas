@@ -2,19 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import LandingPage from '@/LandingPage';
-import GeneratorPage from '@/GeneratorPage';
 import RendererPage from '@/RendererPage';
 import ComponentLibraryPage from '@/ComponentLibraryPage';
 import PlansPage from '@/PlansPage';
+import AdminPage from '@/AdminPage';
 import logo from '@/assets/logo.png';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Image from 'next/image';
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
-const GeneratorIcon = () => (
+const HomeIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-    <path fillRule="evenodd" d="M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527ZM16.72 6.22a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L21.44 12l-4.72-4.72a.75.75 0 0 1 0-1.06Zm-9.44 0a.75.75 0 0 1 0 1.06L2.56 12l4.72 4.72a.75.75 0 0 1-1.06 1.06L.97 12.53a.75.75 0 0 1 0-1.06L6.22 6.22a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
+    <path d="M11.47 3.84a.75.75 0 011.06 0l8.99 9a.75.75 0 11-1.06 1.06L20 13.43V20.5a.75.75 0 01-.75.75h-4.5a.75.75 0 01-.75-.75v-4H10v4a.75.75 0 01-.75.75H4.75a.75.75 0 01-.75-.75v-7.07l-.47.47a.75.75 0 11-1.06-1.06l8.99-9z" />
   </svg>
 );
 
@@ -33,18 +33,24 @@ const LibraryIcon = () => (
   </svg>
 );
 
+const AdminIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+    <path fillRule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clipRule="evenodd" />
+  </svg>
+);
+
 const TABS = [
-  { id: 'generator', label: 'Component Generator', Icon: GeneratorIcon },
-  { id: 'renderer', label: 'Projects', Icon: RendererIcon },
+  { id: 'renderer', label: 'Home', Icon: HomeIcon },
   { id: 'library', label: 'Documentation', Icon: LibraryIcon },
 ];
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('generator');
+  const [activeTab, setActiveTab] = useState('renderer');
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [credits, setCredits] = useState<number | string | null>(null);
   const [activeProject, setActiveProject] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchCredits = async (firebaseUser) => {
     try {
@@ -67,19 +73,32 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser ?? null);
       if (firebaseUser) {
         fetchCredits(firebaseUser);
+        try {
+          const idToken = await firebaseUser.getIdToken();
+          const res = await fetch('/api/admin/check', {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setIsAdmin(data.isAdmin);
+          }
+        } catch (e) {
+          console.error('Error fetching admin status:', e);
+        }
       } else {
         setCredits(null);
+        setIsAdmin(false);
       }
       setAuthLoading(false);
     });
     return unsubscribe;
   }, []);
 
-  const handleStart = (tabId = 'generator', signedInUser = null) => {
+  const handleStart = (tabId = 'renderer', signedInUser = null) => {
     setActiveTab(tabId);
     if (signedInUser) setUser(signedInUser);
   };
@@ -123,7 +142,7 @@ export default function Home() {
 
           {/* Tab Navigation — absolutely centered */}
           <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-xl p-1">
-            {TABS.map(({ id, label, Icon }) => (
+            {TABS.concat(isAdmin ? [{ id: 'admin', label: 'Admin', Icon: AdminIcon }] : []).map(({ id, label, Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -182,7 +201,6 @@ export default function Home() {
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div className={`flex-1 flex flex-col min-h-0 ${activeTab !== 'renderer' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-        {activeTab === 'generator' && <GeneratorPage user={user} onCreditDeduction={() => fetchCredits(user)} />}
         {/* RendererPage stays mounted to preserve activeProject state; hidden via CSS when not active */}
         <div className={activeTab === 'renderer' ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}>
           <RendererPage
@@ -194,16 +212,9 @@ export default function Home() {
         </div>
         {activeTab === 'library' && <ComponentLibraryPage user={user} />}
         {activeTab === 'plans' && <PlansPage user={user} onRefreshCredits={() => fetchCredits(user)} />}
+        {activeTab === 'admin' && <AdminPage user={user} />}
 
-        {/* ── Footer (Generator only) ──────────────────────────────────────────── */}
-        {activeTab === 'generator' && (
-          <footer className="mt-auto border-t border-surface/60 py-5 px-6 shrink-0">
-            <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-subtext/40">
-              <span>Velocity Canvas — Power Apps YAML Generator</span>
-              
-            </div>
-          </footer>
-        )}
+
       </div>
     </div>
   );

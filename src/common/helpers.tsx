@@ -110,7 +110,12 @@ export function removeNode(nodes, id) {
 export function insertNode(nodes, node, parentId) {
   if (!parentId) return [...nodes, node] // Append so it's drawn last (on top)
   return nodes.map(n => {
-    if (n.id === parentId) return { ...n, children: [...(n.children || []), node] } 
+    if (n.id === parentId) {
+      if (node.type === 'Screen' && n.type === 'App') {
+        return { ...n, children: [node, ...(n.children || [])] }
+      }
+      return { ...n, children: [...(n.children || []), node] } 
+    }
     if (n.children?.length) return { ...n, children: insertNode(n.children, node, parentId) }
     return n
   })
@@ -356,6 +361,14 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
     // 'table' type accepts arrays, objects, or strings — no further type check needed
     if (propDef.type === 'table') {
       return null
+    }
+
+    // Enum validation: if the property has predefined options, the evaluated value must be one of them
+    if (propDef.options && Array.isArray(propDef.options)) {
+      const validValues = propDef.options.map((opt: any) => (typeof opt === 'object' && opt !== null && 'value' in opt) ? opt.value : opt)
+      if (!validValues.includes(evaluated)) {
+        return `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`
+      }
     }
 
     if (!isEvent && (propDef.type === 'string' || propDef.type === 'text')) {

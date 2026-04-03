@@ -71,7 +71,7 @@ export default function HtmlTextRenderer({
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    zIndex: selected ? 10 : 1,
+    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
   }
 
 

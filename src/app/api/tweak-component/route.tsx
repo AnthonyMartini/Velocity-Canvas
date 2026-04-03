@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { tweakModel } from "@/lib/gemini";
-
-import { verifyIdToken, checkAndDeductCredit } from "@/lib/firebase-admin";
+import { tweakModel, MODEL_NAME } from "@/lib/gemini";
+import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 
 export async function POST(req) {
   try {
@@ -37,7 +36,17 @@ export async function POST(req) {
     const fullPrompt = `${ctx}\nComponent to tweak:\n${compJson}\n\nUser request: ${prompt.trim()}`;
 
     const response = await tweakModel.generateContent(fullPrompt);
-    const rawText = response.response.text();
+    const usage = response.response.usageMetadata;
+    if (usage) {
+      logTokenUsage(
+        uid,
+        MODEL_NAME,
+        usage.promptTokenCount || 0,
+        usage.candidatesTokenCount || 0,
+        usage.cachedContentTokenCount || 0
+      ).catch(console.error);
+    }
+    const rawText = (response.response as any).text();
 
     // Robust JSON extraction
     const start = rawText.indexOf("{");
