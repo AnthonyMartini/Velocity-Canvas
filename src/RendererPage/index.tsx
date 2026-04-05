@@ -70,7 +70,7 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
 }
 
 // ── Errors Pane ───────────────────────────────────────────────────────────────
-function ErrorsPane({ errors, onSelectNode, width }) {
+function ErrorsPane({ errors, onSelectNode, width, onClose }) {
   return (
     <div style={{ width }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
       {/* Header */}
@@ -80,6 +80,14 @@ function ErrorsPane({ errors, onSelectNode, width }) {
           <span className="text-xs font-semibold text-text">Validation Errors</span>
           <span className="text-[10px] text-white bg-red/80 px-1.5 py-0.5 rounded-full">{errors.length}</span>
         </div>
+        <button
+          onClick={onClose}
+          className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+          </svg>
+        </button>
       </div>
 
       {/* Errors list */}
@@ -111,8 +119,186 @@ function ErrorsPane({ errors, onSelectNode, width }) {
   )
 }
 
+function RendererSwitch({ comp, sharedProps }) {
+  if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'Container') return (
+    <ContainerRenderer key={comp.id} {...sharedProps}
+      selectedIds={sharedProps.selectedIds || []}
+      onChildMouseDown={sharedProps.onChildMouseDown}
+      onChildClick={sharedProps.onChildClick}
+      onDropInto={sharedProps.onDropInto}
+      dragOverId={sharedProps.dragOverId}
+      setDragOverId={sharedProps.setDragOverId}
+    />
+  )
+  if (comp.type === 'Gallery') return (
+    <GalleryRenderer key={comp.id} {...sharedProps}
+      selectedIds={sharedProps.selectedIds || []}
+      onChildMouseDown={sharedProps.onChildMouseDown}
+      onChildClick={sharedProps.onChildClick}
+      onDropInto={sharedProps.onDropInto}
+      dragOverId={sharedProps.dragOverId}
+      setDragOverId={sharedProps.setDragOverId}
+    />
+  )
+  if (comp.type === 'Checkbox') return (
+    <CheckboxRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'Rectangle') return (
+    <RectangleRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'Icon') {
+    // Inject the raw SVG string if available
+    return <IconRenderer key={comp.id} {...sharedProps} />
+  }
+  if (comp.type === 'HtmlText') return (
+    <HtmlTextRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'DatePicker') return (
+    <DatePickerRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'ComboBox') return (
+    <ComboBoxRenderer key={comp.id} {...sharedProps} />
+  )
+  return null
+}
+
+function AppLoadingOverlay({ isVisible, onCancel }) {
+  if (!isVisible) return null;
+  return (
+    <div className="fixed inset-0 z-[100001] flex items-center justify-center animate-in fade-in duration-300">
+      <div className="absolute inset-0 bg-[#0a0a16]/40 backdrop-blur-[1px]" />
+      <div className="relative bg-[#1a1b2e] border border-violet-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full border-4 border-violet-500/20 border-t-violet-500 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xl">✨</span>
+          </div>
+        </div>
+        <div className="text-center">
+          <h3 className="text-lg font-bold text-white mb-1">AI at work</h3>
+          <p className="text-sm text-subtext/60">Generating your layout changes...</p>
+        </div>
+        <button 
+          onClick={onCancel}
+          className="w-full py-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-bold border border-red-500/20 transition-all cursor-pointer active:scale-95"
+        >
+          Cancel Request
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, confirmTweak, undoTweak, handleReorder }) {
+  if (!node) return null;
+  const hasProposal = !!tweakOriginalNode;
+
+  return (
+    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2 pointer-events-none">
+      <div className="pointer-events-auto bg-[#1a1b2e]/80 backdrop-blur-xl border border-overlay/40 rounded-2xl shadow-2xl p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
+        {!hasProposal && (
+          <>
+            {/* Layer Actions */}
+            <div className="flex items-center gap-0.5 bg-overlay/10 rounded-xl p-0.5 border border-overlay/20">
+              <button onClick={() => handleReorder(node.id, 'back')} title="Send to Back" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+              </button>
+              <button onClick={() => handleReorder(node.id, 'down')} title="Move Backward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <button onClick={() => handleReorder(node.id, 'up')} title="Move Forward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
+              </button>
+              <button onClick={() => handleReorder(node.id, 'front')} title="Bring to Front" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/></svg>
+              </button>
+            </div>
+            <div className="w-px h-6 bg-overlay/20 mx-1" />
+          </>
+        )}
+
+        <button 
+          onClick={() => setIsTweaking(!isTweaking)}
+          className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
+            isTweaking || hasProposal 
+              ? 'bg-violet-500/25 text-violet-200 border-violet-500/50 ring-2 ring-violet-500/20' 
+              : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:bg-accent/10 hover:text-accent hover:border-accent/40 active:scale-95'
+          }`}
+        >
+          <span className="text-sm">✨</span>
+          {hasProposal ? 'Reviewing Change' : 'Tweak with AI'}
+        </button>
+      </div>
+
+      {(isTweaking || hasProposal) && (
+        <div className="pointer-events-auto w-[320px] bg-[#1a1b2e]/90 backdrop-blur-2xl border border-violet-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+          {isTweaking && !hasProposal && (
+            <div className="p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">AI Styling Tweak</span>
+                <button onClick={() => setIsTweaking(false)} className="text-subtext/40 hover:text-subtext transition-colors cursor-pointer">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" /></svg>
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={tweakInput}
+                  onChange={e => setTweakInput(e.target.value)}
+                  onKeyDown={e => {
+                    e.stopPropagation()
+                    if (e.key === 'Enter') handleTweakSubmit()
+                    if (e.key === 'Escape') setIsTweaking(false)
+                  }}
+                  autoFocus
+                  placeholder="e.g. bold red text with soft shadow"
+                  className="flex-1 bg-surface border border-violet-500/20 rounded-xl px-3 py-2 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 transition-all"
+                />
+                <button 
+                  onClick={handleTweakSubmit}
+                  disabled={tweakLoading || !tweakInput.trim()}
+                  className="w-9 h-9 rounded-xl bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 shadow-lg shadow-violet-500/25 hover:bg-violet-600 transition-colors cursor-pointer"
+                >
+                  {tweakLoading ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {hasProposal && (
+            <div className="p-4 flex items-center justify-between gap-4 bg-violet-500/10">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-violet-200">Review Changes</span>
+                <span className="text-[10px] text-violet-300/60 leading-tight">Apply these AI tweaks?</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={undoTweak}
+                  className="px-3 py-1.5 rounded-lg border border-overlay/40 hover:bg-red/10 hover:text-red hover:border-red/40 text-[11px] font-medium text-subtext transition-all cursor-pointer">
+                  Undo
+                </button>
+                <button onClick={confirmTweak}
+                  className="px-4 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-bold shadow-lg shadow-violet-500/20 transition-all cursor-pointer">
+                  Keep
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Code Pane ─────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width }) {
+function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width, onClose }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
@@ -163,31 +349,41 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
             : <span className="text-[10px] text-violet-300/80 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded-full">Screen</span>
           }
         </div>
-        <button
-          onClick={handleCopy}
-          className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all duration-200 cursor-pointer
-            ${copied
-              ? 'bg-green/15 border-green/30 text-green'
-              : 'bg-base/60 border-overlay/40 text-subtext hover:border-accent/50 hover:text-accent'
-            }`}
-        >
-          {copied ? (
-            <>
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-              </svg>
-              Copied!
-            </>
-          ) : (
-            <>
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
-                <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
-              </svg>
-              Copy
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleCopy}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all duration-200 cursor-pointer
+              ${copied
+                ? 'bg-green/15 border-green/30 text-green'
+                : 'bg-base/60 border-overlay/40 text-subtext hover:border-accent/50 hover:text-accent'
+              }`}
+          >
+            {copied ? (
+              <>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                </svg>
+                <span className="hidden sm:inline">Copied!</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
+                  <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
+                </svg>
+                <span className="hidden sm:inline">Copy</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Code area */}
@@ -459,6 +655,23 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [isTweaking, setIsTweaking] = useState(false)
   const [tweakInput, setTweakInput] = useState('')
   const [tweakLoading, setTweakLoading] = useState(false)
+
+  // Abort Controllers for AI
+  const chatAbortControllerRef = useRef<AbortController | null>(null)
+  const tweakAbortControllerRef = useRef<AbortController | null>(null)
+
+  const handleCancelAI = useCallback(() => {
+    if (chatAbortControllerRef.current) {
+      chatAbortControllerRef.current.abort()
+      chatAbortControllerRef.current = null
+    }
+    if (tweakAbortControllerRef.current) {
+      tweakAbortControllerRef.current.abort()
+      tweakAbortControllerRef.current = null
+    }
+    setChatLoading(false)
+    setTweakLoading(false)
+  }, [])
   
   // Sidebar/Pane Resizing state
   const [rightWidth, setRightWidth] = useState(256)
@@ -1647,12 +1860,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     if (!msg || selectedIds.length !== 1 || tweakLoading) return
     
     const selectedId = selectedIds[0]
-    // Save original state if not already saved (allows multiple sequential tweaks before confirming)
     const currentNode = findNode(tree, selectedId)
     if (!currentNode) return
     if (!tweakOriginalNode) {
       setTweakOriginalNode(JSON.parse(JSON.stringify(currentNode)))
     }
+
+    // Cancel any previous tweak request
+    if (tweakAbortControllerRef.current) tweakAbortControllerRef.current.abort()
+    tweakAbortControllerRef.current = new AbortController()
 
     setTweakLoading(true)
     try {
@@ -1669,6 +1885,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           canvas_width: canvasW,
           canvas_height: canvasH,
         }),
+        signal: tweakAbortControllerRef.current.signal
       })
       if (!res.ok) { 
         const e = await res.json().catch(() => ({})); 
@@ -1679,7 +1896,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
       const modifiedComponent = await res.json()
 
-      // Update the tree with the new component
+      // Update the tree with the new component immediately (Keep/Undo flow)
       if (modifiedComponent && modifiedComponent.id === selectedId) {
         setTree(prev => {
           const nextTree = updateNode(prev, selectedId, () => modifiedComponent)
@@ -1688,15 +1905,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         })
         setTweakInput('')
         setIsTweaking(false)
-        setTweakOriginalNode(null)
       }
 
     } catch (err) {
+      if (err.name === 'AbortError') return
       alert(`Tweak failed: ${err.message}`)
     } finally {
       setTweakLoading(false)
+      tweakAbortControllerRef.current = null
     }
-  }, [tweakInput, selectedIds, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode, saveHistory])
+  }, [tweakInput, selectedIds, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode, onCreditDeduction, user, saveHistory])
 
   const confirmTweak = useCallback(() => {
     setTweakOriginalNode(null)
@@ -1754,6 +1972,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setChatImage(null)
 
     setChatMessages(prev => [...prev, { role: 'user', content: msg, added: 0, image: imagePayload }])
+    
+    if (chatAbortControllerRef.current) chatAbortControllerRef.current.abort()
+    chatAbortControllerRef.current = new AbortController()
+
     setChatLoading(true)
 
     const payload = {
@@ -1783,6 +2005,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           'Authorization': `Bearer ${idToken}`
         },
         body: JSON.stringify(payload),
+        signal: chatAbortControllerRef.current.signal
       })
       if (!res.ok) { 
         const e = await res.json().catch(() => ({})); 
@@ -1873,9 +2096,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         usage: data.usage
       }])
     } catch (err) {
+      if (err.name === 'AbortError') return
       setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}`, added: 0 }])
     } finally {
       setChatLoading(false)
+      chatAbortControllerRef.current = null
     }
   }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH, saveHistory, activeScreenNode])
 
@@ -1895,6 +2120,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
+      <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} />
 
       {/* Top Bar */}
       <div id="top-menu" className="flex items-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0">
@@ -2317,6 +2543,24 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               </div>
             )
           })()}
+
+          {/* Floating Tweak Bar Overlay */}
+          {!effectiveIsPlaying && selectedIds.length === 1 && selectedNode?.type !== 'Screen' && selectedNode?.type !== 'App' && (
+            <FloatingTweakBar 
+              node={selectedNode}
+              isTweaking={isTweaking}
+              setIsTweaking={setIsTweaking}
+              tweakInput={tweakInput}
+              setTweakInput={setTweakInput}
+              handleTweakSubmit={handleTweakSubmit}
+              tweakLoading={tweakLoading}
+              tweakOriginalNode={tweakOriginalNode}
+              confirmTweak={confirmTweak}
+              undoTweak={undoTweak}
+              handleReorder={handleReorder}
+            />
+          )}
+
           <div
             id="canvas-scroll-wrapper"
             className="absolute inset-0 overflow-auto bg-[#f0f0f0]"
@@ -2422,54 +2666,21 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       // Only set single selection if NOT shift-clicking
                       if (!e.shiftKey) setSelectedIds([comp.id]) 
                     },
+                    selectedIds,
+                    onChildMouseDown: handleChildMouseDown,
+                    onChildClick: handleChildClick,
+                    onDropInto: handleDropInto,
+                    dragOverId,
+                    setDragOverId
                   }
-                  if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
-                  if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
-                  if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
-                  if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
-                  if (comp.type === 'Container') return (
-                    <ContainerRenderer key={comp.id} {...sharedProps}
-                      selectedIds={selectedIds}
-                      onChildMouseDown={handleChildMouseDown}
-                      onChildClick={handleChildClick}
-                      onDropInto={handleDropInto}
-                      dragOverId={dragOverId}
-                      setDragOverId={setDragOverId}
-                    />
-                  )
-                  if (comp.type === 'Gallery') return (
-                    <GalleryRenderer key={comp.id} {...sharedProps}
-                      selectedIds={selectedIds}
-                      onChildMouseDown={handleChildMouseDown}
-                      onChildClick={handleChildClick}
-                      onDropInto={handleDropInto}
-                      dragOverId={dragOverId}
-                      setDragOverId={setDragOverId}
-                    />
-                  )
-                  if (comp.type === 'Checkbox') return (
-                    <CheckboxRenderer key={comp.id} {...sharedProps} />
-                  )
-                  if (comp.type === 'Rectangle') return (
-                    <RectangleRenderer key={comp.id} {...sharedProps} />
-                  )
+                  
                   if (comp.type === 'Icon') {
-                    // Inject the raw SVG string from the schema mapping so it displays accurately in Canvas
                     const iconProp = SCHEMAS.Icon.properties.find((p: any) => p.key === 'Icon') as any;
                     const schemaOptionVal = iconProp?.options?.find((o: any) => o?.value === comp.Icon);
-                    const svgString = schemaOptionVal ? schemaOptionVal.svg : null;
-                    return <IconRenderer key={comp.id} {...sharedProps} comp={{...comp, _svg: svgString}} />
+                    comp._svg = schemaOptionVal ? schemaOptionVal.svg : null;
                   }
-                  if (comp.type === 'HtmlText') return (
-                    <HtmlTextRenderer key={comp.id} {...sharedProps} />
-                  )
-                  if (comp.type === 'DatePicker') return (
-                    <DatePickerRenderer key={comp.id} {...sharedProps} />
-                  )
-                  if (comp.type === 'ComboBox') return (
-                    <ComboBoxRenderer key={comp.id} {...sharedProps} />
-                  )
-                  return null
+
+                  return <RendererSwitch key={comp.id} comp={comp} sharedProps={sharedProps} />
                 })}
                 
                 {/* Snap Lines (Guides) */}
@@ -2774,6 +2985,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               tweakLoading={tweakLoading}
               tweakOriginalNode={tweakOriginalNode}
               width={codeWidth}
+              onClose={() => setShowCodePane(false)}
             />
           </div>
         )}
@@ -2797,6 +3009,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 setShowErrorsPane(false)
               }}
               width={rightWidth}
+              onClose={() => setShowErrorsPane(false)}
             />
           </div>
         ) : showLocalData ? (
@@ -2817,7 +3030,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               </div>
               <button
                 onClick={() => setShowLocalData(false)}
-                className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer"
+                className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
@@ -2877,80 +3090,17 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       {schema.control}
                     </span>
                     <div className="flex items-center gap-1.5">
-                      {/* Layer Actions */}
-                      <div className="flex items-center gap-0.5 bg-overlay/10 rounded-lg p-0.5 border border-overlay/20 mr-1">
-                        <button onClick={() => handleReorder(selectedNode.id, 'back')} title="Send to Back" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
-                        </button>
-                        <button onClick={() => handleReorder(selectedNode.id, 'down')} title="Move Backward" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <button onClick={() => handleReorder(selectedNode.id, 'up')} title="Move Forward" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
-                        </button>
-                        <button onClick={() => handleReorder(selectedNode.id, 'front')} title="Bring to Front" className="p-1 text-subtext/60 hover:text-accent hover:bg-accent/10 rounded transition-colors">
-                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/></svg>
-                        </button>
-                      </div>
-
-                      <button 
-                        onClick={() => setIsTweaking(!isTweaking)}
-                        className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors border ${
-                          isTweaking || tweakOriginalNode ? 'bg-violet-500/20 text-violet-300 border-violet-500/40' : 'bg-surface/50 text-subtext/70 border-overlay/40 hover:text-accent hover:border-accent/40'
-                        }`}
+                      <button
+                        onClick={() => setShowPropertiesPane(false)}
+                        className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
                       >
-                        ✨ Tweak
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                        </svg>
                       </button>
                     </div>
                   </div>
                   
-                  {isTweaking && !tweakOriginalNode && (
-                    <div className="flex flex-col gap-2 p-2.5 bg-violet-500/10 border border-violet-500/20 rounded-lg animate-in fade-in zoom-in-95 duration-200">
-                      <p className="text-[10px] text-violet-300/80 font-medium">What should AI change about this component?</p>
-                      <div className="flex gap-1.5">
-                        <input 
-                          type="text" 
-                          value={tweakInput}
-                          onChange={e => setTweakInput(e.target.value)}
-                          onKeyDown={e => {
-                            e.stopPropagation() // prevent delete/copy hotkeys while typing
-                            if (e.key === 'Enter') handleTweakSubmit()
-                          }}
-                          autoFocus
-                          placeholder="e.g. make text red and bold"
-                          className="flex-1 min-w-0 bg-base border border-violet-500/30 rounded px-2 py-1 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500"
-                        />
-                        <button 
-                          onClick={handleTweakSubmit}
-                          disabled={tweakLoading || !tweakInput.trim()}
-                          className="w-6 h-6 rounded bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-50"
-                        >
-                          {tweakLoading ? (
-                            <div className="w-2.5 h-2.5 rounded-full border border-white border-t-transparent animate-spin" />
-                          ) : (
-                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {tweakOriginalNode && (
-                    <div className="flex items-center justify-between p-2.5 bg-violet-500/10 border border-violet-500/30 rounded-lg animate-in fade-in zoom-in-95 duration-200">
-                      <span className="text-[11px] font-medium text-violet-200">Review tweaks</span>
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={undoTweak}
-                          className="text-[10px] px-2 py-1 rounded-md border border-overlay/40 hover:bg-red/10 hover:text-red hover:border-red/40 text-subtext transition-colors">
-                          Undo
-                        </button>
-                        <button onClick={confirmTweak}
-                          className="text-[10px] px-2 py-1 rounded-md bg-violet-500 hover:bg-violet-600 text-white font-medium transition-colors">
-                          Keep
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   {(() => {
                     const originalName = selectedNode.name || ''
                     // Check for duplicate and invalid characters live as user types
