@@ -183,29 +183,51 @@ export function componentToYaml(node, col = 0) {
 
   const p = (k, v) => {
     if (v === undefined || v === null) return
-    const valStr = String(v).trim()
+    // Normalize smart quotes to straight quotes
+    let valStr = String(v).trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
     
-    // If it starts with '=', it's already a formula
+    // Explicit formula (starts with '=')
     if (valStr.startsWith('=')) {
-      lines.push(`${sp(col + 6)}${k}: ${valStr}`)
+      let formula = valStr.slice(1).trim()
+      // Strip outer quotes if redundant (e.g. ="Notify(...)")
+      if ((formula.startsWith('"') && formula.endsWith('"')) || (formula.startsWith("'") && formula.endsWith("'"))) {
+        const inner = formula.slice(1, -1)
+        // If the inner content looks like a function, strip quotes
+        if (/^[A-Z][a-zA-Z0-9]*\s*\(/.test(inner)) {
+          formula = inner
+        }
+      }
+      lines.push(`${sp(col + 6)}${k}: =${formula}`)
       return
     }
 
     const isQuoted = (valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))
     const isNumeric = !isNaN(Number(valStr)) && valStr !== ''
     const isBoolean = valStr === 'true' || valStr === 'false'
+    const isFunction = /^[A-Z][a-zA-Z0-9]*\s*\(/.test(valStr)
+
+    // Handle quoted strings that are actually functions (e.g. "Notify(...)")
+    if (isQuoted) {
+      const inner = valStr.slice(1, -1).trim()
+      if (/^[A-Z][a-zA-Z0-9]*\s*\(/.test(inner)) {
+        lines.push(`${sp(col + 6)}${k}: =${inner}`)
+        return
+      }
+    }
+
     // Enums look like Object.Member (e.g. Icon.Add, FontWeight.Bold)
     const isEnum = /^[A-Z][a-zA-Z0-9]*\.[A-Z][a-zA-Z0-9]*$/.test(valStr) || 
                    ['DisplayMode.Edit', 'DisplayMode.View', 'DisplayMode.Disabled', 'BorderStyle.Solid', 'BorderStyle.None', 'BorderStyle.Dashed', 'BorderStyle.Dotted'].includes(valStr)
 
     if (isQuoted || isEnum) {
-      lines.push(`${sp(col + 6)}${k}: ${valStr}`)
-    } else if (isNumeric || isBoolean) {
-      // Numbers and booleans still get the '=' prefix
+      // Wrap everything in '=' prefix for Modern PA YAML compliance
+      lines.push(`${sp(col + 6)}${k}: =${valStr}`)
+    } else if (isNumeric || isBoolean || isFunction) {
+      // Numbers, booleans, and functions get the '=' prefix
       lines.push(`${sp(col + 6)}${k}: =${valStr}`)
     } else {
-      // It's a literal string that isn't quoted. Wrap it in quotes.
-      lines.push(`${sp(col + 6)}${k}: "${valStr}"`)
+      // It's a literal string that isn't quoted. Wrap it in quotes and add '=' prefix.
+      lines.push(`${sp(col + 6)}${k}: ="${valStr}"`)
     }
   }
 
@@ -315,6 +337,7 @@ export function componentToYaml(node, col = 0) {
     if (node.Strikethrough) p('Strikethrough', 'true')
     if (node.Visible === false) p('Visible', 'false')
     if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.LineHeight) p('LineHeight', node.LineHeight)
     if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
     if (node.OnSelect) p('OnSelect', node.OnSelect)
     if (node.OnChange) p('OnChange', node.OnChange)

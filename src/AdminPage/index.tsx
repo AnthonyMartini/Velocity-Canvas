@@ -189,45 +189,60 @@ export default function AdminPage({ user }: AdminPageProps) {
                   <th className="px-6 py-4 text-[10px] uppercase font-black tracking-widest text-subtext/40">Model</th>
                   <th className="px-6 py-4 text-[10px] uppercase font-black tracking-widest text-subtext/40 text-right">In / Cached / Out</th>
                   <th className="px-6 py-4 text-[10px] uppercase font-black tracking-widest text-subtext/40 text-right">Total Tokens</th>
+                  <th className="px-6 py-4 text-[10px] uppercase font-black tracking-widest text-subtext/40 text-right">Cost</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="text-white text-sm">
-                        {new Date(log.timestamp).toLocaleDateString()}
-                      </div>
-                      <div className="text-subtext/60 text-[10px]">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-subtext text-xs font-mono max-w-[120px] truncate" title={log.uid}>
-                        {log.uid}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded inline-block">
-                        {log.modelName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-subtext text-xs">{log.inputTokens?.toLocaleString()}</span>
-                      {(log.cachedTokens > 0) && (
-                        <>
-                          <span className="text-subtext/40 mx-1">/</span>
-                          <span className="text-emerald-400 text-xs font-bold" title="Cached tokens">{log.cachedTokens?.toLocaleString()} 💾</span>
-                        </>
-                      )}
-                      <span className="text-subtext/40 mx-1">/</span>
-                      <span className="text-subtext text-xs">{log.outputTokens?.toLocaleString()}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right text-white font-black text-sm">
-                      {log.totalTokens?.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                {filteredLogs.map((log) => {
+                  const modelPrice = PRICING[log.modelName] || { input: 0, output: 0, cachedInput: 0 };
+                  const nonCachedInput = (log.inputTokens || 0) - (log.cachedTokens || 0);
+                  const rowCost = 
+                    ((nonCachedInput / 1_000_000) * modelPrice.input) +
+                    (((log.cachedTokens || 0) / 1_000_000) * modelPrice.cachedInput) +
+                    (((log.outputTokens || 0) / 1_000_000) * modelPrice.output);
+
+                  return (
+                    <tr key={log.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="text-white text-sm">
+                          {new Date(log.timestamp).toLocaleDateString()}
+                        </div>
+                        <div className="text-subtext/60 text-[10px]">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-subtext text-xs font-mono max-w-[120px] truncate" title={log.uid}>
+                          {log.uid}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded inline-block">
+                          {log.modelName}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-subtext text-xs">{log.inputTokens?.toLocaleString()}</span>
+                        {(log.cachedTokens > 0) && (
+                          <>
+                            <span className="text-subtext/40 mx-1">/</span>
+                            <span className="text-emerald-400 text-xs font-bold" title="Cached tokens">{log.cachedTokens?.toLocaleString()} 💾</span>
+                          </>
+                        )}
+                        <span className="text-subtext/40 mx-1">/</span>
+                        <span className="text-subtext text-xs">{log.outputTokens?.toLocaleString()}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-white font-black text-sm">
+                        {log.totalTokens?.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-accent font-black text-sm">
+                          ${rowCost.toFixed(4)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

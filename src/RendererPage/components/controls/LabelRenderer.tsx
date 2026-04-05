@@ -2,14 +2,15 @@ import PropTypes from 'prop-types'
 import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN, CSS_BORDER_STYLE } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { resolveSampleText } from './sampleText'
 
 export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
   const style: any = {
     position: 'absolute',
-    left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
+    left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill === 'transparent' ? 'transparent' : comp.Fill,
     color: comp.Color,
-    fontSize: comp.Size,
+    fontSize: `${comp.Size}pt`,
     fontWeight: CSS_FW[comp.FontWeight] || comp.FontWeight,
     fontStyle: comp.Italic ? 'italic' : 'normal',
     textDecoration: comp.Underline ? 'underline' : 'none',
@@ -20,10 +21,10 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
     alignItems: CSS_VALIGN[comp.VerticalAlign] || 'center',
     justifyContent: CSS_JUSTIFY[comp.Align] || 'flex-start',
     boxSizing: 'border-box' as const,
-    paddingLeft: comp.PaddingLeft, paddingRight: comp.PaddingRight,
-    paddingTop: comp.PaddingTop, paddingBottom: comp.PaddingBottom,
+    paddingLeft: `${comp.PaddingLeft}pt`, paddingRight: `${comp.PaddingRight}pt`,
+    paddingTop: `${comp.PaddingTop}pt`, paddingBottom: `${comp.PaddingBottom}pt`,
     border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && comp.BorderThickness > 0)
-      ? `${comp.BorderThickness}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
+      ? `${comp.BorderThickness}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
       : 'none',
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
@@ -32,7 +33,7 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
-  const displayText = (comp.Text !== undefined && comp.Text !== null) ? comp.Text : ''
+  const displayText = resolveSampleText((comp.Text !== undefined && comp.Text !== null) ? comp.Text : '')
 
   const handleClick = (e) => {
     onClick(e)

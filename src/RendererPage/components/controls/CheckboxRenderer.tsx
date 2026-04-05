@@ -30,16 +30,16 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
 
   const containerStyle: any = {
     position: 'absolute',
-    left: comp.X,
-    top: comp.Y,
-    width: comp.Width,
-    height: comp.Height,
+    left: `${comp.X}pt`,
+    top: `${comp.Y}pt`,
+    width: `${comp.Width}pt`,
+    height: `${comp.Height}pt`,
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '8pt',
     backgroundColor: comp.Fill,
     color: comp.Color,
-    fontSize: comp.Size,
+    fontSize: comp.Size ? `${comp.Size}pt` : 'inherit',
     fontWeight: comp.FontWeight?.split('.')[1]?.toLowerCase() || 'normal',
     opacity: comp.Visible === false ? 0.3 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
     cursor: isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : (isPlaying ? 'default' : 'move'),
@@ -47,7 +47,7 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
     pointerEvents: (comp.DisplayMode === 'DisplayMode.Disabled' && isPlaying) ? 'none' : 'auto',
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     boxSizing: 'border-box',
-    padding: '4px 8px',
+    padding: '4pt 8pt',
     zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
   }
 
@@ -61,8 +61,8 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
         disabled={!isPlaying || comp.DisplayMode === 'DisplayMode.Disabled'}
         onChange={handleChange}
         style={{
-          width: comp.CheckboxSize || 20,
-          height: comp.CheckboxSize || 20,
+          width: `${comp.CheckboxSize || 20}pt`,
+          height: `${comp.CheckboxSize || 20}pt`,
           cursor: isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : 'default',
         }}
       />

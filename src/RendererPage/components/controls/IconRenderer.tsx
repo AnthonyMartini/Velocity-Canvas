@@ -21,10 +21,10 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
 
   const containerStyle: any = {
     position: 'absolute',
-    left: comp.X,
-    top: comp.Y,
-    width: comp.Width,
-    height: comp.Height,
+    left: `${comp.X}pt`,
+    top: `${comp.Y}pt`,
+    width: `${comp.Width}pt`,
+    height: `${comp.Height}pt`,
     backgroundColor: comp.Fill || 'transparent',
     color: comp.Color || '#0078d4',
     opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),

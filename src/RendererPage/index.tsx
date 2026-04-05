@@ -191,8 +191,19 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
       </div>
 
       {/* Code area */}
-      <div className="flex-1 overflow-auto p-4 font-mono text-[11px] whitespace-pre">
-        {highlighted ?? (
+      <div className="flex-1 overflow-auto pl-0 pr-1 py-4 font-mono text-[11px]">
+        {highlighted ? (
+          highlighted.map((lineElement, i) => (
+            <div key={i} className="flex gap-3 group hover:bg-white/5 transition-colors">
+              <span className="w-8 shrink-0 text-right text-subtext/20 select-none group-hover:text-subtext/40 transition-colors pt-[1px]">
+                {i + 1}
+              </span>
+              <div className="flex-1 whitespace-pre-wrap break-words overflow-visible">
+                {lineElement}
+              </div>
+            </div>
+          ))
+        ) : (
           <span className="text-subtext/30 italic">Select a Screen or component to view YAML</span>
         )}
       </div>
@@ -452,7 +463,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   // Sidebar/Pane Resizing state
   const [rightWidth, setRightWidth] = useState(256)
   const [chatHeight, setChatHeight] = useState(240)
-  const [codeWidth, setCodeWidth] = useState(288)
+  const [codeWidth, setCodeWidth] = useState(384)
   const paneResizeRef = useRef(null)
 
   // History state for Undo/Redo
@@ -1032,7 +1043,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       // ── Resize mode ──────────────────────────────────────────────────────────
       if (resizeRef.current) {
         const { id, dir, startMouseX, startMouseY, startX, startY, startW, startH } = resizeRef.current
-        const pxRatio = 1 / zoomRef.current
+        const PT_RATIO = 0.75
+        const pxRatio = (1 / zoomRef.current) * PT_RATIO
         const dx = (e.clientX - startMouseX) * pxRatio
         const dy = (e.clientY - startMouseY) * pxRatio
         
@@ -1161,7 +1173,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const { startMouseX, startMouseY, nodes } = dragRef.current
         
         // Calculate scaled delta
-        const pxRatio = 1 / zoomRef.current
+        const PT_RATIO = 0.75
+        const pxRatio = (1 / zoomRef.current) * PT_RATIO
         const dx = (e.clientX - startMouseX) * pxRatio
         const dy = (e.clientY - startMouseY) * pxRatio
 
@@ -1365,7 +1378,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const rootCanvas = document.getElementById('canvas-root')
         if (rootCanvas) {
           const rect = rootCanvas.getBoundingClientRect()
-          const pxRatio = 1 / zoomRef.current
+          const PT_RATIO = 0.75
+          const pxRatio = (1 / zoomRef.current) * PT_RATIO
           const currentX = (e.clientX - rect.left) * pxRatio
           const currentY = (e.clientY - rect.top) * pxRatio
           // console.log('Marquee moving:', currentX, currentY)
@@ -2339,7 +2353,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 const canvasEl = document.getElementById('canvas-root')
                 if (!canvasEl) return
                 const rect = canvasEl.getBoundingClientRect()
-                const pxRatio = 1 / zoom
+                const PT_RATIO = 0.75
+                const pxRatio = (1 / zoom) * PT_RATIO
                 const startX = (e.clientX - rect.left) * pxRatio
                 const startY = (e.clientY - rect.top) * pxRatio
                 // console.log('Setting selectionBox start', { startX, startY })
@@ -2362,7 +2377,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               )}
               <div
                 className="relative shrink-0"
-                style={{ width: canvasW, height: canvasH, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
+                style={{ width: `${canvasW}pt`, height: `${canvasH}pt`, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
                 data-container-id={activeScreenNode?.id || 'root'}
                 id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
@@ -2473,8 +2488,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       key={`snap-${i}`}
                       style={{
                         position: 'absolute',
-                        left: line.orientation === 'vertical' ? absX : 0,
-                        top: line.orientation === 'horizontal' ? absY : 0,
+                        left: line.orientation === 'vertical' ? `${absX}pt` : 0,
+                        top: line.orientation === 'horizontal' ? `${absY}pt` : 0,
                         width: line.orientation === 'vertical' ? 1 : '100%',
                         height: line.orientation === 'horizontal' ? 1 : '100%',
                         backgroundColor: '#0078d4',
@@ -2496,7 +2511,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     <div
                       style={{
                         position: 'absolute',
-                        left, top, width, height,
+                        left: `${left}pt`, top: `${top}pt`, width: `${width}pt`, height: `${height}pt`,
                         border: '1px solid #0078d4',
                         backgroundColor: 'rgba(0, 120, 212, 0.1)',
                         zIndex: 10000,
@@ -2525,13 +2540,13 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     <div
                       style={{
                         position: 'absolute',
-                        left: minX - 4,
-                        top: minY - 4,
-                        width: (maxX - minX) + 8,
-                        height: (maxY - minY) + 8,
-                        border: '1.5px solid #0078d4',
+                        left: `${minX - 4}pt`,
+                        top: `${minY - 4}pt`,
+                        width: `${(maxX - minX) + 8}pt`,
+                        height: `${(maxY - minY) + 8}pt`,
+                        border: '1.5pt solid #0078d4',
                         backgroundColor: 'rgba(0, 120, 212, 0.05)',
-                        borderRadius: '4px',
+                        borderRadius: '4pt',
                         zIndex: 9998,
                         pointerEvents: 'none'
                       }}
@@ -2557,8 +2572,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         title="This component has validation errors"
                         style={{
                           position: 'absolute',
-                          left: x + (w || 0) - 10,
-                          top: y - 10,
+                          left: `${x + (w || 0) - 10}pt`,
+                          top: `${y - 10}pt`,
                           zIndex: 10005
                         }}
                         className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-xs shadow-md border-2 border-[#1a1b2e] animate-pulse cursor-pointer hover:bg-red-600 transition-colors"
@@ -2587,14 +2602,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   const { Width: w, Height: h } = resolvedComp
 
                   const handles = [
-                    { dir: 'nw', style: { left: x - 5, top: y - 5, cursor: 'nw-resize' } },
-                    { dir: 'n',  style: { left: x + w/2 - 5, top: y - 5, cursor: 'n-resize' } },
-                    { dir: 'ne', style: { left: x + w - 5, top: y - 5, cursor: 'ne-resize' } },
-                    { dir: 'e',  style: { left: x + w - 5, top: y + h/2 - 5, cursor: 'e-resize' } },
-                    { dir: 'se', style: { left: x + w - 5, top: y + h - 5, cursor: 'se-resize' } },
-                    { dir: 's',  style: { left: x + w/2 - 5, top: y + h - 5, cursor: 's-resize' } },
-                    { dir: 'sw', style: { left: x - 5, top: y + h - 5, cursor: 'sw-resize' } },
-                    { dir: 'w',  style: { left: x - 5, top: y + h/2 - 5, cursor: 'w-resize' } },
+                    { dir: 'nw', style: { left: `${x - 5}pt`, top: `${y - 5}pt`, cursor: 'nw-resize' } },
+                    { dir: 'n',  style: { left: `${x + w/2 - 5}pt`, top: `${y - 5}pt`, cursor: 'n-resize' } },
+                    { dir: 'ne', style: { left: `${x + w - 5}pt`, top: `${y - 5}pt`, cursor: 'ne-resize' } },
+                    { dir: 'e',  style: { left: `${x + w - 5}pt`, top: `${y + h/2 - 5}pt`, cursor: 'e-resize' } },
+                    { dir: 'se', style: { left: `${x + w - 5}pt`, top: `${y + h - 5}pt`, cursor: 'se-resize' } },
+                    { dir: 's',  style: { left: `${x + w/2 - 5}pt`, top: `${y + h - 5}pt`, cursor: 's-resize' } },
+                    { dir: 'sw', style: { left: `${x - 5}pt`, top: `${y + h - 5}pt`, cursor: 'sw-resize' } },
+                    { dir: 'w',  style: { left: `${x - 5}pt`, top: `${y + h/2 - 5}pt`, cursor: 'w-resize' } },
                   ]
                   return handles.map(({ dir, style }) => (
                     <div

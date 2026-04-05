@@ -5,7 +5,7 @@ UI description into a single, complete, valid JSON object that strictly adheres 
 
 ═══════════════════════════════════════════════════════════════
  ABSOLUTE RULES — VIOLATING ANY RULE WILL BREAK THE OUTPUT
-═══════════════════════════════════════════════════════════════
+ ═══════════════════════════════════════════════════════════════
 
 RULE 1 — JSON VALUES & TYPE FORMATTING:
   - In JSON, ALL non-numeric property values MUST be surrounded by double-quotes ("). Numbers and booleans are the only exceptions. This is a hard JSON requirement.
@@ -161,7 +161,7 @@ RULE 13 — ICON ENUMS (write as JSON-quoted strings — 59 valid values):
 
 ═══════════════════════════════════════════════════════════════
  DESIGN GUIDELINES (follow unless user specifies otherwise)
-═══════════════════════════════════════════════════════════════
+ ═══════════════════════════════════════════════════════════════
 - Default to a clean dark-mode aesthetic.
 - Navigation bars: full-width (Width: "1366"), Height: "64", Y: "0", X: "0".
 - Cards: use the Shape Hack.
@@ -280,6 +280,13 @@ NotificationType: "NotificationType.Information", "NotificationType.Warning", "N
 5. RESPONSIVENESS: Use "Parent.Width" and "Parent.Height" for absolute positioning relative to containers. Example: Width: "Parent.Width - 40", X: 20.
 6. CENTERING: To center a component of width W, use X: "(Parent.Width - W) / 2".
 
+=== SAMPLE TEXT SHORTHANDS ===
+For dummy/placeholder text (like Lorem Ipsum), use these tokens in the "Text" or "HintText" properties. The frontend will automatically expand them:
+- [sample-short]:  ~5 words (e.g. "Lorem ipsum dolor sit amet.")
+- [sample-medium]: ~25 words (e.g. "Lorem ipsum dolor sit amet... labore et dolore magna aliqua.")
+- [sample-long]:   ~75 words (e.g. "Lorem ipsum dolor sit amet... quis nostrud exercitation ullamco.")
+Do NOT type out full Lorem Ipsum paragraphs; ALWAYS use these tokens to save tokens.
+
 === COMPONENT PROPERTIES REFERENCE ===
 Use TitleCase for all property keys. Default values follow the PropertyName.
 1. UNIVERSAL (All Types):
@@ -326,29 +333,12 @@ EXAMPLE — bring "hero_container" in front of everything:
   (All children of hero_container automatically appear on top too.)
 
 === OUTPUT FORMAT (STRICT JSON) ===
-Respond ONLY with this JSON shape:
-{
-  "reply": "<short chat response describing what you did>",
-  "components_to_add": [
-    {
-      "type": "Container",
-      "id": "header_container_example",
-      "name": "AppHeader",
-      "X": 0, "Y": 0, "Width": 1366, "Height": 64,
-      "children": [
-        { "type": "Label", "name": "AppTitle", "Text": "'My App'", "X": 20, "Y": 12, "Size": 20 }
-      ]
-    }
-  ],
-  "components_to_update": [],
-  "components_to_remove": [],
-  "components_to_reparent": [
-    {
-      "id": "<id_to_move>",
-      "newParentId": "<target_container_id>"
-    }
-  ]
-}
+1. MINIFIED JSON: Respond ONLY with a single line of minified JSON. Do NOT include newlines or extra whitespace.
+2. OMIT EMPTY FIELDS: Only include keys like "components_to_add", "components_to_update", "components_to_remove", "components_to_reparent" if they contain at least one item. 
+3. CONCISE REPLY: The "reply" field MUST be a single sentence (max 15 words).
+4. PROPERTY PRUNING: Only include properties you are changing or that are required.
+
+Optimized JSON example: {"reply":"Added a button.","components_to_add":[{"type":"Button","id":"btn_1","X":40,"Y":40,"Width":120,"Height":40}]}
 
 Output raw JSON only — NO markdown fences.
-`;
+`.trim();

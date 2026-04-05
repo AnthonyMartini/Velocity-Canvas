@@ -14,13 +14,13 @@ export default function RectangleRenderer({
 
   const containerStyle: any = {
     position: 'absolute',
-    left: comp.X,
-    top: comp.Y,
-    width: comp.Width,
-    height: comp.Height,
+    left: `${comp.X}pt`,
+    top: `${comp.Y}pt`,
+    width: `${comp.Width}pt`,
+    height: `${comp.Height}pt`,
     backgroundColor: comp.Fill,
     border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && (comp.BorderThickness || 0) > 0)
-      ? `${comp.BorderThickness || 0}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor || 'transparent'}`
+      ? `${comp.BorderThickness || 0}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor || 'transparent'}`
       : 'none',
     opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
     cursor: isPlaying ? (comp.DisplayMode === 'DisplayMode.Disabled' ? 'default' : 'pointer') : 'move',

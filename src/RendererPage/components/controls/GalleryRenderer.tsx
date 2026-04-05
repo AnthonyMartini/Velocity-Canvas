@@ -33,7 +33,7 @@ export default function GalleryRenderer({
 }) {
   const style: any = {
     position: 'absolute',
-    left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
+    left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
     border: '2px dashed rgba(236, 72, 153, 0.4)',
     opacity: comp.Visible ? 1 : 0.3,
@@ -138,10 +138,10 @@ export default function GalleryRenderer({
           // so they render correctly inside the row wrapper with no extra offset.
           const rowStyle: any = {
             position: 'absolute',
-            top:      isVertical ? offset : 0,
-            left:     isVertical ? 0 : offset,
-            width:    isVertical ? '100%' : tSize,
-            height:   isVertical ? tSize : '100%',
+            top:      isVertical ? `${offset}pt` : 0,
+            left:     isVertical ? 0 : `${offset}pt`,
+            width:    isVertical ? '100%' : `${tSize}pt`,
+            height:   isVertical ? `${tSize}pt` : '100%',
             overflow: 'hidden',
             boxSizing: 'border-box',
           }
@@ -178,7 +178,7 @@ export default function GalleryRenderer({
       </div>
 
       {/* Active (editable) template row */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
         {renderChildren(rows.length > 0 ? { ...localVars, ThisItem: rows[0] } : localVars, true)}
       </div>
 
@@ -187,7 +187,7 @@ export default function GalleryRenderer({
         const offset = (gi + 1) * (tSize + padding)
         const ghostRowVars = rows.length > gi + 1 ? { ...localVars, ThisItem: rows[gi + 1] } : localVars
         return (
-          <div key={gi} style={{ position: 'absolute', top: isVertical ? offset : 0, left: isVertical ? 0 : offset, width: isVertical ? '100%' : tSize, height: isVertical ? tSize : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
+          <div key={gi} style={{ position: 'absolute', top: isVertical ? `${offset}pt` : 0, left: isVertical ? 0 : `${offset}pt`, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
             {renderChildren(ghostRowVars, false)}
           </div>
         )

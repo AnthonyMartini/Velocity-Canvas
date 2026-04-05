@@ -1,5 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* Selawik - Microsoft's open-source replacement for Segoe UI */
+@font-face {
+  font-family: 'Selawik';
+  src: url('https://cdn.jsdelivr.net/gh/Microsoft/Selawik@master/Selawik-Light.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Selawik';
+  src: url('https://cdn.jsdelivr.net/gh/Microsoft/Selawik@master/Selawik-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Selawik';
+  src: url('https://cdn.jsdelivr.net/gh/Microsoft/Selawik@master/Selawik-Semibold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Selawik';
+  src: url('https://cdn.jsdelivr.net/gh/Microsoft/Selawik@master/Selawik-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,7 +37,7 @@
 body {
   background-color: #1e1e2e;
   color: #cdd6f4;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Selawik', 'Inter', system-ui, sans-serif;
   margin: 0;
 }
 

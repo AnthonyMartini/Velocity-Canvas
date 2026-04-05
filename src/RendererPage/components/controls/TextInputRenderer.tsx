@@ -2,31 +2,33 @@ import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { resolveSampleText } from './sampleText'
 
 export default function TextInputRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
   const style: any = {
     position: 'absolute',
-    left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
+    left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill,
     color: comp.Color,
-    fontSize: comp.Size,
+    fontSize: `${comp.Size}pt`,
     fontWeight: CSS_FW[comp.FontWeight] || comp.FontWeight,
-    border: `${comp.BorderThickness}px solid ${comp.BorderColor}`,
-    borderRadius: 2,
+    border: `${comp.BorderThickness}pt solid ${comp.BorderColor}`,
+    borderRadius: '2pt',
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'text' : 'move', userSelect: isPlaying ? 'auto' : 'none',
     display: 'flex', alignItems: 'center',
-    paddingLeft: 8, paddingRight: 8,
+    paddingLeft: '8pt', paddingRight: '8pt',
     boxSizing: 'border-box' as const,
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
     zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
-  const displayDefaultValue = (comp.Default !== undefined && comp.Default !== null) ? comp.Default : ''
-  const displayValue = (comp.Text !== undefined && comp.Text !== null) ? comp.Text : displayDefaultValue
-  const displayHint = (comp.HintText !== undefined && comp.HintText !== null) ? comp.HintText : ''
+  const displayDefaultValue = resolveSampleText((comp.Default !== undefined && comp.Default !== null) ? comp.Default : '')
+  const displayValue = resolveSampleText((comp.Text !== undefined && comp.Text !== null) ? comp.Text : displayDefaultValue)
+  const displayHint = resolveSampleText((comp.HintText !== undefined && comp.HintText !== null) ? comp.HintText : '')
 
   const handleChange = (e) => {
     const val = e.target.value
@@ -42,7 +44,7 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
     return (
       <input
         type="text"
-        style={{ ...style, outline: 'none', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill }}
+        style={{ ...style, outline: 'none', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill, lineHeight: comp.LineHeight }}
         defaultValue={displayValue || ''}
         placeholder={displayHint || ''}
         onMouseDown={onMouseDown}
@@ -77,6 +79,7 @@ TextInputRenderer.propTypes = {
     Visible: PropTypes.bool,
     Default: PropTypes.string,
     HintText: PropTypes.string,
+    LineHeight: PropTypes.number,
   }).isRequired,
   selected: PropTypes.bool,
   isPlaying: PropTypes.bool,

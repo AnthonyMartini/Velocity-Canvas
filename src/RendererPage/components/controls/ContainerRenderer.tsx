@@ -27,12 +27,12 @@ export default function ContainerRenderer({
 
   const style: any = {
     position: 'absolute',
-    left: comp.X, top: comp.Y, width: comp.Width, height: comp.Height,
+    left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
     border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && (comp.BorderThickness || 0) > 0)
-      ? `${comp.BorderThickness}px ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
+      ? `${comp.BorderThickness}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
       : 'none',
-    borderRadius: `${comp.RadiusTopLeft || 0}px ${comp.RadiusTopRight || 0}px ${comp.RadiusBottomRight || 0}px ${comp.RadiusBottomLeft || 0}px`,
+    borderRadius: `${comp.RadiusTopLeft || 0}pt ${comp.RadiusTopRight || 0}pt ${comp.RadiusBottomRight || 0}pt ${comp.RadiusBottomLeft || 0}pt`,
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',

@@ -40,13 +40,15 @@ export function highlightYamlLine(line, index) {
   if (/^Properties:|^Children:/.test(trimmed)) {
     return <div key={index} className="text-accent/70 font-semibold">{line}</div>
   }
-  if (/^[A-Z][A-Za-z]+:/.test(trimmed)) {
-    const [, val] = line.split(/:\s*=?/)
+  if (/^[A-Z][A-Za-z0-9]+:/.test(trimmed)) {
+    const colonIndex = line.indexOf(':')
+    const key = line.substring(0, colonIndex)
+    const val = line.substring(colonIndex + 1)
     return (
       <div key={index}>
-        <span className="text-blue-200/80">{line.split(':')[0]}</span>
-        <span className="text-subtext/50">: </span>
-        <span className="text-green-300/80">={val?.trim()}</span>
+        <span className="text-blue-200/80">{key}</span>
+        <span className="text-subtext/50">:</span>
+        <span className="text-green-300/80">{val}</span>
       </div>
     )
   }
