@@ -8,6 +8,14 @@ const SSE_HEADERS = {
   "Cache-Control": "no-cache, no-transform",
   Connection: "keep-alive",
 };
+const ALLOWED_RENDERER_CHAT_MODELS = new Set([
+  "gemini-3-flash-preview",
+  "gemini-3.1-pro-preview",
+]);
+const RENDERER_CHAT_MODEL_CREDIT_COST = {
+  "gemini-3-flash-preview": 5,
+  "gemini-3.1-pro-preview": 10,
+};
 
 function parseJsonFromText(rawText) {
   const start = rawText.indexOf("{");
@@ -176,7 +184,13 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
     }
 
-    const creditResult = await checkAndDeductCredit(uid, "Canvas Editor AI Chat");
+    const { message, canvas_components, active_screen_id, canvas_width, canvas_height, image_data, image_mime_type, chat_history, model } =
+      await req.json();
+
+    const requestedModel = ALLOWED_RENDERER_CHAT_MODELS.has(model) ? model : RENDERER_CHAT_MODEL_NAME;
+    const creditCost = RENDERER_CHAT_MODEL_CREDIT_COST[requestedModel] ?? 5;
+
+    const creditResult = await checkAndDeductCredit(uid, "Canvas Editor AI Chat", creditCost);
     if (!creditResult.success) {
       return NextResponse.json(
         {
@@ -186,9 +200,6 @@ export async function POST(req) {
         { status: 403 }
       );
     }
-
-    const { message, canvas_components, active_screen_id, canvas_width, canvas_height, image_data, image_mime_type, chat_history } =
-      await req.json();
 
     if (!message) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -222,6 +233,7 @@ export async function POST(req) {
     const totalComponentCount = countComponents(canvas_components || []);
 
     const requestPayload = {
+      model: requestedModel,
       contents: [
         ...history,
         {
@@ -310,7 +322,7 @@ export async function POST(req) {
             if (usage) {
               logTokenUsage(
                 uid,
-                RENDERER_CHAT_MODEL_NAME,
+                requestedModel,
                 usage.promptTokenCount || 0,
                 usage.candidatesTokenCount || 0,
                 usage.cachedContentTokenCount || 0
@@ -334,6 +346,7 @@ export async function POST(req) {
               topLevelComponentCount,
               totalComponentCount,
               hasImage: Boolean(image_data),
+              selectedModel: requestedModel,
             });
 
             console.log("[renderer-chat] final prompt", {

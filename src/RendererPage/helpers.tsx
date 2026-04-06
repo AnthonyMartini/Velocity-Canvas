@@ -1,4 +1,5 @@
 import { SCHEMAS, BORDER_MAP } from './constants'
+import { resolveSampleTextDeep } from './components/controls/sampleText'
 
 // ── Unique ID ─────────────────────────────────────────────────────────────────
 export const uid = () => `comp_${Math.random().toString(36).substring(2, 11)}`
@@ -39,6 +40,7 @@ export function createFromSpec(spec, usedIds?: Set<string>) {
   const childrenList = spec.children || spec.Children || []
   const { children, Children, ...rest } = spec
   
+  const normalizedRest = resolveSampleTextDeep(rest)
   const processedChildren = childrenList.map(c => createFromSpec(c, usedIds)).filter(Boolean)
   
   let finalId = spec.id || uid()
@@ -51,7 +53,7 @@ export function createFromSpec(spec, usedIds?: Set<string>) {
 
   return { 
     ...base, 
-    ...rest, 
+    ...normalizedRest, 
     id: finalId, 
     type: schema.type, 
     name: spec.name || nextName(schema.type), 

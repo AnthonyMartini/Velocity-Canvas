@@ -443,6 +443,22 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
     )
   }
 
+  if (prop.propertyType === 'Output') {
+    return (
+      <div className="flex items-center justify-between py-1.5 gap-2">
+        <label className="text-xs text-subtext shrink-0">{prop.label}</label>
+        <div className="flex-1 min-w-0 bg-base border border-overlay/30 rounded-md px-2 py-1 text-xs text-subtext/90 font-mono">
+          <input
+            type="text"
+            value={value ?? ''}
+            readOnly
+            className="w-full bg-transparent outline-none cursor-text"
+          />
+        </div>
+      </div>
+    )
+  }
+
   const isEvent = prop.propertyType === 'Event' || (prop.type === 'string' && prop.name?.startsWith('On')) || prop.type === 'event' || prop.key?.startsWith('On')
   if (isEvent) {
     return (

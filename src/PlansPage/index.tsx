@@ -63,27 +63,10 @@ export default function PlansPage({ user, onRefreshCredits }: PlansPageProps & {
     fetchLogs();
   };
 
-  const addDevCredits = async () => {
-    if (!user) return;
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch('/api/user/credits', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${idToken}` }
-      });
-      if (res.ok) {
-        if (onRefreshCredits) onRefreshCredits();
-        alert('Added 100 dev credits!');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   return (
     <div className="flex-1 bg-base min-h-full py-12 px-6 relative overflow-y-auto">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center mb-16 animate-fade-in px-4 gap-8">
-        <div className="text-center md:text-left flex items-start gap-4">
+        <div className="text-center md:text-left">
           <div>
             <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
               Supercharge Your <span className="text-accent">Workflow</span>
@@ -92,13 +75,6 @@ export default function PlansPage({ user, onRefreshCredits }: PlansPageProps & {
               Choose a plan that fits your needs. Get more credits to build complex apps.
             </p>
           </div>
-          {/* Dev Button */}
-          <button 
-            onClick={addDevCredits}
-            className="mt-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-3 py-1.5 rounded-lg text-[10px] font-black text-red-500 uppercase tracking-widest transition-all cursor-pointer"
-          >
-            Dev: +100 Credits
-          </button>
         </div>
         
         <button 

@@ -60,10 +60,10 @@ export async function verifyIdToken(token: string): Promise<string | null> {
 }
 
 /**
- * Checks if a user has at least 1 credit and deducts it if successful.
+ * Checks if a user has enough credits and deducts the requested amount if successful.
  * Also records a log of the action.
  */
-export async function checkAndDeductCredit(uid: string, action: string): Promise<{ success: boolean; credits?: number; error?: string }> {
+export async function checkAndDeductCredit(uid: string, action: string, amount: number = 1): Promise<{ success: boolean; credits?: number; error?: string }> {
   if (!adminDb) {
     return { success: true }; 
   }
@@ -81,11 +81,11 @@ export async function checkAndDeductCredit(uid: string, action: string): Promise
 
       const currentCredits = userDoc.data()?.credits ?? 0;
 
-      if (currentCredits < 1) {
+      if (currentCredits < amount) {
         return { success: false, credits: currentCredits, error: 'Insufficient credits.' };
       }
 
-      const newCredits = currentCredits - 1;
+      const newCredits = currentCredits - amount;
       
       // Update credits
       transaction.update(userRef, { credits: newCredits });
@@ -93,7 +93,7 @@ export async function checkAndDeductCredit(uid: string, action: string): Promise
       // Record log
       transaction.set(logRef, {
         action,
-        amount: -1,
+        amount: -amount,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         previousCredits: currentCredits,
         newCredits: newCredits

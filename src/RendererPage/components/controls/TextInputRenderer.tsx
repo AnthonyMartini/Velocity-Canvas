@@ -4,6 +4,13 @@ import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
 
+function normalizeTextInputValue(value) {
+  if (value === undefined || value === null) return ''
+  const normalized = String(value).trim()
+  if (normalized === '""' || normalized === "''") return ''
+  return String(value)
+}
+
 export default function TextInputRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
     position: 'absolute',
@@ -26,9 +33,13 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
-  const displayDefaultValue = resolveSampleText((comp.Default !== undefined && comp.Default !== null) ? comp.Default : '')
-  const displayValue = resolveSampleText((comp.Text !== undefined && comp.Text !== null) ? comp.Text : displayDefaultValue)
-  const displayHint = resolveSampleText((comp.HintText !== undefined && comp.HintText !== null) ? comp.HintText : '')
+  const rawDefaultValue = normalizeTextInputValue(comp.Default)
+  const rawTextValue = normalizeTextInputValue(comp.Text)
+  const rawHintValue = normalizeTextInputValue(comp.HintText)
+  const displayDefaultValue = resolveSampleText(rawDefaultValue)
+  const displayHint = resolveSampleText(rawHintValue)
+  const displayValue = resolveSampleText(rawTextValue || displayDefaultValue)
+  const hasDisplayValue = displayValue !== undefined && displayValue !== null && String(displayValue).trim() !== ''
 
   const handleChange = (e) => {
     const val = e.target.value
@@ -45,7 +56,7 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
       <input
         type="text"
         style={{ ...style, outline: 'none', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill, lineHeight: comp.LineHeight }}
-        defaultValue={displayValue || ''}
+        defaultValue={hasDisplayValue ? displayValue : ''}
         placeholder={displayHint || ''}
         onMouseDown={onMouseDown}
         onClick={onClick}
@@ -56,9 +67,9 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
 
   return (
     <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
-      {(displayValue !== undefined && displayValue !== null && displayValue !== "")
+      {hasDisplayValue
         ? <span>{displayValue}</span>
-        : <span style={{ color: '#aaa', fontStyle: 'italic' }}>{comp.HintText}</span>
+        : <span style={{ color: '#aaa', fontStyle: 'italic' }}>{displayHint}</span>
       }
     </div>
   )

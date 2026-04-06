@@ -1,4 +1,5 @@
 import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES } from '../RendererPage/Functions'
+import { SCHEMAS } from '../RendererPage/constants'
 
 /**
  * Parses a formula string into an Abstract Syntax Tree (AST).
@@ -250,6 +251,26 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     return ""
   }
 
+  const findNodeByName = (name: string) => flatNodes.find(n => (n?.name || '').toLowerCase() === String(name || '').toLowerCase())
+  const getPropertyValue = (targetNode: any, propertyName: string) => {
+    if (!targetNode || !propertyName) return undefined
+    if (targetNode[propertyName] !== undefined) return targetNode[propertyName]
+
+    const matchingKey = Object.keys(targetNode).find(key => key.toLowerCase() === propertyName.toLowerCase())
+    return matchingKey ? targetNode[matchingKey] : undefined
+  }
+  const getSchemaPropertyDef = (targetNode: any, propertyName: string) => {
+    const schema = SCHEMAS?.[targetNode?.type]
+    const properties = schema?.groups
+      ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
+      : (schema?.properties || [])
+
+    return properties.find((property: any) => {
+      const key = property.key || property.name
+      return String(key || '').toLowerCase() === String(propertyName || '').toLowerCase()
+    })
+  }
+
   // Helper to resolve property path like "Label1.Text"
   const resolvePropertyPath = (path) => {
     // Helper to find the parent of a node in the flat list
@@ -330,12 +351,13 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
     // Allow other localVars entries that are plain objects
     else if (localVars[compName] !== undefined && typeof localVars[compName] === 'object' && !Array.isArray(localVars[compName])) targetNode = localVars[compName]
-    else targetNode = flatNodes.find(n => n.name === compName)
+    else targetNode = findNodeByName(compName)
 
     if (!targetNode && ALL_ENUM_VALUES.has(path)) return path
 
     if (targetNode) {
-      let rawVal = targetNode[propName]
+      let rawVal = getPropertyValue(targetNode, propName)
+      const targetPropDef = getSchemaPropertyDef(targetNode, propName)
 
       // Provide implicit fallbacks for Screen/App dimensions if not explicitly set
       if (rawVal === undefined && (targetNode.type === 'Screen' || targetNode.type === 'App')) {
@@ -360,6 +382,10 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
         if (isEnum) return rawVal
 
         // If the property itself is a formula, parse and evaluate it
+        if (targetPropDef?.propertyType === 'Output') {
+          return rawVal
+        }
+
         if (typeof rawVal === 'string') {
             const subAst = parseFormula(rawVal, strict)
             const resolvedParent = findParentNode(targetNode.id)
@@ -402,7 +428,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       
       // We don't want to return the actual component node object because it crashes React when rendered.
       // If it's used in a context that requires a component (like Navigate), returning the string name is preferred anyway.
-      const compNode = flatNodes.find(n => n.name === node.name)
+      const compNode = findNodeByName(node.name)
       if (compNode && strict) return compNode
       if (compNode && !strict) return node.name
       

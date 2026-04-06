@@ -126,7 +126,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
     }
 
-    const creditResult = await checkAndDeductCredit(uid, "Component Tweak");
+    const creditResult = await checkAndDeductCredit(uid, "Component Tweak", 1);
     if (!creditResult.success) {
       return NextResponse.json(
         {

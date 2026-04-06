@@ -18,3 +18,21 @@ export function resolveSampleText(text: any): any {
     .replace(/\[sample-medium\]/g, SAMPLE_TEXT.medium)
     .replace(/\[sample-long\]/g, SAMPLE_TEXT.long);
 }
+
+export function resolveSampleTextDeep(value: any): any {
+  if (typeof value === 'string') {
+    return resolveSampleText(value)
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(resolveSampleTextDeep)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, resolveSampleTextDeep(nestedValue)])
+    )
+  }
+
+  return value
+}

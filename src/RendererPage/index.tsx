@@ -2,7 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import NextImage from 'next/image'
 import PropTypes from 'prop-types'
+import logo from '@/assets/logo.png'
 import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
   RectangleRenderer,
   IconRenderer,
@@ -15,11 +17,18 @@ import PropField from './components/PropField'
 import ChatMessage from './components/ChatMessage'
 import LayerRow from './components/LayerRow'
 import ProjectsDashboard from './ProjectsDashboard'
+import { resolveSampleTextDeep } from './components/controls/sampleText'
 import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
+const CANVAS_ZOOM_BASE = 0.9
+const RENDERER_CHAT_MODEL_OPTIONS = [
+  { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
+  { value: 'gemini-3.1-pro-preview', label: '3.1-pro-preview - 10 credits' },
+] as const
+const DEFAULT_RENDERER_CHAT_MODEL = RENDERER_CHAT_MODEL_OPTIONS[0].value
 const AI_REQUEST_SUMMARY_KEYS = new Set([
   'id',
   'type',
@@ -274,9 +283,9 @@ function ErrorsPane({ errors, onSelectNode, width, onClose }) {
               onClick={() => onSelectNode(err.nodeId)}
               className="group flex flex-col gap-1 p-3 rounded-lg border border-red/20 bg-red/5 hover:bg-red/10 hover:border-red/40 transition-colors cursor-pointer"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono text-red-300 font-semibold">{err.path}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 text-subtext/60 group-hover:text-text transition-colors">Select &rarr;</span>
+              <div className="flex items-center justify-between overflow-hidden gap-2">
+                <span className="text-[11px] font-mono text-red-300 font-semibold truncate flex-1" title={err.path}>{err.path}</span>
+                <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded bg-black/20 text-subtext/60 group-hover:text-text transition-colors">Select &rarr;</span>
               </div>
               <p className="text-[11px] text-red-200 mt-0.5">{err.error}</p>
             </div>
@@ -342,7 +351,15 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
       <div className="relative bg-[#1a1b2e] border border-violet-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4">
         <div className="relative">
           <div className="w-16 h-16 rounded-full border-4 border-violet-500/20 border-t-violet-500 animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 pointer-events-none text-transparent">
+            <NextImage
+              src={logo}
+              alt="Velocity Canvas"
+              width={40}
+              height={40}
+              className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 object-contain"
+              priority
+            />
             <span className="text-xl">✨</span>
           </div>
         </div>
@@ -363,102 +380,76 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
 
 function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, confirmTweak, undoTweak, handleReorder }) {
   if (!node) return null;
-  const hasProposal = !!tweakOriginalNode;
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2 pointer-events-none">
       <div className="pointer-events-auto bg-[#1a1b2e]/80 backdrop-blur-xl border border-overlay/40 rounded-2xl shadow-2xl p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
-        {!hasProposal && (
-          <>
-            {/* Layer Actions */}
-            <div className="flex items-center gap-0.5 bg-overlay/10 rounded-xl p-0.5 border border-overlay/20">
-              <button onClick={() => handleReorder(node.id, 'back')} title="Send to Back" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
-              </button>
-              <button onClick={() => handleReorder(node.id, 'down')} title="Move Backward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
-              </button>
-              <button onClick={() => handleReorder(node.id, 'up')} title="Move Forward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
-              </button>
-              <button onClick={() => handleReorder(node.id, 'front')} title="Bring to Front" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/></svg>
-              </button>
-            </div>
-            <div className="w-px h-6 bg-overlay/20 mx-1" />
-          </>
-        )}
+        {/* Layer Actions */}
+        <div className="flex items-center gap-0.5 bg-overlay/10 rounded-xl p-0.5 border border-overlay/20">
+          <button onClick={() => handleReorder(node.id, 'back')} title="Send to Back" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+          </button>
+          <button onClick={() => handleReorder(node.id, 'down')} title="Move Backward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <button onClick={() => handleReorder(node.id, 'up')} title="Move Forward" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 15l7-7 7 7"/></svg>
+          </button>
+          <button onClick={() => handleReorder(node.id, 'front')} title="Bring to Front" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/></svg>
+          </button>
+        </div>
+        <div className="w-px h-6 bg-overlay/20 mx-1" />
 
         <button 
           onClick={() => setIsTweaking(!isTweaking)}
           className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
-            isTweaking || hasProposal 
+            isTweaking 
               ? 'bg-violet-500/25 text-violet-200 border-violet-500/50 ring-2 ring-violet-500/20' 
               : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:bg-accent/10 hover:text-accent hover:border-accent/40 active:scale-95'
           }`}
         >
           <span className="text-sm">✨</span>
-          {hasProposal ? 'Reviewing Change' : 'Tweak with AI'}
+          Tweak with AI - 1 credit
         </button>
       </div>
 
-      {(isTweaking || hasProposal) && (
+      {isTweaking && (
         <div className="pointer-events-auto w-[320px] bg-[#1a1b2e]/90 backdrop-blur-2xl border border-violet-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-          {isTweaking && !hasProposal && (
-            <div className="p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">AI Styling Tweak</span>
-                <button onClick={() => setIsTweaking(false)} className="text-subtext/40 hover:text-subtext transition-colors cursor-pointer">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" /></svg>
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={tweakInput}
-                  onChange={e => setTweakInput(e.target.value)}
-                  onKeyDown={e => {
-                    e.stopPropagation()
-                    if (e.key === 'Enter') handleTweakSubmit()
-                    if (e.key === 'Escape') setIsTweaking(false)
-                  }}
-                  autoFocus
-                  placeholder="e.g. bold red text with soft shadow"
-                  className="flex-1 bg-surface border border-violet-500/20 rounded-xl px-3 py-2 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 transition-all"
-                />
-                <button 
-                  onClick={handleTweakSubmit}
-                  disabled={tweakLoading || !tweakInput.trim()}
-                  className="w-9 h-9 rounded-xl bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 shadow-lg shadow-violet-500/25 hover:bg-violet-600 transition-colors cursor-pointer"
-                >
-                  {tweakLoading ? (
-                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  ) : (
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
-                  )}
-                </button>
-              </div>
+          <div className="p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">AI Styling Tweak - 1 credit</span>
+              <button onClick={() => setIsTweaking(false)} className="text-subtext/40 hover:text-subtext transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" /></svg>
+              </button>
             </div>
-          )}
-
-          {hasProposal && (
-            <div className="p-4 flex items-center justify-between gap-4 bg-violet-500/10">
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-violet-200">Review Changes</span>
-                <span className="text-[10px] text-violet-300/60 leading-tight">Apply these AI tweaks?</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={undoTweak}
-                  className="px-3 py-1.5 rounded-lg border border-overlay/40 hover:bg-red/10 hover:text-red hover:border-red/40 text-[11px] font-medium text-subtext transition-all cursor-pointer">
-                  Undo
-                </button>
-                <button onClick={confirmTweak}
-                  className="px-4 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-bold shadow-lg shadow-violet-500/20 transition-all cursor-pointer">
-                  Keep
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={tweakInput}
+                onChange={e => setTweakInput(e.target.value)}
+                onKeyDown={e => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') handleTweakSubmit()
+                  if (e.key === 'Escape') setIsTweaking(false)
+                }}
+                autoFocus
+                placeholder="e.g. bold red text with soft shadow"
+                className="flex-1 bg-surface border border-violet-500/20 rounded-xl px-3 py-2 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 transition-all"
+              />
+              <button 
+                onClick={handleTweakSubmit}
+                disabled={tweakLoading || !tweakInput.trim()}
+                className="w-9 h-9 rounded-xl bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 shadow-lg shadow-violet-500/25 hover:bg-violet-600 transition-colors cursor-pointer"
+              >
+                {tweakLoading ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" /></svg>
+                )}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
@@ -796,7 +787,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [selectedIds, setSelectedIds] = useState([]) // Array of selected component IDs
   const [dragOverId, setDragOverId] = useState(null)
   const [collapsedIds, setCollapsedIds] = useState(new Set()) // Container collapse state
-  const [zoom, setZoom] = useState(1) // Canvas zoom level
+  const [zoom, setZoom] = useState(1) // User-facing zoom level (100% baseline)
   const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
   const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
   const [showPropertiesPane, setShowPropertiesPane] = useState(false) // Toggle visibility of Properties Pane
@@ -807,6 +798,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [chatMessages, setChatMessages] = useState([
     { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
   ])
+  const [chatModel, setChatModel] = useState<string>(DEFAULT_RENDERER_CHAT_MODEL)
   const [chatLoading, setChatLoading] = useState(false)
   const [chatImage, setChatImage] = useState(null)
   const fileInputRef = useRef(null)
@@ -1225,6 +1217,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   // Always re-derive the node from the tree so name/fill changes are reflected live
   const activeScreenNode = findNode(tree, activeScreenId)
+  const activeScreenComponentCount = useMemo(() => {
+    if (!activeScreenNode) return 0;
+    return flattenTree(activeScreenNode.children || [], new Set()).length;
+  }, [activeScreenNode]);
   useEffect(() => { treeRef.current = tree }, [tree])
   useEffect(() => { activeScreenIdRef.current = activeScreenId }, [activeScreenId])
 
@@ -1271,29 +1267,27 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   // ── Add component to root or into selected container ──────────────────────
   const addComponent = useCallback((sch) => {
-    let parentId = null
+    let targetParent = activeScreenNode
     let isGallery = false
-    if (selectedNode?.type === 'Container' || selectedNode?.type === 'Gallery') {
-      parentId = selectedNode.id
+
+    if (selectedNode?.type === 'Container' || selectedNode?.type === 'Gallery' || selectedNode?.type === 'Screen') {
+      targetParent = selectedNode
       isGallery = selectedNode.type === 'Gallery'
-    } else if (selectedNode?.type === 'Screen') {
-      parentId = selectedNode.id
     } else if (selectedNode) {
       const parent = findParent(tree, selectedNode.id)
-      if (parent && (parent.type === 'Container' || parent.type === 'Gallery')) {
-        parentId = parent.id
+      if (parent && (parent.type === 'Container' || parent.type === 'Gallery' || parent.type === 'Screen')) {
+        targetParent = parent
         isGallery = parent.type === 'Gallery'
-      } else {
-        parentId = activeScreenNode?.id || null
       }
-    } else {
-      parentId = activeScreenNode?.id || null
     }
 
-    const offset = totalCount * 16
+    const parentId = targetParent?.id || null
+    const siblingCount = targetParent?.children?.length || 0
+    const baseInset = targetParent?.type === 'Container' ? 16 : 20
+    const offset = siblingCount * 16
     const comp = createComponent(sch, {
-      X: isGallery ? 0 : 20,
-      Y: isGallery ? 0 : 20 + offset,
+      X: isGallery ? 0 : baseInset,
+      Y: isGallery ? 0 : baseInset + offset,
     })
     
     setTree(prev => {
@@ -1302,7 +1296,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       return next
     })
     setSelectedIds([comp.id])
-  }, [selectedNode, activeScreenNode, totalCount, saveHistory])
+  }, [selectedNode, activeScreenNode, tree, saveHistory])
 
   // ── Add a new Screen ────────────────────────────────────────────────────────
   const addScreen = useCallback(() => {
@@ -1363,7 +1357,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       } else if (patch.op === 'reparent' && patch.id && patch.newParentId) {
         nextTree = handleDropLogic(nextTree, patch.id, patch.newParentId)
       } else if (patch.op === 'update' && patch.id && patch.changes) {
-        const changes = { ...patch.changes }
+        const changes = resolveSampleTextDeep({ ...patch.changes })
         if (changes.name) {
           const currentNames = flattenTree(nextTree).filter(n => n.id !== patch.id).map(n => n.name)
           if (currentNames.includes(changes.name)) {
@@ -1456,8 +1450,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   // Keep canvas size ref in sync
   useEffect(() => { canvasSizeRef.current = { w: canvasW, h: canvasH } }, [canvasW, canvasH])
 
-  const zoomRef = useRef(1)
-  useEffect(() => { zoomRef.current = zoom }, [zoom])
+  const effectiveZoom = zoom * CANVAS_ZOOM_BASE
+  const zoomRef = useRef(effectiveZoom)
+  useEffect(() => { zoomRef.current = effectiveZoom }, [effectiveZoom])
 
   useEffect(() => {
     const onMove = (e) => {
@@ -2105,10 +2100,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     const siblingNodes = ((parentNode?.children || activeScreenNode?.children || []) as any[])
       .filter(node => node?.id !== selectedId)
       .slice(0, 6)
-    if (!tweakOriginalNode) {
-      setTweakOriginalNode(JSON.parse(JSON.stringify(currentNode)))
-    }
-
     // Cancel any previous tweak request
     if (tweakAbortControllerRef.current) tweakAbortControllerRef.current.abort()
     tweakAbortControllerRef.current = new AbortController()
@@ -2146,14 +2137,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       const modifiedComponent = modifiedComponentResponse?.mode === 'legacy'
         ? modifiedComponentResponse.data
         : modifiedComponentResponse
+      const normalizedModifiedComponent = resolveSampleTextDeep(modifiedComponent)
 
       // Update the tree with the new component immediately (Keep/Undo flow)
-      if (modifiedComponent && modifiedComponent.id === selectedId) {
+      if (normalizedModifiedComponent && normalizedModifiedComponent.id === selectedId) {
         setTree(prev => {
-          const nextTree = updateNode(prev, selectedId, () => modifiedComponent)
+          const nextTree = updateNode(prev, selectedId, () => normalizedModifiedComponent)
           saveHistory(nextTree)
           return nextTree
         })
+        setTweakOriginalNode(null)
         setTweakInput('')
         setIsTweaking(false)
       }
@@ -2238,6 +2231,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       active_screen_id: activeScreenNode?.id || activeScreenIdRef.current,
       canvas_width: canvasW,
       canvas_height: canvasH,
+      model: chatModel,
       prompt_method: 'Direct'
     } as any
 
@@ -2300,7 +2294,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             if (data.components_to_update?.length) {
               data.components_to_update.forEach(u => {
                 if (u.id) {
-                  const { id, ...changes } = u
+                  const { id, ...rawChanges } = u
+                  const changes = resolveSampleTextDeep(rawChanges)
                   if (changes.name) {
                     const currentNames = flattenTree(nextTree).filter(n => n.id !== id).map(n => n.name)
                     if (currentNames.includes(changes.name)) {
@@ -2376,7 +2371,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
       chatAbortControllerRef.current = null
     }
-  }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch])
+  }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch, chatModel])
 
   // ── Shared child event handlers ─────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
@@ -2876,7 +2871,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 if (!canvasEl) return
                 const rect = canvasEl.getBoundingClientRect()
                 const PT_RATIO = 0.75
-                const pxRatio = (1 / zoom) * PT_RATIO
+                const pxRatio = (1 / effectiveZoom) * PT_RATIO
                 const startX = (e.clientX - rect.left) * pxRatio
                 const startY = (e.clientY - rect.top) * pxRatio
                 // console.log('Setting selectionBox start', { startX, startY })
@@ -2888,12 +2883,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               }
             }}
           >
-            <div id="canvas-padding-wrapper" className="inline-block transition-transform duration-200" style={{ padding: '50vh 50vw', transform: `scale(${zoom})`, transformOrigin: 'center' }}>
+            <div id="canvas-padding-wrapper" className="inline-block transition-transform duration-200" style={{ padding: '50vh 50vw', transform: `scale(${effectiveZoom})`, transformOrigin: 'center' }}>
               {/* Screen name label above canvas */}
               {activeScreenNode && (
                 <div style={{ marginBottom: 6, marginLeft: 2 }} className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold text-black tracking-wide select-none">
-                    {activeScreenNode.name || activeScreenNode.id}
+                    {activeScreenNode.name || activeScreenNode.id} - {activeScreenComponentCount} component{activeScreenComponentCount !== 1 ? 's' : ''}
                   </span>
                 </div>
               )}
@@ -3067,7 +3062,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                           top: `${y - 10}pt`,
                           zIndex: 10005
                         }}
-                        className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-xs shadow-md border-2 border-[#1a1b2e] animate-pulse cursor-pointer hover:bg-red-600 transition-colors"
+                        className="w-5 h-5 rounded-full bg-red flex items-center justify-center text-white font-bold text-xs shadow-md border-2 border-white animate-pulse cursor-pointer hover:bg-red/80 transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedIds([nodeId]);
@@ -3148,14 +3143,35 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 document.body.style.cursor = 'row-resize'
               }}
             />
-            <div className="flex items-center justify-between px-4 py-2 border-b border-overlay/20 bg-surface/40 shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-overlay/20 bg-surface/40 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
                     <path fillRule="evenodd" d="M8.25 2.25A.75.75 0 0 1 9 3v.75h2.25V3a.75.75 0 0 1 1.5 0v.75H15V3a.75.75 0 0 1 1.5 0v.75h.75a3 3 0 0 1 3 3v.75H21A.75.75 0 0 1 21 9h-.75v2.25H21a.75.75 0 0 1 0 1.5h-.75V15H21a.75.75 0 0 1 0 1.5h-.75v.75a3 3 0 0 1-3 3h-.75V21a.75.75 0 0 1-1.5 0v-.75h-2.25V21a.75.75 0 0 1-1.5 0v-.75H9V21a.75.75 0 0 1-1.5 0v-.75h-.75a3 3 0 0 1-3-3v-.75H3A.75.75 0 0 1 3 15h.75v-2.25H3a.75.75 0 0 1 0-1.5h.75V9H3a.75.75 0 0 1 0-1.5h.75v-.75a3 3 0 0 1 3-3h.75V3a.75.75 0 0 1 .75-.75ZM6 6.75A.75.75 0 0 1 6.75 6h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75H6.75a.75.75 0 0 1-.75-.75V6.75Z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <span className="text-xs font-semibold text-text">AI Canvas Assistant</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-semibold text-text whitespace-nowrap">AI Canvas Assistant</span>
+                  <label className="flex items-center gap-2 min-w-0 rounded-xl border border-overlay/30 bg-base/60 px-2.5 py-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-subtext/50 whitespace-nowrap">Chat model</span>
+                    <select
+                      value={chatModel}
+                      onChange={e => setChatModel(e.target.value)}
+                      className="min-w-[220px] bg-transparent text-[11px] font-medium text-text outline-none cursor-pointer"
+                    >
+                      {RENDERER_CHAT_MODEL_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value} className="bg-[#1a1b2e] text-text">
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {chatModel === 'gemini-3.1-pro-preview' && (
+                    <span className="text-[10px] font-medium text-amber-300/90 whitespace-nowrap">
+                      Can take 1-3 minutes
+                    </span>
+                  )}
+                </div>
               </div>
               <button onClick={() => setChatOpen(false)}
                 className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer">
@@ -3288,6 +3304,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               onSelectNode={(id) => {
                 setSelectedIds([id])
                 setShowErrorsPane(false)
+                setShowPropertiesPane(true)
               }}
               width={rightWidth}
               onClose={() => setShowErrorsPane(false)}
@@ -3440,7 +3457,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       .filter(p => {
                         // Screens should not have editable width/height in the props panel as they follow the canvas
                         if (selectedNode.type === 'Screen' && (p.key === 'Width' || p.key === 'Height')) return false;
-                        return p.propertyType === 'Input' || p.propertyType === 'Event' || p.propertyType === 'Output';
+                        return p.propertyType === 'Input' || p.propertyType === 'Event';
                       })
                       .map(prop => (
                         <PropField 

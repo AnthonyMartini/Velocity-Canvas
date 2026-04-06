@@ -1,6 +1,7 @@
 import React from 'react'
 import { parseFormula, evaluateAST } from './FormulaParser'
 import { ALL_ENUM_VALUES } from '../RendererPage/Functions'
+import { SCHEMAS } from '../RendererPage/constants'
 
 /**
  * Copies `text` to the clipboard.
@@ -294,8 +295,18 @@ export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars 
  */
 export function resolveProperties(comp, localVars, flatNodes, parentNode = null) {
   const resolved = { ...comp }
+  const schema = SCHEMAS?.[comp?.type]
+  const propertyDefs = schema?.groups
+    ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
+    : (schema?.properties || [])
+
   for (const key of Object.keys(comp)) {
     if (key === 'id' || key === 'type' || key === 'name' || key === 'children' || key.startsWith('On')) {
+      continue
+    }
+
+    const propDef = propertyDefs.find((property: any) => (property.key || property.name) === key)
+    if (propDef?.propertyType === 'Output') {
       continue
     }
 
@@ -437,6 +448,7 @@ export function getAllAppErrors(tree, localVars, schemas) {
       
       // Skip structural and computed internal props
       if (['id', 'type', 'name', 'children'].includes(propKey)) continue
+      if (propDef.propertyType === 'Output') continue
       
       const value = node[propKey]
       
