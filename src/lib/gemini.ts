@@ -47,9 +47,9 @@ function getClient(): GoogleGenAI {
 
 // ── Model Wrapper ────────────────────────────────────────────────────────────
 
-export const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
-export const TWEAK_MODEL_NAME = process.env.GEMINI_TWEAK_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
-export const RENDERER_CHAT_MODEL_NAME = process.env.GEMINI_RENDERER_CHAT_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+export const MODEL_NAME = "gemini-3-flash-preview";
+export const TWEAK_MODEL_NAME = "gemini-3.1-flash-lite-preview";
+export const RENDERER_CHAT_MODEL_NAME = "gemini-3-flash-preview";
 
 /**
  * Creates a thin wrapper around the new @google/genai SDK that matches
