@@ -19,7 +19,7 @@ function getVertexClient(): GoogleGenAI {
 
   if (cert.private_key) cert.private_key = cert.private_key.replace(/\\n/g, "\n");
 
-  const location = process.env.GCP_LOCATION || "us-central1";
+  const location = process.env.GCP_LOCATION || "global";
 
   console.log(`Vertex AI (Gen AI SDK) initializing with project: ${cert.project_id}, location: ${location}`);
 

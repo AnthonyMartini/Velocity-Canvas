@@ -105,9 +105,11 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
             <h2 className="text-2xl font-black text-white tracking-tight mb-1">
               {showAll ? 'All Projects' : 'Recent Projects'}
             </h2>
-            <p className="text-subtext text-xs uppercase tracking-widest font-bold opacity-60">
-              {showAll ? `${projects.length} Total` : 'Your last 3 items'}
-            </p>
+            {showAll && (
+              <p className="text-subtext text-xs uppercase tracking-widest font-bold opacity-60">
+                {projects.length} Total
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button
