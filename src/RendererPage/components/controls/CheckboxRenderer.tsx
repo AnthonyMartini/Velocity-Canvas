@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 
-export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
+export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const defaultEval = comp.Default
   const displayValue = defaultEval === true || defaultEval === 'true'
   const displayText = comp.Text
@@ -48,7 +48,7 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     boxSizing: 'border-box',
     padding: '4pt 8pt',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
+    zIndex: renderZIndex
   }
 
   // To simulate the PA checkbox closely we might need custom styling, 
@@ -96,6 +96,7 @@ CheckboxRenderer.propTypes = {
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
   navigate: PropTypes.func,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

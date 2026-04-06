@@ -19,6 +19,174 @@ import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
+const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
+const AI_REQUEST_SUMMARY_KEYS = new Set([
+  'id',
+  'type',
+  'name',
+  'X',
+  'Y',
+  'Width',
+  'Height',
+  'Text',
+  'Fill',
+  'Color',
+  'Size',
+  'Font',
+  'FontWeight',
+  'Align',
+  'VerticalAlign',
+  'DisplayMode',
+  'Visible',
+  'Icon',
+  'LayoutMode',
+])
+
+function compactNodeForAIRequest(node, { summaryOnly = false, childLimit = 0 } = {}) {
+  if (!node || typeof node !== 'object') return null
+
+  const out: any = {}
+
+  for (const [key, value] of Object.entries(node)) {
+    if (value == null || key.startsWith('_') || typeof value === 'function') continue
+
+    if (key === 'children') {
+      if (!Array.isArray(value) || value.length === 0 || childLimit <= 0) continue
+      out.children = value.slice(0, childLimit).map(child => compactNodeForAIRequest(child, { summaryOnly: true }))
+      out.childCount = value.length
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      if (summaryOnly || value.length === 0) continue
+      if (value.every(item => item == null || ['string', 'number', 'boolean'].includes(typeof item))) {
+        out[key] = value.slice(0, 12)
+      }
+      continue
+    }
+
+    if (typeof value === 'object') continue
+    if (summaryOnly && !AI_REQUEST_SUMMARY_KEYS.has(key)) continue
+
+    out[key] = value
+  }
+
+  return out
+}
+
+async function consumeAIResponse(res, options: any = {}) {
+  const { onStatus, onPatch, onReply } = options
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('text/event-stream')) {
+    return { mode: 'legacy' as const, data: await res.json() }
+  }
+
+  const reader = res.body?.getReader()
+  if (!reader) {
+    throw new Error('Streaming response not available')
+  }
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finalResult = null
+  let didStreamPatches = false
+  let didComplete = false
+  const streamed = {
+    reply: '',
+    added: 0,
+    mods: 0,
+    lastId: null,
+  }
+
+  const processEvent = (rawEvent) => {
+    if (!rawEvent.trim()) return
+
+    let eventName = 'message'
+    const dataLines = []
+
+    rawEvent.split(/\r?\n/).forEach(line => {
+      if (line.startsWith('event:')) eventName = line.slice(6).trim()
+      if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+    })
+
+    const rawPayload = dataLines.join('\n')
+    const payload = rawPayload ? JSON.parse(rawPayload) : null
+
+    if (eventName === 'status' && payload?.message) {
+      onStatus?.(payload.message)
+      return
+    }
+
+    if (eventName === 'error') {
+      throw new Error(payload?.error || 'AI request failed')
+    }
+
+    if (eventName === 'reply') {
+      streamed.reply = payload?.text || streamed.reply || 'Done!'
+      onReply?.(streamed.reply)
+      return
+    }
+
+    if (eventName === 'patch' && payload?.op) {
+      didStreamPatches = true
+      onPatch?.(payload)
+
+      if (payload.op === 'add') {
+        streamed.added += 1
+        streamed.lastId = payload?.component?.id || streamed.lastId
+      } else if (payload.op === 'update') {
+        streamed.mods += 1
+        streamed.lastId = payload?.id || streamed.lastId
+      } else if (payload.op === 'remove' || payload.op === 'reparent') {
+        streamed.mods += 1
+        streamed.lastId = payload?.id || streamed.lastId
+      }
+      return
+    }
+
+    if (eventName === 'done') {
+      didComplete = true
+      if (!streamed.reply && payload?.reply) streamed.reply = payload.reply
+      return
+    }
+
+    if (eventName === 'result') {
+      finalResult = payload
+    }
+  }
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary !== -1) {
+      const eventBlock = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+      processEvent(eventBlock)
+      boundary = buffer.indexOf('\n\n')
+    }
+  }
+
+  if (buffer.trim()) {
+    processEvent(buffer.trim())
+  }
+
+  if (finalResult == null) {
+    if (didStreamPatches || didComplete) {
+      return {
+        mode: 'stream' as const,
+        ...streamed,
+        reply: streamed.reply || 'Done!'
+      }
+    }
+    throw new Error('No AI result returned')
+  }
+
+  return { mode: 'legacy' as const, data: finalResult }
+}
 
 // ── Live-Validating Name Input ──────────────────────────────────────────────
 function NameInput({ initialValue, checkDuplicate, onCommit }) {
@@ -166,7 +334,7 @@ function RendererSwitch({ comp, sharedProps }) {
   return null
 }
 
-function AppLoadingOverlay({ isVisible, onCancel }) {
+function AppLoadingOverlay({ isVisible, onCancel, message }) {
   if (!isVisible) return null;
   return (
     <div className="fixed inset-0 z-[100001] flex items-center justify-center animate-in fade-in duration-300">
@@ -180,7 +348,7 @@ function AppLoadingOverlay({ isVisible, onCancel }) {
         </div>
         <div className="text-center">
           <h3 className="text-lg font-bold text-white mb-1">AI at work</h3>
-          <p className="text-sm text-subtext/60">Generating your layout changes...</p>
+          <p className="text-sm text-subtext/60">{message || DEFAULT_AI_LOADING_MESSAGE}</p>
         </div>
         <button 
           onClick={onCancel}
@@ -655,6 +823,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [isTweaking, setIsTweaking] = useState(false)
   const [tweakInput, setTweakInput] = useState('')
   const [tweakLoading, setTweakLoading] = useState(false)
+  const [aiLoadingMessage, setAiLoadingMessage] = useState(DEFAULT_AI_LOADING_MESSAGE)
 
   // Abort Controllers for AI
   const chatAbortControllerRef = useRef<AbortController | null>(null)
@@ -671,6 +840,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
     setChatLoading(false)
     setTweakLoading(false)
+    setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
   }, [])
   
   // Sidebar/Pane Resizing state
@@ -684,6 +854,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     items: [[...tree]],
     index: 0
   })
+  const treeRef = useRef(tree)
+  const activeScreenIdRef = useRef<string | null>(null)
 
   const [snapLines, setSnapLines] = useState([]) // Active grid lines [{x?, y?, orientation}]
 
@@ -913,6 +1085,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setCanvasHInput('768');
       setHistoryState({ items: [blankTree], index: 0 });
       setSelectedIds([]);
+      setActiveScreenId(blankTree[0]?.children?.[0]?.id || null);
       setCollapsedIds(new Set());
       setLocalVars({});
       setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768 }));
@@ -935,6 +1108,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       if (activeProject.canvasH) { setCanvasH(loadedH); setCanvasHInput(String(loadedH)); }
       setHistoryState({ items: [savedTree], index: 0 });
       setSelectedIds([]);
+      setActiveScreenId(savedTree[0]?.children?.[0]?.id || null);
       setCollapsedIds(new Set());
       setLastSavedState(JSON.stringify({ tree: savedTree, canvasW: loadedW, canvasH: loadedH }));
     }
@@ -1015,17 +1189,32 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     return screens[0]?.id || null
   })
 
-  useEffect(() => {
-    if (selectedIds.length === 0) return // Don't change screen on deselect
-    const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
-    const sId = selectedIds[0]
+  const getScreenIdForNode = useCallback((nodeId, sourceTree = tree) => {
+    if (!nodeId) return null
+    const screens = sourceTree[0]?.type === 'App' ? (sourceTree[0]?.children || []) : []
     for (const s of screens) {
-      if (s.id === sId || isDescendant(tree, sId, s.id)) {
-        setActiveScreenId(s.id)
-        return
+      if (s.id === nodeId || isDescendant(sourceTree, nodeId, s.id)) {
+        return s.id
       }
     }
-  }, [selectedIds, tree])
+    return null
+  }, [tree])
+
+  useEffect(() => {
+    if (selectedIds.length === 0) return // Don't change screen on deselect
+    const nextScreenId = getScreenIdForNode(selectedIds[0], tree)
+    if (nextScreenId) setActiveScreenId(nextScreenId)
+  }, [selectedIds, tree, getScreenIdForNode])
+
+  useEffect(() => {
+    const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
+    if (screens.length === 0) {
+      setActiveScreenId(null)
+      return
+    }
+    if (activeScreenId && screens.some(s => s.id === activeScreenId)) return
+    setActiveScreenId(getScreenIdForNode(selectedIds[0], tree) || screens[0]?.id || null)
+  }, [tree, activeScreenId, selectedIds, getScreenIdForNode])
 
   // Automatically switch from Variables pane back to Properties when a component is selected
   useEffect(() => {
@@ -1036,6 +1225,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   // Always re-derive the node from the tree so name/fill changes are reflected live
   const activeScreenNode = findNode(tree, activeScreenId)
+  useEffect(() => { treeRef.current = tree }, [tree])
+  useEffect(() => { activeScreenIdRef.current = activeScreenId }, [activeScreenId])
 
   // Sync canvas dimensions to all Screen nodes
   useEffect(() => {
@@ -1131,6 +1322,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       saveHistory(next)
       return next
     })
+    setActiveScreenId(comp.id)
     setSelectedIds([comp.id])
     // Un-collapse App node to show the new screen
     setCollapsedIds(prev => {
@@ -1159,6 +1351,53 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       return next
     })
   }, [saveHistory])
+
+  const applyRendererChatPatch = useCallback((patch) => {
+    if (!patch?.op) return
+
+    setTree(prev => {
+      let nextTree = prev
+
+      if (patch.op === 'remove' && patch.id) {
+        nextTree = removeNode(nextTree, patch.id)[0]
+      } else if (patch.op === 'reparent' && patch.id && patch.newParentId) {
+        nextTree = handleDropLogic(nextTree, patch.id, patch.newParentId)
+      } else if (patch.op === 'update' && patch.id && patch.changes) {
+        const changes = { ...patch.changes }
+        if (changes.name) {
+          const currentNames = flattenTree(nextTree).filter(n => n.id !== patch.id).map(n => n.name)
+          if (currentNames.includes(changes.name)) {
+            changes.name = getNextAvailableName(changes.name, currentNames)
+          }
+        }
+        nextTree = updateNode(nextTree, patch.id, () => changes)
+      } else if (patch.op === 'add' && patch.component) {
+        const allIds = new Set(flattenTree(nextTree).map(n => n.id))
+        const comp = createFromSpec(patch.component, allIds)
+        if (comp) {
+          if (comp.name) {
+            const currentNames = flattenTree(nextTree).map(n => n.name)
+            if (currentNames.includes(comp.name)) {
+              comp.name = getNextAvailableName(comp.name, currentNames)
+            }
+          }
+          const requestedParentId = patch.parentId || patch.component.parentId || null
+          const requestedParentNode = requestedParentId ? findNode(nextTree, requestedParentId) : null
+          const parentId =
+            !requestedParentId ||
+            requestedParentId === 'screen' ||
+            requestedParentId === 'root' ||
+            (requestedParentNode?.type === 'Screen' && requestedParentId !== activeScreenIdRef.current)
+              ? activeScreenIdRef.current
+              : requestedParentId
+          nextTree = insertNode(nextTree, comp, parentId)
+        }
+      }
+
+      treeRef.current = nextTree
+      return nextTree
+    })
+  }, [])
 
   // ── Snap Lines state ────────────────────────────────────────────────────────
 
@@ -1862,6 +2101,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     const selectedId = selectedIds[0]
     const currentNode = findNode(tree, selectedId)
     if (!currentNode) return
+    const parentNode = findParent(tree, selectedId)
+    const siblingNodes = ((parentNode?.children || activeScreenNode?.children || []) as any[])
+      .filter(node => node?.id !== selectedId)
+      .slice(0, 6)
     if (!tweakOriginalNode) {
       setTweakOriginalNode(JSON.parse(JSON.stringify(currentNode)))
     }
@@ -1871,6 +2114,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     tweakAbortControllerRef.current = new AbortController()
 
     setTweakLoading(true)
+    setAiLoadingMessage('Preparing component update...')
     try {
       const idToken = await user.getIdToken()
       const res = await fetch('/api/tweak-component', {
@@ -1881,7 +2125,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         },
         body: JSON.stringify({
           prompt: msg,
-          component: currentNode,
+          component_context: {
+            component: compactNodeForAIRequest(currentNode, { childLimit: 8 }),
+            parent: compactNodeForAIRequest(parentNode, { summaryOnly: true }),
+            siblings: siblingNodes.map(node => compactNodeForAIRequest(node, { summaryOnly: true })),
+          },
           canvas_width: canvasW,
           canvas_height: canvasH,
         }),
@@ -1894,7 +2142,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
       if (onCreditDeduction) onCreditDeduction()
 
-      const modifiedComponent = await res.json()
+      const modifiedComponentResponse = await consumeAIResponse(res, { onStatus: setAiLoadingMessage })
+      const modifiedComponent = modifiedComponentResponse?.mode === 'legacy'
+        ? modifiedComponentResponse.data
+        : modifiedComponentResponse
 
       // Update the tree with the new component immediately (Keep/Undo flow)
       if (modifiedComponent && modifiedComponent.id === selectedId) {
@@ -1912,9 +2163,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       alert(`Tweak failed: ${err.message}`)
     } finally {
       setTweakLoading(false)
+      setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
       tweakAbortControllerRef.current = null
     }
-  }, [tweakInput, selectedIds, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode, onCreditDeduction, user, saveHistory])
+  }, [tweakInput, selectedIds, tweakLoading, tree, canvasW, canvasH, tweakOriginalNode, onCreditDeduction, user, saveHistory, activeScreenNode])
 
   const confirmTweak = useCallback(() => {
     setTweakOriginalNode(null)
@@ -1977,11 +2229,13 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     chatAbortControllerRef.current = new AbortController()
 
     setChatLoading(true)
+    setAiLoadingMessage('Analyzing the current canvas...')
 
     const payload = {
       message: msg || "See attached image.",
       chat_history: chatMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
       canvas_components: activeScreenNode?.children || [],
+      active_screen_id: activeScreenNode?.id || activeScreenIdRef.current,
       canvas_width: canvasW,
       canvas_height: canvasH,
       prompt_method: 'Direct'
@@ -1995,6 +2249,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         payload.image_data = base64
       }
     }
+
+    const preStreamTree = JSON.parse(JSON.stringify(treeRef.current))
+    let streamMutatedTree = false
 
     try {
       const idToken = await user.getIdToken()
@@ -2013,96 +2270,113 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       }
       
       if (onCreditDeduction) onCreditDeduction()
-      const data = await res.json()
+      const response = await consumeAIResponse(res, {
+        onStatus: setAiLoadingMessage,
+        onPatch: (patch) => {
+          streamMutatedTree = true
+          applyRendererChatPatch(patch)
+        }
+      })
 
-      setChatLoading(false)
+      if (response.mode === 'legacy') {
+        const data = response.data
 
-      if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length || data.components_to_reparent?.length) {
-        setTree(prev => {
-          let nextTree = prev
-          // 1. Removals
-          if (data.components_to_remove?.length) {
-            data.components_to_remove.forEach(rId => {
-              const [t] = removeNode(nextTree, rId)
-              nextTree = t
-            })
-          }
-          // 2. Reparents (must run BEFORE updates so handleDropLogic's default X/Y can be overridden)
-          if (data.components_to_reparent?.length) {
-            data.components_to_reparent.forEach(r => {
-              if (r.id && r.newParentId) {
-                nextTree = handleDropLogic(nextTree, r.id, r.newParentId)
-              }
-            })
-          }
-          // 3. Updates
-          if (data.components_to_update?.length) {
-            data.components_to_update.forEach(u => {
-              if (u.id) {
-                const { id, ...changes } = u
-                // Prevent duplicate names
-                if (changes.name) {
-                  const currentNames = flattenTree(nextTree).filter(n => n.id !== id).map(n => n.name)
-                  if (currentNames.includes(changes.name)) {
-                    changes.name = getNextAvailableName(changes.name, currentNames)
-                  }
+        if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length || data.components_to_reparent?.length) {
+          setTree(prev => {
+            let nextTree = prev
+            if (data.components_to_remove?.length) {
+              data.components_to_remove.forEach(rId => {
+                const [t] = removeNode(nextTree, rId)
+                nextTree = t
+              })
+            }
+            if (data.components_to_reparent?.length) {
+              data.components_to_reparent.forEach(r => {
+                if (r.id && r.newParentId) {
+                  nextTree = handleDropLogic(nextTree, r.id, r.newParentId)
                 }
-                // prevent id changes
-                nextTree = updateNode(nextTree, id, () => changes)
-              }
-            })
-          }
-          // 4. Additions
-          if (data.components_to_add?.length) {
-            // Collect all current IDs to ensure uniqueness
-            const allIds = new Set(flattenTree(nextTree).map(n => n.id))
-            data.components_to_add.forEach(spec => {
-              const comp = createFromSpec(spec, allIds)
-              if (comp) {
-                // Prevent duplicate names in newly generated components
-                if (comp.name) {
-                  const currentNames = flattenTree(nextTree).map(n => n.name)
-                  if (currentNames.includes(comp.name)) {
-                    comp.name = getNextAvailableName(comp.name, currentNames)
+              })
+            }
+            if (data.components_to_update?.length) {
+              data.components_to_update.forEach(u => {
+                if (u.id) {
+                  const { id, ...changes } = u
+                  if (changes.name) {
+                    const currentNames = flattenTree(nextTree).filter(n => n.id !== id).map(n => n.name)
+                    if (currentNames.includes(changes.name)) {
+                      changes.name = getNextAvailableName(changes.name, currentNames)
+                    }
                   }
+                  nextTree = updateNode(nextTree, id, () => changes)
                 }
-                nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
-              }
-            })
-          }
+              })
+            }
+            if (data.components_to_add?.length) {
+              const allIds = new Set(flattenTree(nextTree).map(n => n.id))
+              data.components_to_add.forEach(spec => {
+                const comp = createFromSpec(spec, allIds)
+                if (comp) {
+                  if (comp.name) {
+                    const currentNames = flattenTree(nextTree).map(n => n.name)
+                    if (currentNames.includes(comp.name)) {
+                      comp.name = getNextAvailableName(comp.name, currentNames)
+                    }
+                  }
+                  nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
+                }
+              })
+            }
 
-          saveHistory(nextTree)
-          return nextTree
-        })
+            treeRef.current = nextTree
+            saveHistory(nextTree)
+            return nextTree
+          })
+        }
+
+        let lastId = null
+        if (data.components_to_add?.length) {
+          lastId = data.components_to_add[data.components_to_add.length - 1].id
+        } else if (data.components_to_update?.length) {
+          lastId = data.components_to_update[data.components_to_update.length - 1].id
+        }
+
+        if (lastId) setTimeout(() => setSelectedIds([lastId]), 10)
+
+        const addsCount = (data.components_to_add || []).length
+        const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length + (data.components_to_reparent || []).length
+
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.reply || 'Done!',
+          added: addsCount,
+          mods: modsCount,
+          usage: data.usage
+        }])
+      } else {
+        if (streamMutatedTree) {
+          saveHistory(treeRef.current)
+        }
+        if (response.lastId) setTimeout(() => setSelectedIds([response.lastId]), 10)
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response.reply || 'Done!',
+          added: response.added || 0,
+          mods: response.mods || 0
+        }])
       }
-
-      let lastId = null // Re-initialize lastId for setting selection
-      if (data.components_to_add?.length) {
-        lastId = data.components_to_add[data.components_to_add.length - 1].id
-      } else if (data.components_to_update?.length) {
-        lastId = data.components_to_update[data.components_to_update.length - 1].id
-      }
-
-      if (lastId) setTimeout(() => setSelectedIds([lastId]), 10)
-
-      const addsCount = (data.components_to_add || []).length
-      const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length + (data.components_to_reparent || []).length
-
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply || 'Done!',
-        added: addsCount,
-        mods: modsCount,
-        usage: data.usage
-      }])
     } catch (err) {
+      if (typeof streamMutatedTree !== 'undefined' && streamMutatedTree) {
+        treeRef.current = preStreamTree
+        setTree(preStreamTree)
+      }
       if (err.name === 'AbortError') return
       setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}`, added: 0 }])
     } finally {
       setChatLoading(false)
+      setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
       chatAbortControllerRef.current = null
     }
-  }, [chatInput, chatImage, chatLoading, tree, canvasW, canvasH, saveHistory, activeScreenNode])
+  }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch])
 
   // ── Shared child event handlers ─────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
@@ -2120,7 +2394,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
-      <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} />
+      <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />
 
       {/* Top Bar */}
       <div id="top-menu" className="flex items-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0">
@@ -2453,6 +2727,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       newSelectedIds = [id]
                     }
                     setSelectedIds(newSelectedIds)
+                    if (!e.shiftKey) {
+                      const nextScreenId = getScreenIdForNode(id)
+                      if (nextScreenId) setActiveScreenId(nextScreenId)
+                    }
                     setShowErrorsPane(false)
                   }}
                   onReorder={handleReorder}
@@ -2638,7 +2916,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
-                {(activeScreenNode?.children || []).map(rawComp => {
+                {(activeScreenNode?.children || []).map((rawComp, siblingIndex) => {
                   const isSelected = selectedIds.includes(rawComp.id)
                   const comp = resolveProperties(rawComp, localVars, fullFlatNodes, activeScreenNode)
                   const sharedProps = {
@@ -2647,10 +2925,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     flatNodes: fullFlatNodes,
                     updateProp,
                     parentNode: activeScreenNode,
+                    renderZIndex: siblingIndex + 1,
                     navigate: (targetNameOrId) => {
                       const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
                       const targetScreen = screens.find(s => s.id === targetNameOrId || s.name === targetNameOrId)
                       if (targetScreen) {
+                        setActiveScreenId(targetScreen.id)
                         setSelectedIds([targetScreen.id])
                       } else {
                         notify(`Screen not found: ${targetNameOrId}`)
@@ -2889,10 +3169,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               {chatLoading && (
                 <div className="flex gap-2 items-center">
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center text-[10px] font-bold text-white shrink-0">AI</div>
-                  <div className="bg-surface border border-overlay/40 rounded-xl px-3 py-2 flex items-center gap-1.5">
+                  <div className="bg-surface border border-overlay/40 rounded-xl px-3 py-2 flex items-center gap-2 max-w-[260px]">
                     <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="text-[11px] text-subtext/70 truncate">{aiLoadingMessage}</span>
                   </div>
                 </div>
               )}

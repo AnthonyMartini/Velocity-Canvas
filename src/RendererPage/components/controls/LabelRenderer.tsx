@@ -4,7 +4,7 @@ import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
 
-export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
+export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
     position: 'absolute',
     left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
@@ -29,7 +29,7 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    overflow: 'hidden', zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    overflow: 'hidden', zIndex: renderZIndex,
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
@@ -77,6 +77,7 @@ LabelRenderer.propTypes = {
   navigate: PropTypes.func,
   flatNodes: PropTypes.array,
   parentNode: PropTypes.object,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

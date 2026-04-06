@@ -3,7 +3,7 @@ import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 
-export default function DropdownRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick }) {
+export default function DropdownRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
     position: 'absolute',
     left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
@@ -21,7 +21,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    zIndex: renderZIndex,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
   let items = []
@@ -89,6 +89,7 @@ DropdownRenderer.propTypes = {
   notify: PropTypes.func,
   navigate: PropTypes.func,
   updateProp: PropTypes.func,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

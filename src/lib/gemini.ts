@@ -1,13 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
-import { SYSTEM_PROMPT, TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT } from "./prompts";
+import { TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT } from "./prompts";
 
 // ── Client Factories ─────────────────────────────────────────────────────────
-
-function getAIStudioClient(): GoogleGenAI {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("Missing GEMINI_API_KEY for AI Studio.");
-  return new GoogleGenAI({ apiKey: key });
-}
 
 function getVertexClient(): GoogleGenAI {
   const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -45,51 +39,61 @@ function getVertexClient(): GoogleGenAI {
 }
 
 function getClient(): GoogleGenAI {
-  return process.env.USE_VERTEX_AI === "true" ? getVertexClient() : getAIStudioClient();
+  if (!(globalThis as any).__velocityCanvasGeminiClient) {
+    (globalThis as any).__velocityCanvasGeminiClient = getVertexClient();
+  }
+  return (globalThis as any).__velocityCanvasGeminiClient;
 }
 
 // ── Model Wrapper ────────────────────────────────────────────────────────────
 
 export const MODEL_NAME = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+export const TWEAK_MODEL_NAME = process.env.GEMINI_TWEAK_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+export const RENDERER_CHAT_MODEL_NAME = process.env.GEMINI_RENDERER_CHAT_MODEL || process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
 
 /**
  * Creates a thin wrapper around the new @google/genai SDK that matches
  * the call signature used across the API routes.
  */
-function createModel(systemInstruction: string) {
+function createModel(systemInstruction: string, modelName: string = MODEL_NAME) {
+  function buildGenerateParams(content: any) {
+    let contents: any;
+    let config = { systemInstruction } as Record<string, any>;
+    let rest = {};
+
+    if (typeof content === "string") {
+      contents = [{ role: "user", parts: [{ text: content }] }];
+    } else if (content && Array.isArray(content.contents)) {
+      const { contents: c, generationConfig, ...remaining } = content;
+      contents = c;
+      config = {
+        systemInstruction,
+        ...(generationConfig || {}),
+      };
+      rest = remaining;
+    } else {
+      contents = content;
+    }
+
+    return {
+      model: modelName,
+      contents,
+      config,
+      ...rest,
+    };
+  }
+
   return {
     generateContent: async (content: any) => {
       const client = getClient();
-
-      // Normalise content to the SDK's Parts format
-      let contents: any;
-      if (typeof content === "string") {
-        contents = [{ role: "user", parts: [{ text: content }] }];
-      } else if (content && Array.isArray(content.contents)) {
-        // Already the full request shape from renderer-chat
-        // Pass through directly, extracting generationConfig as config
-        const { contents: c, generationConfig, ...rest } = content;
-        const response = await client.models.generateContent({
-          model: MODEL_NAME,
-          contents: c,
-          config: {
-            systemInstruction,
-            ...(generationConfig || {}),
-          },
-          ...rest,
-        });
-        return { response: wrapResponse(response) };
-      } else {
-        contents = content;
-      }
-
-      const response = await client.models.generateContent({
-        model: MODEL_NAME,
-        contents,
-        config: { systemInstruction },
-      });
+      const response = await client.models.generateContent(buildGenerateParams(content));
 
       return { response: wrapResponse(response) };
+    },
+    generateContentStream: async (content: any) => {
+      const client = getClient();
+      const stream = await client.models.generateContentStream(buildGenerateParams(content));
+      return wrapStream(stream);
     },
   };
 }
@@ -108,8 +112,14 @@ function wrapResponse(response: any) {
   };
 }
 
+async function* wrapStream(stream: AsyncGenerator<any>) {
+  for await (const chunk of stream) {
+    yield wrapResponse(chunk);
+  }
+}
+
 // ── Exported Models ──────────────────────────────────────────────────────────
 
-export const model = createModel(SYSTEM_PROMPT);
-export const tweakModel = createModel(TWEAK_SYSTEM_PROMPT);
-export const rendererChatModel = createModel(RENDERER_CHAT_SYSTEM_PROMPT);
+
+export const tweakModel = createModel(TWEAK_SYSTEM_PROMPT, TWEAK_MODEL_NAME);
+export const rendererChatModel = createModel(RENDERER_CHAT_SYSTEM_PROMPT, RENDERER_CHAT_MODEL_NAME);

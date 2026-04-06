@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 const PRICING: Record<string, { input: number; output: number; cachedInput: number }> = {
   "gemini-3.1-flash-lite-preview": { input: 0.25, output: 1.50, cachedInput: 0.03 },
   "gemini-3.1-pro-preview": { input: 2.00, output: 12.00, cachedInput: 0.20 },
+  "gemini-3-flash-preview": { input: 0.50, output: 3.00, cachedInput: 0.05 },
+  "gemini-3-pro-preview": { input: 2.00, output: 12.00, cachedInput: 0.20 },
 };
 
 interface AdminPageProps {

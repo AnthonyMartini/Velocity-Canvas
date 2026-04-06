@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '../RendererPage/Functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES } from '../RendererPage/Functions'
 
 /**
  * Parses a formula string into an Abstract Syntax Tree (AST).
@@ -19,7 +19,7 @@ export function parseFormula(formula, strict = false) {
   // Tokenizer
   const tokens = []
   // Updated regex to include # for hex colors and maybe some basic logical operators
-  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:])/g
+  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z0-9_]+)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:.]|(?:\r?\n)+)/g
   let match
   
   while ((match = regex.exec(text)) !== null) {
@@ -252,10 +252,22 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
   // Helper to resolve property path like "Label1.Text"
   const resolvePropertyPath = (path) => {
-    if (visited.has(path)) return handleError('#CYCLE!')
-    const nextVisited = new Set(visited).add(path)
+    // Helper to find the parent of a node in the flat list
+    const findParentNode = (nodeId: string) => {
+      return flatNodes.find(n => n.children?.some((c: any) => c.id === nodeId))
+    }
 
     const [compName, propName] = path.split('.')
+
+    // Cycle detection: Resolve relative keywords to absolute component names
+    // so that "Parent.Width" at different levels are tracked as distinct paths.
+    let absolutePath = path
+    if (compName.toLowerCase() === 'parent' && parentNode) absolutePath = `${parentNode.name}.${propName}`
+    else if (compName.toLowerCase() === 'self' && selfNode) absolutePath = `${selfNode.name}.${propName}`
+
+    if (visited.has(absolutePath)) return handleError('#CYCLE!')
+    const nextVisited = new Set(visited).add(absolutePath)
+
     let targetNode = null
     if (compName.toLowerCase() === 'parent') targetNode = parentNode
     else if (compName.toLowerCase() === 'self') targetNode = selfNode
@@ -270,6 +282,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     else if (compName === 'DropShadow') targetNode = DropShadow
     else if (compName === 'TextMode') targetNode = TextMode
     else if (compName === 'TextFormat') targetNode = TextFormat
+    else if (compName === 'Layout') targetNode = Layout
     else if (compName === 'ThisItem') {
       const item = localVars['ThisItem']
 
@@ -319,20 +332,41 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     else if (localVars[compName] !== undefined && typeof localVars[compName] === 'object' && !Array.isArray(localVars[compName])) targetNode = localVars[compName]
     else targetNode = flatNodes.find(n => n.name === compName)
 
+    if (!targetNode && ALL_ENUM_VALUES.has(path)) return path
 
-    if (targetNode && targetNode[propName] !== undefined) {
-      const rawVal = targetNode[propName]
-      
-      // If resolving from an enum, return literal value and don't re-evaluate
-      const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat].includes(targetNode)
-      if (isEnum) return rawVal
+    if (targetNode) {
+      let rawVal = targetNode[propName]
 
-      // If the property itself is a formula, parse and evaluate it
-      if (typeof rawVal === 'string') {
-          const subAst = parseFormula(rawVal, strict)
-          return evaluateAST(subAst, localVars, flatNodes, nextVisited, targetNode?.parent, targetNode, context, strict)
+      // Provide implicit fallbacks for Screen/App dimensions if not explicitly set
+      if (rawVal === undefined && (targetNode.type === 'Screen' || targetNode.type === 'App')) {
+        if (propName === 'Width') rawVal = 1366
+        else if (propName === 'Height') rawVal = 768
       }
-      return rawVal
+
+      // Special Gallery Template dimension logic
+      // In Power Apps, Parent.Height in a vertical gallery is the TemplateSize, not the Gallery Height.
+      if (targetNode.type === 'Gallery' && (propName === 'Width' || propName === 'Height')) {
+        const isVertical = targetNode.Variant ? targetNode.Variant.includes('Vertical') : true
+        if (isVertical && propName === 'Height') {
+          rawVal = targetNode.TemplateSize || 100
+        } else if (!isVertical && propName === 'Width') {
+          rawVal = targetNode.TemplateSize || 100
+        }
+      }
+
+      if (rawVal !== undefined) {
+        // If resolving from an enum, return literal value and don't re-evaluate
+        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat].includes(targetNode)
+        if (isEnum) return rawVal
+
+        // If the property itself is a formula, parse and evaluate it
+        if (typeof rawVal === 'string') {
+            const subAst = parseFormula(rawVal, strict)
+            const resolvedParent = findParentNode(targetNode.id)
+            return evaluateAST(subAst, localVars, flatNodes, nextVisited, resolvedParent, targetNode, context, strict)
+        }
+        return rawVal
+      }
     }
     
     // In non-strict mode, failing to resolve a property just returns the path as a string literal
@@ -392,23 +426,35 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     case 'RecordLiteral': {
       const record: Record<string, any> = {}
       for (const [key, fieldAst] of Object.entries(node.fields)) {
-        record[key] = evaluateAST(fieldAst, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        const val = evaluateAST(fieldAst, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (val instanceof Error) return val
+        record[key] = val
       }
       return record
     }
 
     case 'ArrayLiteral': {
-      return node.elements.map(el => evaluateAST(el, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
+      const elements = []
+      for (const el of node.elements) {
+        const val = evaluateAST(el, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (val instanceof Error) return val
+        elements.push(val)
+      }
+      return elements
     }
 
     case 'ActionSequence': {
-      evaluateAST(node.left, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      const left = evaluateAST(node.left, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      if (left instanceof Error) return left
       return evaluateAST(node.right, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
     }
 
     case 'BinaryExpression': {
       const left = evaluateAST(node.left, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      if (left instanceof Error) return left
       const right = evaluateAST(node.right, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      if (right instanceof Error) return right
+
 
       let res = null
       switch (node.operator) {
@@ -433,6 +479,8 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
     case 'UnaryExpression': {
       const arg = evaluateAST(node.argument, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      if (arg instanceof Error) return arg
+
       if (node.operator === '!') {
         return !arg
       }
@@ -462,21 +510,24 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       const evaluatedArgs = []
       for (let i = 0; i < node.arguments.length; i++) {
         const argData = node.arguments[i]
+        let val: any
         if (funcDef.name === 'Set' && i === 0) {
           if (argData.type === 'PropertyAccess') {
             return handleError(`"Set" cannot be used to update a component property. Please target a variable instead.`)
           }
           if (argData.type === 'VariableAccess') {
              // Pass the literal name of the variable instead of evaluating it
-             evaluatedArgs.push(argData.name)
+             val = argData.name
           } else {
              // If it's something else (like a literal or expression), evaluate it and hope for the best, 
              // though normally Set expects an identifier.
-             evaluatedArgs.push(evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
+             val = evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
           }
         } else {
-          evaluatedArgs.push(evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict))
+          val = evaluateAST(argData, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
         }
+        if (val instanceof Error) return val
+        evaluatedArgs.push(val)
       }
 
       // Invoke the function dynamically with unpacked args, passing the runtime context at the end

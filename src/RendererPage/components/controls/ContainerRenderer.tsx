@@ -16,7 +16,7 @@ import { resolveProperties } from '../../../common/helpers'
 export default function ContainerRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
   updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
-  onDropInto, dragOverId, setDragOverId 
+  onDropInto, dragOverId, setDragOverId, renderZIndex = 1
 }) {
   const shadowMap = {
     'DropShadow.None': 'none',
@@ -41,7 +41,7 @@ export default function ContainerRenderer({
     boxShadow: selected
       ? '0 0 0 3px rgba(0,120,212,0.25)'
       : (shadowMap[comp.DropShadow] || 'none'),
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    zIndex: renderZIndex,
   }
 
   if (dragOverId === comp.id) {
@@ -76,7 +76,7 @@ export default function ContainerRenderer({
       )}
 
       {/* Children */}
-      {(comp.children || []).map(rawChild => {
+      {(comp.children || []).map((rawChild, childIndex) => {
         const isChildSelected = selectedIds.includes(rawChild.id)
         const child = resolveProperties(rawChild, localVars, flatNodes, comp)
         const childProps = {
@@ -87,6 +87,7 @@ export default function ContainerRenderer({
           localVars, setLocalVars, flatNodes, notify, navigate,
           updateProp,
           parentNode: comp,
+          renderZIndex: childIndex + 1,
           onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
           onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
           onDropInto, dragOverId, setDragOverId,
@@ -156,4 +157,5 @@ ContainerRenderer.propTypes = {
   onDropInto: PropTypes.func,
   dragOverId: PropTypes.string,
   setDragOverId: PropTypes.func,
+  renderZIndex: PropTypes.number,
 }

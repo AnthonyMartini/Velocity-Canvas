@@ -1,8 +1,118 @@
 import { NextResponse } from "next/server";
-import { tweakModel, MODEL_NAME } from "@/lib/gemini";
+import { tweakModel, TWEAK_MODEL_NAME } from "@/lib/gemini";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+};
+
+const AI_SUMMARY_KEYS = new Set([
+  "id",
+  "type",
+  "name",
+  "X",
+  "Y",
+  "Width",
+  "Height",
+  "Text",
+  "Fill",
+  "Color",
+  "Size",
+  "Font",
+  "FontWeight",
+  "Align",
+  "VerticalAlign",
+  "DisplayMode",
+  "Visible",
+  "Icon",
+  "LayoutMode",
+]);
+
+function compactNodeForAI(node, { summaryOnly = false, childLimit = 0 } = {}) {
+  if (!node || typeof node !== "object") return null;
+
+  const out: any = {};
+
+  for (const [key, value] of Object.entries(node)) {
+    if (value == null || key.startsWith("_") || typeof value === "function") continue;
+
+    if (key === "children") {
+      if (!Array.isArray(value) || value.length === 0 || childLimit <= 0) continue;
+      out.children = value.slice(0, childLimit).map((child) => compactNodeForAI(child, { summaryOnly: true }));
+      out.childCount = value.length;
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      if (summaryOnly || value.length === 0) continue;
+      if (value.every((item) => item == null || ["string", "number", "boolean"].includes(typeof item))) {
+        out[key] = value.slice(0, 12);
+      }
+      continue;
+    }
+
+    if (typeof value === "object") continue;
+    if (summaryOnly && !AI_SUMMARY_KEYS.has(key)) continue;
+
+    out[key] = value;
+  }
+
+  return out;
+}
+
+function buildTweakPrompt({ canvasWidth, canvasHeight, component, parent, siblings, prompt }) {
+  const sections = [
+    `Canvas size: ${canvasWidth} x ${canvasHeight} px.`,
+    `Selected component:\n${JSON.stringify(component)}`,
+  ];
+
+  if (parent) {
+    sections.push(`Parent context:\n${JSON.stringify(parent)}`);
+  }
+
+  if (siblings?.length) {
+    sections.push(`Nearby sibling summaries:\n${JSON.stringify(siblings)}`);
+  }
+
+  sections.push(`User request: ${prompt.trim()}`);
+  return sections.join("\n\n");
+}
+
+function parseJsonFromText(rawText) {
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error("Invalid JSON from AI");
+  }
+
+  return JSON.parse(rawText.substring(start, end + 1).trim());
+}
+
+function convertSingleTickLiterals(value) {
+  const singleTickRe = /^'([\s\S]*)'$/;
+
+  if (typeof value === "string") {
+    const match = value.match(singleTickRe);
+    return match ? `"${match[1]}"` : value;
+  }
+
+  if (Array.isArray(value)) return value.map(convertSingleTickLiterals);
+
+  if (value !== null && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = convertSingleTickLiterals(v);
+    return out;
+  }
+
+  return value;
+}
+
 export async function POST(req) {
+  const requestStartedAt = Date.now();
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -11,79 +121,111 @@ export async function POST(req) {
 
     const idToken = authHeader.split("Bearer ")[1];
     const uid = await verifyIdToken(idToken);
-    
+
     if (!uid) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
     }
 
-    // Check and deduct credit
     const creditResult = await checkAndDeductCredit(uid, "Component Tweak");
     if (!creditResult.success) {
-      return NextResponse.json({ 
-        error: creditResult.error || "Insufficient credits", 
-        credits: creditResult.credits 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          error: creditResult.error || "Insufficient credits",
+          credits: creditResult.credits,
+        },
+        { status: 403 }
+      );
     }
 
-    const { prompt, component, canvas_width, canvas_height } = await req.json();
+    const { prompt, component, component_context, canvas_width, canvas_height } = await req.json();
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    const compJson = JSON.stringify(component, null, 2);
-    const ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
-    const fullPrompt = `${ctx}\nComponent to tweak:\n${compJson}\n\nUser request: ${prompt.trim()}`;
+    const selectedComponent = compactNodeForAI(component_context?.component || component, { childLimit: 8 });
+    const parentSummary = compactNodeForAI(component_context?.parent, { summaryOnly: true });
+    const siblingSummaries = Array.isArray(component_context?.siblings)
+      ? component_context.siblings
+          .map((sibling) => compactNodeForAI(sibling, { summaryOnly: true }))
+          .filter(Boolean)
+          .slice(0, 6)
+      : [];
 
-    const response = await tweakModel.generateContent(fullPrompt);
-    const usage = response.response.usageMetadata;
-    if (usage) {
-      logTokenUsage(
-        uid,
-        MODEL_NAME,
-        usage.promptTokenCount || 0,
-        usage.candidatesTokenCount || 0,
-        usage.cachedContentTokenCount || 0
-      ).catch(console.error);
-    }
-    const rawText = (response.response as any).text();
+    const fullPrompt = buildTweakPrompt({
+      canvasWidth: canvas_width,
+      canvasHeight: canvas_height,
+      component: selectedComponent,
+      parent: parentSummary,
+      siblings: siblingSummaries,
+      prompt,
+    });
 
-    // Robust JSON extraction
-    const start = rawText.indexOf("{");
-    const end = rawText.lastIndexOf("}");
-    
-    if (start === -1 || end === -1 || end < start) {
-      console.error("No valid JSON object found in tweak-component response.");
-      return NextResponse.json({ error: "Invalid JSON from AI", raw: rawText }, { status: 500 });
-    }
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+          const send = (event, payload) => {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+          };
 
-    const cleaned = rawText.substring(start, end + 1).trim();
+          let rawText = "";
+          let usage = null;
+          let firstChunkAt = null;
+          const modelStartedAt = Date.now();
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (parseError) {
-      console.error("Failed to parse JSON in tweak-component:", parseError);
-      return NextResponse.json({ error: "Parse error", raw: cleaned }, { status: 500 });
-    }
+          try {
+            send("status", { message: "Preparing component update..." });
+            const stream = await tweakModel.generateContentStream(fullPrompt);
+            send("status", { message: "Generating component changes..." });
 
-    // Convert single-tick string literals ('value') → "value" (PowerApps double-quote format).
-    const singleTickRe = /^'([\s\S]*)'$/;
-    function convertSingleTickLiterals(value: any): any {
-      if (typeof value === "string") {
-        const m = value.match(singleTickRe);
-        return m ? `"${m[1]}"` : value;
-      }
-      if (Array.isArray(value)) return value.map(convertSingleTickLiterals);
-      if (value !== null && typeof value === "object") {
-        const out: Record<string, any> = {};
-        for (const [k, v] of Object.entries(value)) out[k] = convertSingleTickLiterals(v);
-        return out;
-      }
-      return value;
-    }
+            for await (const chunk of stream) {
+              usage = chunk.usageMetadata || usage;
 
-    return NextResponse.json(convertSingleTickLiterals(parsed));
+              const text = (chunk as any).text?.() || "";
+              if (!text) continue;
+
+              if (!firstChunkAt) {
+                firstChunkAt = Date.now();
+                send("status", { message: "Finalizing component update..." });
+              }
+
+              rawText += text;
+              console.log(`[tweak-component] chunk: ${text}`);
+            }
+
+            if (usage) {
+              logTokenUsage(
+                uid,
+                TWEAK_MODEL_NAME,
+                usage.promptTokenCount || 0,
+                usage.candidatesTokenCount || 0,
+                usage.cachedContentTokenCount || 0
+              ).catch(console.error);
+            }
+
+            const parsed = parseJsonFromText(rawText);
+            const result = convertSingleTickLiterals(parsed);
+            const completedAt = Date.now();
+
+            console.log("[tweak-component] timings", {
+              totalMs: completedAt - requestStartedAt,
+              modelMs: completedAt - modelStartedAt,
+              timeToFirstChunkMs: firstChunkAt ? firstChunkAt - modelStartedAt : null,
+              promptChars: fullPrompt.length,
+            });
+
+            send("result", result);
+          } catch (error) {
+            console.error("Gemini API error:", error);
+            send("error", { error: error.message || "Tweak failed" });
+          } finally {
+            controller.close();
+          }
+        },
+      }),
+      { headers: SSE_HEADERS }
+    );
   } catch (error) {
     console.error("Gemini API error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

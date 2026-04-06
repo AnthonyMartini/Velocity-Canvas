@@ -29,7 +29,7 @@ function normaliseItems(raw: any): Record<string, any>[] {
 export default function GalleryRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
   updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
-  onDropInto, dragOverId, setDragOverId
+  onDropInto, dragOverId, setDragOverId, renderZIndex = 1
 }) {
   const style: any = {
     position: 'absolute',
@@ -43,7 +43,7 @@ export default function GalleryRenderer({
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(236, 72, 153, 0.25)' : 'none',
     transition: 'box-shadow 0.12s',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    zIndex: renderZIndex,
     overflow: 'hidden',
   }
 
@@ -58,7 +58,7 @@ export default function GalleryRenderer({
 
   // ── Helper: render children for one template row with given localVars ──────
   function renderChildren(rowLocalVars, isEditableRow) {
-    return (comp.children || []).map(rawChild => {
+    return (comp.children || []).map((rawChild, childIndex) => {
       // Resolve formula properties for this row
       const child = resolveProperties(rawChild, rowLocalVars, flatNodes, comp)
       const childProps: any = {
@@ -73,6 +73,7 @@ export default function GalleryRenderer({
         flatNodes,
         updateProp,
         parentNode: comp,
+        renderZIndex: childIndex + 1,
         onDropInto, dragOverId, setDragOverId,
       }
 
@@ -219,4 +220,5 @@ GalleryRenderer.propTypes = {
   onDropInto: PropTypes.func,
   dragOverId: PropTypes.string,
   setDragOverId: PropTypes.func,
+  renderZIndex: PropTypes.number,
 }

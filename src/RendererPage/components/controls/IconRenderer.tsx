@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { SCHEMAS } from '../../constants'
 
-export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick }) {
+export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const handleActionClick = (e) => {
     if (isPlaying && comp.OnSelect) {
       e.stopPropagation()
@@ -34,7 +34,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
+    zIndex: renderZIndex
   }
 
   return (
@@ -71,6 +71,7 @@ IconRenderer.propTypes = {
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
   navigate: PropTypes.func,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

@@ -72,6 +72,11 @@ export const TextFormat = {
     Number: "TextFormat.Number"
 }
 
+export const Layout = {
+    Vertical: "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0",
+    Horizontal: "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"
+}
+
 export const Icon = {
     Add: "Icon.Add",
     Cancel: "Icon.Cancel",
@@ -145,6 +150,7 @@ export const ALL_ENUM_VALUES = new Set([
     ...Object.values(DropShadow),
     ...Object.values(TextMode),
     ...Object.values(TextFormat),
+    ...Object.values(Layout),
     ...Object.values(Icon)
 ])
 

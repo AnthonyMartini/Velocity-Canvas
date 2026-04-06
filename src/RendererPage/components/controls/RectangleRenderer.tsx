@@ -3,7 +3,7 @@ import { CSS_BORDER_STYLE } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 
 export default function RectangleRenderer({ 
-  comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick 
+  comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1
 }) {
   const handleContainerClick = (e) => {
     if (onClick) onClick(e)
@@ -27,7 +27,7 @@ export default function RectangleRenderer({
     userSelect: 'none',
     boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
     boxSizing: 'border-box',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1)
+    zIndex: renderZIndex
   }
 
   return (
@@ -51,6 +51,7 @@ RectangleRenderer.propTypes = {
   selected: PropTypes.bool,
   isPlaying: PropTypes.bool,
   localVars: PropTypes.object,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }

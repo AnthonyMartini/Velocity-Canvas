@@ -2,7 +2,9 @@
   "type": "Screen",
   "control": "Screen",
   "defaults": {
-    "Fill": "RGBA(255, 255, 255, 1)"
+    "Fill": "RGBA(255, 255, 255, 1)",
+    "Width": 1366,
+    "Height": 768
   },
   "properties": [
     {

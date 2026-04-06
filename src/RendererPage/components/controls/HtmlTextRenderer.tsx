@@ -14,7 +14,8 @@ export default function HtmlTextRenderer({
   flatNodes,
   parentNode,
   onMouseDown, 
-  onClick 
+  onClick,
+  renderZIndex = 1
 }) {
   const contentRef = useRef(null)
 
@@ -71,7 +72,7 @@ export default function HtmlTextRenderer({
     outline: selected ? '2px solid #0078d4' : 'none',
     outlineOffset: selected ? '2px' : '0',
     boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
-    zIndex: selected ? 9999 : (comp.ZIndex ?? 1),
+    zIndex: renderZIndex,
   }
 
 
@@ -136,6 +137,7 @@ HtmlTextRenderer.propTypes = {
   localVars: PropTypes.object,
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
+  renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,
 }
