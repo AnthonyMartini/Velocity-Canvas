@@ -1,3 +1,5 @@
+import { themeTailwindColors } from './src/theme/theme.js'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -6,20 +8,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--vc-font-sans)', 'system-ui', 'sans-serif'],
       },
-      colors: {
-        base: '#1e1e2e',
-        surface: '#313244',
-        overlay: '#45475a',
-        accent: '#89b4fa',
-        'accent-dark': '#74c7ec',
-        text: '#cdd6f4',
-        subtext: '#a6adc8',
-        green: '#a6e3a1',
-        red: '#f38ba8',
-        yellow: '#f9e2af',
-      },
+      colors: themeTailwindColors,
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',

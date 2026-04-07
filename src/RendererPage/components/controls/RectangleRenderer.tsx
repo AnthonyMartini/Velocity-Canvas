@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { CSS_BORDER_STYLE } from './cssProps'
 import { executeAction } from '../../../common/helpers'
+import { getInsetSelectionStyles } from '@/theme/theme'
 
 export default function RectangleRenderer({ 
   comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1
@@ -25,7 +26,7 @@ export default function RectangleRenderer({
     opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
     cursor: isPlaying ? (comp.DisplayMode === 'DisplayMode.Disabled' ? 'default' : 'pointer') : 'move',
     userSelect: 'none',
-    boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
+    ...getInsetSelectionStyles(selected),
     boxSizing: 'border-box',
     zIndex: renderZIndex
   }

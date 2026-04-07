@@ -12,6 +12,7 @@ import ComboBoxRenderer from './ComboBoxRenderer'
 import ContainerRenderer from './ContainerRenderer'
 import { resolveProperties } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getDragOutlineStyles, getSelectionStyles, themeVars } from '@/theme/theme'
 
 // Normalise Items to an array of records.
 // Plain arrays → [{Value: item}]. Plain objects pass through as [record].
@@ -35,21 +36,18 @@ export default function GalleryRenderer({
     position: 'absolute',
     left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
-    border: '2px dashed rgba(236, 72, 153, 0.4)',
+    border: `2px dashed ${themeVars.colors.gallerySelectionSoft}`,
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',
-    outline: selected ? '2px solid #ec4899' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(236, 72, 153, 0.25)' : 'none',
+    ...getSelectionStyles(selected, 'gallery'),
     transition: 'box-shadow 0.12s',
     zIndex: renderZIndex,
     overflow: 'hidden',
   }
 
   if (dragOverId === comp.id) {
-    style.outline = '4px solid rgba(236,72,153,0.5)'
-    style.outlineOffset = '2px'
+    Object.assign(style, getDragOutlineStyles('gallery'))
   }
 
   const isVertical = comp.Variant ? comp.Variant.includes('Vertical') : comp.Height > comp.Width
@@ -174,12 +172,12 @@ export default function GalleryRenderer({
         if (dragOverId !== comp.id) setDragOverId(comp.id)
       }}
     >
-      <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: '#ec4899', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}>
+      <div style={{ position: 'absolute', top: 4, left: 6, fontSize: 10, color: themeVars.colors.gallerySelection, fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}>
         Gallery Template
       </div>
 
       {/* Active (editable) template row */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? `1px dashed ${themeVars.colors.gallerySelectionSoft}` : 'none', borderRight: !isVertical ? `1px dashed ${themeVars.colors.gallerySelectionSoft}` : 'none' }}>
         {renderChildren(rows.length > 0 ? { ...localVars, ThisItem: rows[0] } : localVars, true)}
       </div>
 
@@ -188,7 +186,7 @@ export default function GalleryRenderer({
         const offset = (gi + 1) * (tSize + padding)
         const ghostRowVars = rows.length > gi + 1 ? { ...localVars, ThisItem: rows[gi + 1] } : localVars
         return (
-          <div key={gi} style={{ position: 'absolute', top: isVertical ? `${offset}pt` : 0, left: isVertical ? 0 : `${offset}pt`, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', borderRight: !isVertical ? '1px dashed rgba(236, 72, 153, 0.2)' : 'none', opacity: 0.3, pointerEvents: 'none' }}>
+          <div key={gi} style={{ position: 'absolute', top: isVertical ? `${offset}pt` : 0, left: isVertical ? 0 : `${offset}pt`, width: isVertical ? '100%' : `${tSize}pt`, height: isVertical ? `${tSize}pt` : '100%', overflow: 'hidden', borderBottom: isVertical ? `1px dashed ${themeVars.colors.gallerySelectionSoft}` : 'none', borderRight: !isVertical ? `1px dashed ${themeVars.colors.gallerySelectionSoft}` : 'none', opacity: 0.3, pointerEvents: 'none' }}>
             {renderChildren(ghostRowVars, false)}
           </div>
         )

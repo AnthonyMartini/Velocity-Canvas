@@ -3,6 +3,7 @@ import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
+import { getSelectionStyles, themeVars } from '@/theme/theme'
 
 function normalizeTextInputValue(value) {
   if (value === undefined || value === null) return ''
@@ -26,9 +27,7 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
     display: 'flex', alignItems: 'center',
     paddingLeft: '8pt', paddingRight: '8pt',
     boxSizing: 'border-box' as const,
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     zIndex: renderZIndex,
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',
@@ -66,10 +65,10 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
   }
 
   return (
-    <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
+      <div style={style} onMouseDown={onMouseDown} onClick={onClick}>
       {hasDisplayValue
         ? <span>{displayValue}</span>
-        : <span style={{ color: '#aaa', fontStyle: 'italic' }}>{displayHint}</span>
+        : <span style={{ color: themeVars.colors.placeholder, fontStyle: 'italic' }}>{displayHint}</span>
       }
     </div>
   )

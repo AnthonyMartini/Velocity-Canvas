@@ -2,6 +2,8 @@ import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getSelectionStyles } from '@/theme/theme'
+import { sanitizeHtmlFragment } from '@/lib/content-sanitizer'
 
 export default function HtmlTextRenderer({ 
   comp, 
@@ -19,7 +21,7 @@ export default function HtmlTextRenderer({
 }) {
   const contentRef = useRef(null)
 
-  const rawHtml = comp.HtmlText || ''
+  const rawHtml = sanitizeHtmlFragment(comp.HtmlText || '')
 
   const isInteractive = isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' && comp.OnSelect
 
@@ -69,9 +71,7 @@ export default function HtmlTextRenderer({
     overflow: 'hidden',
     boxSizing: 'border-box',
     fontFamily: comp.Font || 'inherit',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     zIndex: renderZIndex,
   }
 

@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { SCHEMAS } from '../../constants'
+import { getInsetSelectionStyles, themeVars } from '@/theme/theme'
+import { sanitizeSvgFragment } from '@/lib/content-sanitizer'
 
 export default function IconRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const handleActionClick = (e) => {
@@ -17,7 +19,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
   const iconSchema = SCHEMAS.Icon as any;
   const iconProp = iconSchema.properties.find((p: any) => p.key === 'Icon') as any;
   const schemaOptionVal = iconProp?.options?.find((o: any) => o?.value === comp.Icon);
-  const resolvedSvg = schemaOptionVal ? schemaOptionVal.svg : (comp._svg || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>`);
+  const resolvedSvg = sanitizeSvgFragment(schemaOptionVal ? schemaOptionVal.svg : (comp._svg || `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/></svg>`));
 
   const containerStyle: any = {
     position: 'absolute',
@@ -26,11 +28,11 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
     width: `${comp.Width}pt`,
     height: `${comp.Height}pt`,
     backgroundColor: comp.Fill || 'transparent',
-    color: comp.Color || '#0078d4',
+    color: comp.Color || themeVars.colors.selection,
     opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
     cursor: isPlaying && comp.OnSelect && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : 'default',
     pointerEvents: (comp.DisplayMode === 'DisplayMode.Disabled' && isPlaying) ? 'none' : 'auto',
-    boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
+    ...getInsetSelectionStyles(selected),
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

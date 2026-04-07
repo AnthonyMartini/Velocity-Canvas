@@ -22,6 +22,7 @@ import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
+import { appTheme, themeVars } from '@/theme/theme'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
 const RENDERER_CHAT_MODEL_OPTIONS = [
@@ -249,10 +250,10 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
 // ── Errors Pane ───────────────────────────────────────────────────────────────
 function ErrorsPane({ errors, onSelectNode, width, onClose }) {
   return (
-    <div style={{ width }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
+    <div style={{ width, backgroundColor: themeVars.colors.panel }} className="shrink-0 border-l border-overlay/30 flex flex-col overflow-hidden relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-overlay/20 bg-surface/30 shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="absolute right-5 z-10 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-red-400" />
           <span className="text-xs font-semibold text-text">Validation Errors</span>
           <span className="text-[10px] text-white bg-red/80 px-1.5 py-0.5 rounded-full">{errors.length}</span>
@@ -347,8 +348,8 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
   if (!isVisible) return null;
   return (
     <div className="fixed inset-0 z-[100001] flex items-center justify-center animate-in fade-in duration-300">
-      <div className="absolute inset-0 bg-[#0a0a16]/40 backdrop-blur-[1px]" />
-      <div className="relative bg-[#1a1b2e] border border-violet-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4">
+      <div className="absolute inset-0 backdrop-blur-[1px]" style={{ backgroundColor: themeVars.colors.panelScrim }} />
+      <div className="relative border border-violet-500/30 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full mx-4" style={{ backgroundColor: themeVars.colors.panel }}>
         <div className="relative">
           <div className="w-16 h-16 rounded-full border-4 border-violet-500/20 border-t-violet-500 animate-spin" />
           <div className="absolute inset-0 pointer-events-none text-transparent">
@@ -378,12 +379,12 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
   )
 }
 
-function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, confirmTweak, undoTweak, handleReorder }) {
+function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, confirmTweak, undoTweak, handleReorder, deleteSelected }) {
   if (!node) return null;
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2 pointer-events-none">
-      <div className="pointer-events-auto bg-[#1a1b2e]/80 backdrop-blur-xl border border-overlay/40 rounded-2xl shadow-2xl p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
+      <div className="pointer-events-auto backdrop-blur-xl border border-overlay/40 rounded-2xl shadow-2xl p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-500" style={{ backgroundColor: 'color-mix(in srgb, var(--vc-color-panel) 80%, transparent)' }}>
         {/* Layer Actions */}
         <div className="flex items-center gap-0.5 bg-overlay/10 rounded-xl p-0.5 border border-overlay/20">
           <button onClick={() => handleReorder(node.id, 'back')} title="Send to Back" className="w-7 h-7 flex items-center justify-center text-subtext/60 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors cursor-pointer">
@@ -401,6 +402,16 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
         </div>
         <div className="w-px h-6 bg-overlay/20 mx-1" />
 
+        <button
+          onClick={deleteSelected}
+          title="Delete selected component"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-300 transition-all hover:bg-red-500/20 hover:text-red-200 cursor-pointer"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
+          </svg>
+        </button>
+
         <button 
           onClick={() => setIsTweaking(!isTweaking)}
           className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
@@ -415,7 +426,7 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
       </div>
 
       {isTweaking && (
-        <div className="pointer-events-auto w-[320px] bg-[#1a1b2e]/90 backdrop-blur-2xl border border-violet-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        <div className="pointer-events-auto w-[320px] backdrop-blur-2xl border border-violet-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300" style={{ backgroundColor: 'color-mix(in srgb, var(--vc-color-panel) 90%, transparent)' }}>
           <div className="p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">AI Styling Tweak - 1 credit</span>
@@ -497,7 +508,7 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
     : null
 
   return (
-    <div style={{ width }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
+    <div style={{ width, backgroundColor: themeVars.colors.panel }} className="shrink-0 border-l border-overlay/30 flex flex-col overflow-hidden relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-overlay/20 bg-surface/30 shrink-0">
         <div className="flex items-center gap-2">
@@ -655,7 +666,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
   // Backdrop common style
   const backdropBase = {
     position: 'fixed',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: themeVars.colors.panelScrim,
     zIndex: 99998,
     transition: 'all 0.3s ease-in-out'
   } as any
@@ -667,13 +678,13 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: '320px',
-    backgroundColor: '#1a1b2e',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    backgroundColor: themeVars.colors.panel,
+    border: `1px solid ${appTheme.editor.tour.popupBorder}`,
     borderRadius: '20px',
     padding: '24px',
-    color: 'white',
+    color: themeVars.colors.white,
     zIndex: 100001,
-    boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
+    boxShadow: themeVars.shadows.floatingPanel,
     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
   } as any
 
@@ -708,12 +719,12 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
         left: r.left, 
         width: r.width, 
         height: r.height, 
-        border: '2px solid white', 
+        border: `2px solid ${appTheme.colors.white}`, 
         borderRadius: '12px', 
         zIndex: 99999, 
         pointerEvents: 'none',
         transition: 'all 0.3s ease-in-out',
-        boxShadow: '0 0 20px rgba(255, 255, 255, 0.3)'
+        boxShadow: themeVars.shadows.spotlight
       } as any} />
       
       <div style={{ ...popupStyle, pointerEvents: 'auto' }}>
@@ -778,7 +789,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           id: 'screen_1',
           type: 'Screen',
           name: 'Screen1',
-          Fill: 'RGBA(255, 255, 255, 1)',
+          Fill: appTheme.controlDefaults.Screen.Fill,
           children: []
         }
       ]
@@ -1068,7 +1079,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         id: 'app_root',
         type: 'App',
         name: projectName,
-        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
+        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: appTheme.controlDefaults.Screen.Fill, children: [] }]
       }];
       setTree(blankTree);
       setCanvasW(1366);
@@ -1091,7 +1102,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         id: 'app_root',
         type: 'App',
         name: activeProject.name || 'App',
-        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: 'RGBA(255, 255, 255, 1)', children: [] }]
+        children: [{ id: 'screen_1', type: 'Screen', name: 'Screen1', Fill: appTheme.controlDefaults.Screen.Fill, children: [] }]
       }];
       setTree(savedTree);
       const loadedW = activeProject.canvasW || 1366;
@@ -1106,7 +1117,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [activeProject]);
 
-  const handleSaveProject = async () => {
+  const saveProjectToCloud = useCallback(async ({ showSuccessToast = true } = {}) => {
     try {
       setIsSaving(true);
       const payload = {
@@ -1127,23 +1138,64 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       
       if (!res.ok) throw new Error(data.error || 'Failed to save');
       
-      notify('Project saved to cloud!', 'Success');
+      if (showSuccessToast) {
+        notify('Project saved to cloud!', 'Success');
+      }
       setLastSavedState(JSON.stringify({ tree, canvasW, canvasH }));
       
       // Update activeProject with the new ID so future queries act as 'updates'
       if (activeProject === 'new' || !activeProject?.id) {
         setActiveProject({ ...payload, id: data.projectId });
       }
+
+      return true;
     } catch (err: any) {
       notify(err.message, 'Error');
+      return false;
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [activeProject, tree, canvasW, canvasH, user, notify, setActiveProject]);
+
+  const handleSaveProject = useCallback(async () => {
+    await saveProjectToCloud({ showSuccessToast: true });
+  }, [saveProjectToCloud]);
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify({ tree, canvasW, canvasH }) !== lastSavedState;
   }, [tree, canvasW, canvasH, lastSavedState]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  const handleExitProject = useCallback(async () => {
+    if (!hasUnsavedChanges) {
+      setActiveProject(null)
+      return
+    }
+
+    const shouldSave = window.confirm('You have unsaved changes. Click OK to save before leaving, or Cancel to choose whether to discard them.')
+    if (shouldSave) {
+      const didSave = await saveProjectToCloud({ showSuccessToast: true })
+      if (didSave) {
+        setActiveProject(null)
+      }
+      return
+    }
+
+    const shouldDiscard = window.confirm('Discard unsaved changes and leave this project?')
+    if (shouldDiscard) {
+      setActiveProject(null)
+    }
+  }, [hasUnsavedChanges, saveProjectToCloud, setActiveProject]);
 
   // Auto-scroll to center of padded canvas on initial load
   const [initialScrollDone, setInitialScrollDone] = useState(false)
@@ -1304,7 +1356,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       id: uid(),
       type: 'Screen',
       name: nextName('Screen'),
-      Fill: 'RGBA(255, 255, 255, 1)',
+      Fill: appTheme.controlDefaults.Screen.Fill,
       children: []
     }
     
@@ -2190,11 +2242,19 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   }, [selectedIds, tweakOriginalNode, confirmTweak])
 
   // ── Image compression helper ─────────────────────────────────────────────
+  const MAX_RENDERER_CHAT_REQUEST_BYTES = 900 * 1024
+  const MAX_CHAT_IMAGE_BYTES = 450 * 1024
+
+  const estimateBase64Bytes = (base64) => {
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+    return Math.max(0, Math.floor((base64.length * 3) / 4) - padding)
+  }
+
   const compressImageDataUrl = (dataUrl, callback) => {
     const img = new Image()
     img.onload = () => {
       let { width, height } = img
-      const maxDim = 1024
+      const maxDim = 768
       if (width > maxDim || height > maxDim) {
         if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim }
         else { width = Math.round(width * (maxDim / height)); height = maxDim }
@@ -2202,8 +2262,19 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       const canvas = document.createElement('canvas')
       canvas.width = width; canvas.height = height
       canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-      callback(canvas.toDataURL('image/jpeg', 0.8))
+      const qualitySteps = [0.72, 0.6, 0.5, 0.4]
+      let finalDataUrl = canvas.toDataURL('image/jpeg', qualitySteps[0])
+
+      for (const quality of qualitySteps) {
+        const candidate = canvas.toDataURL('image/jpeg', quality)
+        finalDataUrl = candidate
+        const [, base64 = ''] = candidate.split(',')
+        if (estimateBase64Bytes(base64) <= MAX_CHAT_IMAGE_BYTES) break
+      }
+
+      callback(finalDataUrl)
     }
+    img.onerror = () => callback(null)
     img.src = dataUrl
   }
 
@@ -2238,10 +2309,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     if (imagePayload) {
       const [header, base64] = imagePayload.split(',')
       const mimeMatch = header.match(/:(.*?);/)
-      if (mimeMatch) {
+      if (mimeMatch && base64) {
         payload.image_mime_type = mimeMatch[1]
         payload.image_data = base64
       }
+    }
+
+    const requestBody = JSON.stringify(payload)
+    const requestBytes = new TextEncoder().encode(requestBody).length
+    if (requestBytes > MAX_RENDERER_CHAT_REQUEST_BYTES) {
+      throw new Error('The attached screenshot makes the request too large. Try cropping or using a smaller screenshot.')
     }
 
     const preStreamTree = JSON.parse(JSON.stringify(treeRef.current))
@@ -2255,7 +2332,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`
         },
-        body: JSON.stringify(payload),
+        body: requestBody,
         signal: chatAbortControllerRef.current.signal
       })
       if (!res.ok) { 
@@ -2392,7 +2469,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />
 
       {/* Top Bar */}
-      <div id="top-menu" className="flex items-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0">
+      <div id="top-menu" className="relative flex items-center justify-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0 min-h-[58px]">
+        <div className="absolute left-5 z-10 flex items-center gap-4">
         {/* Editable Project Name */}
         <input
           type="text"
@@ -2422,15 +2500,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           <div className="w-1.5 h-1.5 rounded-full bg-overlay" />
           <span className="text-xs text-subtext/50">{totalCount} component{totalCount !== 1 ? 's' : ''}</span>
         </div>
+        </div>
         {/* Toolbar Right */}
-        <div className="flex items-center ml-auto">
+        <div className="flex items-center">
           {/* Cloud Save & Exit Buttons */}
 
           
           <button
-            onClick={() => setActiveProject(null)}
+            onClick={handleExitProject}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-2 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text"
-            title="Exit Project without saving"
+            title="Exit Project"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v.5"/></svg>
             Exit
@@ -2549,18 +2628,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             Variables
           </button>
 
-          <button id="chat-panel-trigger" onClick={() => setChatOpen(o => !o)}
-            className={`flex items-center gap-2 px-5 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 transform active:scale-95 cursor-pointer mr-3
-              ${chatOpen 
-                ? 'bg-gradient-to-r from-violet-900 to-indigo-900 border border-violet-500/50 text-white scale-105 shadow-[0_0_25px_rgba(139,92,246,0.5)]' 
-                : 'bg-gradient-to-r from-violet-800 to-indigo-800 border border-violet-500/30 text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-[1.02]'}`}>
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-              <path fillRule="evenodd" d="M4.848 2.771A49.144 49.144 0 0 1 12 2.25c2.43 0 4.817.178 7.152.52 1.978.292 3.348 2.024 3.348 3.97v6.02c0 1.946-1.37 3.678-3.348 3.97a48.901 48.901 0 0 1-3.476.383.39.39 0 0 0-.297.17l-2.755 4.133a.75.75 0 0 1-1.248 0l-2.755-4.133a.39.39 0 0 0-.297-.17 48.9 48.9 0 0 1-3.476-.384c-1.978-.29-3.348-2.024-3.348-3.97V6.741c0-1.946 1.37-3.68 3.348-3.97Z" clipRule="evenodd" />
-            </svg>
-            Ask AI
-            {chatLoading && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-          </button>
-
           {/* Undo / Redo Buttons */}
           <div className="flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-lg p-0.5 divide-x divide-overlay/40 mr-4">
             <button
@@ -2587,15 +2654,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             </button>
           </div>
 
-          <div className="h-4 w-px bg-overlay/30 mr-2" />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="absolute right-5 z-10 flex items-center gap-2">
           <button 
             onClick={() => {
               setCurrentTourStep(0)
               setIsTourActive(true)
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all mr-2 cursor-pointer shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all cursor-pointer shadow-sm"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10" />
@@ -2603,45 +2669,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
             Tutorial
-          </button>
-
-          {selectedIds.length > 0 && (
-            <button onClick={deleteSelected}
-              className="flex items-center gap-1.5 text-xs text-red/70 hover:text-red border border-red/20 hover:border-red/40 hover:bg-red/5 px-3 py-1.5 rounded-lg transition-all duration-150 cursor-pointer">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clipRule="evenodd" />
-              </svg>
-              Delete
-            </button>
-          )}
-          <button
-            onClick={() => {
-              const defaultTree = [
-                {
-                  id: 'app_root',
-                  type: 'App',
-                  name: 'App',
-                  children: [
-                    {
-                      id: 'screen_1',
-                      type: 'Screen',
-                      name: 'Screen1',
-                      Fill: 'RGBA(255, 255, 255, 1)',
-                      children: []
-                    }
-                  ]
-                }
-              ]
-              setTree(defaultTree)
-              setHistoryState({
-                items: [defaultTree],
-                index: 0
-              })
-              setSelectedIds([])
-            }}
-            className="px-3 py-1.5 rounded-lg bg-surface/50 border border-overlay/40 text-subtext/70 text-xs font-medium hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all ml-4"
-          >
-            Clear All
           </button>
         </div>
       </div>
@@ -2749,7 +2776,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           </div>
         </div>
       </div>    {/* Center: Canvas + Chat */}
-      <div className="flex-1 bg-[#1e1e2e] relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden" style={{ backgroundColor: themeVars.colors.canvasWorkspace }}>
           {/* Notification Toast centered inside Canvas Workspace */}
           {notification && (() => {
             const type = notification.type || 'Information'
@@ -2794,19 +2821,20 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               }
             }
-            const s = styles[type?.replace('NotificationType.', '')] || styles.Information
+            const normalizedType = type?.replace('NotificationType.', '')
+            const s = styles[normalizedType] || styles.Information
             return (
               <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[100000] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
                 <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
                   <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
-                    {type === 'NotificationType.Success' ? (
+                    {normalizedType === 'Success' ? (
                       <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     ) : s.icon}
                   </div>
                   <div className="flex-1 pr-4">
-                    <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{type?.replace('NotificationType.', '')}</p>
+                    <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{normalizedType}</p>
                     <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-black/5">
@@ -2831,13 +2859,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               confirmTweak={confirmTweak}
               undoTweak={undoTweak}
               handleReorder={handleReorder}
+              deleteSelected={deleteSelected}
             />
           )}
 
           <div
             id="canvas-scroll-wrapper"
-            className="absolute inset-0 overflow-auto bg-[#f0f0f0]"
-            style={{ backgroundImage: 'radial-gradient(circle, #bbb 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+            className="absolute inset-0 overflow-auto"
+            style={{ backgroundColor: themeVars.colors.canvasSurface, backgroundImage: themeVars.gradients.canvasGrid, backgroundSize: '20px 20px' }}
             onContextMenu={(e) => {
               // Prevent browser context menu so we can right-click pan smoothly
               e.preventDefault()
@@ -2894,7 +2923,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               )}
               <div
                 className="relative shrink-0"
-                style={{ width: `${canvasW}pt`, height: `${canvasH}pt`, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.05)' }}
+                style={{ width: `${canvasW}pt`, height: `${canvasH}pt`, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: themeVars.shadows.canvas }}
                 data-container-id={activeScreenNode?.id || 'root'}
                 id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
@@ -2978,10 +3007,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         top: line.orientation === 'horizontal' ? `${absY}pt` : 0,
                         width: line.orientation === 'vertical' ? 1 : '100%',
                         height: line.orientation === 'horizontal' ? 1 : '100%',
-                        backgroundColor: '#0078d4',
+                        backgroundColor: themeVars.colors.selection,
                         zIndex: 10001,
                         pointerEvents: 'none',
-                        boxShadow: '0 0 4px rgba(0, 120, 212, 0.4)'
+                        boxShadow: themeVars.shadows.dragGuide
                       }}
                     />
                   )
@@ -2998,8 +3027,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       style={{
                         position: 'absolute',
                         left: `${left}pt`, top: `${top}pt`, width: `${width}pt`, height: `${height}pt`,
-                        border: '1px solid #0078d4',
-                        backgroundColor: 'rgba(0, 120, 212, 0.1)',
+                        border: `1px solid ${themeVars.colors.selection}`,
+                        backgroundColor: themeVars.colors.selectionSoft,
                         zIndex: 10000,
                         pointerEvents: 'none'
                       }}
@@ -3030,8 +3059,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         top: `${minY - 4}pt`,
                         width: `${(maxX - minX) + 8}pt`,
                         height: `${(maxY - minY) + 8}pt`,
-                        border: '1.5pt solid #0078d4',
-                        backgroundColor: 'rgba(0, 120, 212, 0.05)',
+                        border: `1.5pt solid ${themeVars.colors.selection}`,
+                        backgroundColor: themeVars.colors.selectionSoft,
                         borderRadius: '4pt',
                         zIndex: 9998,
                         pointerEvents: 'none'
@@ -3101,8 +3130,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     <div
                       key={dir}
                       data-resize-handle="true"
-                      style={{ ...style, position: 'absolute', width: 10, height: 10, zIndex: 9999 }}
-                      className="rounded-sm bg-white border-2 border-[#0078d4] shadow-sm hover:bg-blue-100 transition-colors"
+                      style={{
+                        ...style,
+                        position: 'absolute',
+                        width: 10,
+                        height: 10,
+                        zIndex: 9999,
+                        backgroundColor: appTheme.colors.white,
+                        border: `1px solid ${appTheme.editor.selection.color}`,
+                      }}
+                      className="rounded-sm shadow-sm transition-colors"
                       onMouseDown={e => handleResizeMouseDown(e, comp.id, dir)}
                     />
                   ))
@@ -3132,9 +3169,27 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               </button>
             </div>
 
+          {!chatOpen && (
+            <button
+              id="chat-panel-trigger"
+              onClick={() => setChatOpen(true)}
+              className="absolute bottom-6 left-1/2 z-40 flex min-w-[300px] -translate-x-1/2 items-center justify-center gap-4 rounded-full px-12 py-4 text-[19px] font-extrabold tracking-[0.01em] text-white transition-all duration-300 hover:scale-[1.03]"
+              style={{
+                backgroundImage: themeVars.gradients.askAi,
+                boxShadow: `0 16px 40px ${appTheme.editor.askAi.glow}, inset 0 2px 0 ${appTheme.editor.askAi.insetHighlight}, inset 0 -2px 0 ${appTheme.editor.askAi.insetShadow}`,
+              }}
+            >
+              <svg className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="currentColor" style={{ filter: `drop-shadow(0 3px 8px ${appTheme.editor.askAi.iconGlow})` }}>
+                <path d="M5.75 4.5A2.75 2.75 0 0 0 3 7.25v6A2.75 2.75 0 0 0 5.75 16H7v3.2c0 .64.76.98 1.24.56L12.6 16h5.65A2.75 2.75 0 0 0 21 13.25v-6a2.75 2.75 0 0 0-2.75-2.75H5.75Zm2.5 4.25a1 1 0 1 0 0 2h7.5a1 1 0 1 0 0-2h-7.5Zm0 3.75a1 1 0 1 0 0 2h4.5a1 1 0 1 0 0-2h-4.5Z" />
+              </svg>
+              Ask AI
+              {chatLoading && <span className="w-2.5 h-2.5 rounded-full bg-white/95 animate-pulse" />}
+            </button>
+          )}
+
 
           {/* AI Chat Panel */}
-          <div style={{ height: chatOpen ? chatHeight : 0 }} className="absolute bottom-0 left-0 w-full z-50 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
+          <div style={{ height: chatOpen ? chatHeight : 0, boxShadow: themeVars.shadows.chatDock }} className="absolute bottom-0 left-0 w-full z-50 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden">
             {/* Resize Handle Chat */}
             <div 
               className="absolute top-0 left-0 w-full h-1 cursor-row-resize hover:bg-accent/30 transition-colors z-[60]"
@@ -3160,7 +3215,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       className="min-w-[220px] bg-transparent text-[11px] font-medium text-text outline-none cursor-pointer"
                     >
                       {RENDERER_CHAT_MODEL_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value} className="bg-[#1a1b2e] text-text">
+                        <option key={option.value} value={option.value} className="text-text" style={{ backgroundColor: themeVars.colors.panel }}>
                           {option.label}
                         </option>
                       ))}
@@ -3199,7 +3254,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               {chatImage && (
                 <div className="relative inline-block w-fit ml-2 group">
                   <img src={chatImage} alt="Chat upload" className="h-16 w-auto rounded-lg border border-overlay/30 object-contain bg-base/50 shadow-sm" />
-                  <button onClick={() => setChatImage(null)} className="absolute -top-2 -right-2 w-5 h-5 bg-red-500/90 text-white rounded-full flex items-center justify-center text-[10px] hover:bg-red-500 hover:scale-110 shadow-md transition-all cursor-pointer opacity-0 group-hover:opacity-100">
+                  <button
+                    onClick={() => setChatImage(null)}
+                    className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white shadow-md transition-all cursor-pointer opacity-0 group-hover:opacity-100 hover:scale-110"
+                    style={{ backgroundColor: appTheme.colors.red }}
+                  >
                     ✕
                   </button>
                 </div>
@@ -3290,7 +3349,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         {/* Right Panel: Local Data OR Properties */}
         {/* Right Panel: Errors OR Local Data OR Properties */}
         {showErrorsPane ? (
-          <div style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-[#1a1b2e] flex flex-col overflow-hidden relative">
+          <div style={{ width: rightWidth, backgroundColor: themeVars.colors.panel }} className="shrink-0 border-l border-overlay/30 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 
               className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"

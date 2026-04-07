@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getSelectionStyles, themeVars } from '@/theme/theme'
 // Inline icons (no external dependency needed)
 const ChevronDownIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +61,7 @@ export default function ComboBoxRenderer({
   let currentBorderColor = comp.BorderColor
   let currentBorderThickness = comp.BorderThickness
   if (comp.DisplayMode === 'DisplayMode.Disabled') {
-    currentBorderColor = '#c8c6c4' 
+    currentBorderColor = comp.DisabledBorderColor || themeVars.colors.controlDisabled
   } else if (isOpen) {
     currentBorderColor = comp.FocusedBorderColor
     currentBorderThickness = comp.FocusedBorderThickness
@@ -69,8 +70,8 @@ export default function ComboBoxRenderer({
   let currentFill = comp.Fill
   let currentColor = comp.Color
   if (comp.DisplayMode === 'DisplayMode.Disabled') {
-    currentFill = '#f3f2f1'
-    currentColor = '#a19f9d'
+    currentFill = comp.DisabledFill || themeVars.colors.controlDisabledFill
+    currentColor = comp.DisabledColor || themeVars.colors.controlDisabled
   }
 
   const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
@@ -104,9 +105,7 @@ export default function ComboBoxRenderer({
     cursor: isInteractive ? 'pointer' : (isPlaying ? 'default' : 'move'),
     userSelect: 'none',
     fontFamily: comp.Font || 'inherit',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     zIndex: renderZIndex,
   }
 

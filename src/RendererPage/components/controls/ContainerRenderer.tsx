@@ -12,6 +12,7 @@ import DatePickerRenderer from './DatePickerRenderer'
 import ComboBoxRenderer from './ComboBoxRenderer'
 import { CSS_BORDER_STYLE } from './cssProps'
 import { resolveProperties } from '../../../common/helpers'
+import { getDragOutlineStyles, getSelectionStyles } from '@/theme/theme'
 
 export default function ContainerRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
@@ -36,17 +37,12 @@ export default function ContainerRenderer({
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected
-      ? '0 0 0 3px rgba(0,120,212,0.25)'
-      : (shadowMap[comp.DropShadow] || 'none'),
+    ...getSelectionStyles(selected, 'default', shadowMap[comp.DropShadow] || 'none'),
     zIndex: renderZIndex,
   }
 
   if (dragOverId === comp.id) {
-    style.outline = '4px solid rgba(0,120,212,0.5)'
-    style.outlineOffset = '2px'
+    Object.assign(style, getDragOutlineStyles('default'))
   }
 
   return (

@@ -92,7 +92,7 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
     <div className="flex-1 bg-base min-h-0 flex flex-col p-8 overflow-y-auto">
       <div className="max-w-6xl mx-auto w-full">
         <div className="mb-12 animate-fade-in px-4">
-          <h1 className="text-4xl font-black text-white tracking-tight mb-2">
+          <h1 className="text-4xl font-black text-text tracking-tight mb-2">
             Welcome back, <span className="text-accent">{user?.displayName?.split(' ')[0] || 'Builder'}</span>!
           </h1>
           <p className="text-subtext text-lg max-w-xl">
@@ -102,7 +102,7 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
 
         <div className="flex items-center justify-between mb-8 px-4">
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tight mb-1">
+            <h2 className="text-2xl font-black text-text tracking-tight mb-1">
               {showAll ? 'All Projects' : 'Recent Projects'}
             </h2>
             {showAll && (
@@ -180,11 +180,11 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
                         if (e.key === 'Enter') commitRename(proj);
                         if (e.key === 'Escape') setRenamingId(null);
                       }}
-                      className="text-lg font-bold text-white bg-base/60 border border-accent/60 rounded-lg px-2 py-1 mb-2 w-full focus:outline-none focus:ring-1 focus:ring-accent/40"
+                      className="text-lg font-bold text-text bg-base/60 border border-accent/60 rounded-lg px-2 py-1 mb-2 w-full focus:outline-none focus:ring-1 focus:ring-accent/40"
                     />
                   ) : (
                     <div className="flex items-center gap-1.5 mb-2 group/name">
-                      <h3 className="text-lg font-bold text-white leading-tight truncate flex-1">
+                      <h3 className="text-lg font-bold text-text leading-tight truncate flex-1">
                         {proj.name || 'Untitled Project'}
                       </h3>
                       <button
@@ -238,7 +238,7 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
                     setShowAll(false);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="text-subtext/60 hover:text-white text-sm font-bold transition-colors"
+                  className="text-subtext/60 hover:text-text text-sm font-bold transition-colors"
                 >
                   ↑ Back to summary
                 </button>
@@ -252,7 +252,7 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
       {showNewProjectModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 backdrop-blur-sm bg-base/40 animate-fade-in">
           <div className="bg-surface border border-overlay/40 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-pop-in">
-            <h2 className="text-2xl font-black text-white mb-2">New Project</h2>
+            <h2 className="text-2xl font-black text-text mb-2">New Project</h2>
             <p className="text-subtext text-sm mb-6">Give your project a name to get started.</p>
             
             <div className="mb-8">
@@ -269,7 +269,7 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
                   }
                   if (e.key === 'Escape') setShowNewProjectModal(false);
                 }}
-                className="w-full bg-base/50 border border-overlay/40 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all"
+                className="w-full bg-base/50 border border-overlay/40 rounded-xl px-4 py-3 text-text font-bold focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all"
                 placeholder="e.g. My Awesome App"
               />
             </div>

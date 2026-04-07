@@ -1,11 +1,11 @@
 import * as admin from 'firebase-admin';
+import { sanitizeProjectId, sanitizeProjectPayload, sanitizeProjectRecord } from '@/lib/component-security';
 
 if (!admin.apps.length) {
   try {
     const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccount) {
-      console.log('FIREBASE_SERVICE_ACCOUNT found, attempting to initialize...');
       const sanitized = serviceAccount.trim().replace(/^['"]|['"]$/g, '');
       
       let cert;
@@ -29,7 +29,6 @@ if (!admin.apps.length) {
         credential: admin.credential.cert(cert),
         projectId: cert.project_id
       });
-      console.log('Firebase Admin SDK initialized successfully for project:', cert.project_id);
     } else {
       console.warn('FIREBASE_SERVICE_ACCOUNT not found in environment variables. Server-side auth verification will be disabled.');
     }
@@ -130,7 +129,7 @@ export async function getUserProjects(uid: string): Promise<any[]> {
     const snap = await adminDb.collection('projects')
       .where('uid', '==', uid)
       .get();
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const docs = snap.docs.map(doc => sanitizeProjectRecord({ id: doc.id, ...doc.data() }));
     // Sort in-memory to avoid requiring a Firestore composite index
     docs.sort((a: any, b: any) => {
       const aTime = a.updatedAt?._seconds ?? 0;
@@ -151,24 +150,30 @@ export async function saveUserProject(uid: string, projectId: string | null, pay
   if (!adminDb) return { success: false, error: 'Database uninitialized' };
   try {
     const projectsRef = adminDb.collection('projects');
+    const sanitizedProjectId = projectId ? sanitizeProjectId(projectId) : null;
+    if (projectId && !sanitizedProjectId) {
+      return { success: false, error: 'Invalid project ID' };
+    }
+
+    const safePayload = sanitizeProjectPayload(payload);
     const saveData = {
       uid,
-      name: payload.name || 'Untitled Project',
-      tree: payload.tree || [],
-      canvasW: payload.canvasW || 1366,
-      canvasH: payload.canvasH || 768,
+      name: safePayload.name,
+      tree: safePayload.tree,
+      canvasW: safePayload.canvasW,
+      canvasH: safePayload.canvasH,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    if (projectId) {
+    if (sanitizedProjectId) {
       // Update existing
-      const docRef = projectsRef.doc(projectId);
+      const docRef = projectsRef.doc(sanitizedProjectId);
       const doc = await docRef.get();
       if (!doc.exists) return { success: false, error: 'Project not found' };
       if (doc.data()?.uid !== uid) return { success: false, error: 'Unauthorized to edit this project' };
       
       await docRef.update(saveData);
-      return { success: true, projectId };
+      return { success: true, projectId: sanitizedProjectId };
     } else {
       // Create new
       const newDocRef = await projectsRef.add({
@@ -189,7 +194,10 @@ export async function saveUserProject(uid: string, projectId: string | null, pay
 export async function deleteUserProject(uid: string, projectId: string): Promise<boolean> {
   if (!adminDb) return false;
   try {
-    const docRef = adminDb.collection('projects').doc(projectId);
+    const sanitizedProjectId = sanitizeProjectId(projectId);
+    if (!sanitizedProjectId) return false;
+
+    const docRef = adminDb.collection('projects').doc(sanitizedProjectId);
     const doc = await docRef.get();
     if (!doc.exists || doc.data()?.uid !== uid) return false;
     await docRef.delete();

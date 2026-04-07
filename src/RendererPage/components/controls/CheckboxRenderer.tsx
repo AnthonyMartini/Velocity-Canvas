@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getInsetSelectionStyles } from '@/theme/theme'
 
 export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const defaultEval = comp.Default
@@ -45,7 +46,7 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
     cursor: isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' ? 'pointer' : (isPlaying ? 'default' : 'move'),
     userSelect: 'none',
     pointerEvents: (comp.DisplayMode === 'DisplayMode.Disabled' && isPlaying) ? 'none' : 'auto',
-    boxShadow: selected ? '0 0 0 2px #0078d4 inset' : 'none',
+    ...getInsetSelectionStyles(selected),
     boxSizing: 'border-box',
     padding: '4pt 8pt',
     zIndex: renderZIndex

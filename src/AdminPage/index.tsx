@@ -80,7 +80,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     <div className="flex-1 bg-base min-h-full py-12 px-6 relative overflow-y-auto">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center mb-12 animate-fade-in px-4 gap-8">
         <div className="text-center md:text-left">
-          <h2 className="text-4xl font-black text-white mb-2 tracking-tight">
+          <h2 className="text-4xl font-black text-text mb-2 tracking-tight">
             Admin <span className="text-accent">Dashboard</span>
           </h2>
           <p className="text-subtext text-lg max-w-xl">
@@ -96,7 +96,7 @@ export default function AdminPage({ user }: AdminPageProps) {
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-surface/50 border border-overlay/40 rounded-xl px-4 py-2 text-xs font-bold text-white transition-all cursor-pointer outline-none focus:border-accent appearance-none"
+              className="bg-surface/50 border border-overlay/40 rounded-xl px-4 py-2 text-xs font-bold text-text transition-all cursor-pointer outline-none focus:border-accent appearance-none"
             >
               <option value="all">All Models</option>
               {Object.keys(PRICING).map(modelKey => (
@@ -105,8 +105,8 @@ export default function AdminPage({ user }: AdminPageProps) {
             </select>
             {selectedModel !== 'all' && PRICING[selectedModel] && (
               <div className="bg-surface/50 border border-overlay/40 rounded-xl px-3 py-2 text-[10px] text-subtext flex items-center gap-2 shadow-sm">
-                <span>In: <b className="text-white">${PRICING[selectedModel].input}</b><span className="text-subtext/50">/1M</span></span>
-                <span>Out: <b className="text-white">${PRICING[selectedModel].output}</b><span className="text-subtext/50">/1M</span></span>
+                <span>In: <b className="text-text">${PRICING[selectedModel].input}</b><span className="text-subtext/50">/1M</span></span>
+                <span>Out: <b className="text-text">${PRICING[selectedModel].output}</b><span className="text-subtext/50">/1M</span></span>
                 <span>Cached: <b className="text-emerald-400">${PRICING[selectedModel].cachedInput}</b><span className="text-subtext/50">/1M</span></span>
               </div>
             )}
@@ -126,7 +126,7 @@ export default function AdminPage({ user }: AdminPageProps) {
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer uppercase tracking-wider ${
                 timeframe === f.id
                   ? 'bg-accent text-base shadow-md shadow-accent/30'
-                  : 'text-subtext hover:text-white hover:bg-white/5'
+                  : 'text-subtext hover:text-text hover:bg-overlay/35'
               }`}
             >
               {f.label}
@@ -150,15 +150,15 @@ export default function AdminPage({ user }: AdminPageProps) {
         </div>
         <div className="bg-surface/40 border border-overlay/30 rounded-3xl p-6 flex flex-col items-center justify-center animate-slide-up" style={{ animationDelay: '50ms' }}>
           <div className="text-subtext text-[10px] uppercase font-black tracking-widest mb-2">Total Requests</div>
-          <div className="text-white text-4xl font-black">{formatK(totalRequests)}</div>
+          <div className="text-text text-4xl font-black">{formatK(totalRequests)}</div>
         </div>
         <div className="bg-surface/40 border border-overlay/30 rounded-3xl p-6 flex flex-col items-center justify-center animate-slide-up" style={{ animationDelay: '100ms' }}>
           <div className="text-subtext text-[10px] uppercase font-black tracking-widest mb-2">Input Tokens</div>
-          <div className="text-white text-4xl font-black">{formatK(totalInput)}</div>
+          <div className="text-text text-4xl font-black">{formatK(totalInput)}</div>
         </div>
         <div className="bg-surface/40 border border-overlay/30 rounded-3xl p-6 flex flex-col items-center justify-center animate-slide-up" style={{ animationDelay: '150ms' }}>
           <div className="text-subtext text-[10px] uppercase font-black tracking-widest mb-2">Output Tokens</div>
-          <div className="text-white text-4xl font-black">{formatK(totalOutput)}</div>
+          <div className="text-text text-4xl font-black">{formatK(totalOutput)}</div>
         </div>
         <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-6 flex flex-col items-center justify-center animate-slide-up" style={{ animationDelay: '200ms' }}>
           <div className="text-emerald-400/80 text-[10px] uppercase font-black tracking-widest mb-1">Cache Savings</div>
@@ -170,7 +170,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       {/* Logs Table */}
       <div className="max-w-6xl mx-auto bg-surface/40 border border-overlay/30 rounded-3xl overflow-hidden shadow-2xl animate-slide-up" style={{ animationDelay: '200ms' }}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-surface/60">
-          <h3 className="text-lg font-bold text-white">Recent Requests</h3>
+          <h3 className="text-lg font-bold text-text">Recent Requests</h3>
           <button onClick={fetchUsage} className="text-accent text-xs font-bold uppercase tracking-wider hover:opacity-80 transition-opacity">
             Refresh
           </button>
@@ -206,7 +206,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                   return (
                     <tr key={log.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="text-white text-sm">
+                        <div className="text-text text-sm">
                           {new Date(log.timestamp).toLocaleDateString()}
                         </div>
                         <div className="text-subtext/60 text-[10px]">
@@ -234,7 +234,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                         <span className="text-subtext/40 mx-1">/</span>
                         <span className="text-subtext text-xs">{log.outputTokens?.toLocaleString()}</span>
                       </td>
-                      <td className="px-6 py-4 text-right text-white font-black text-sm">
+                      <td className="px-6 py-4 text-right text-text font-black text-sm">
                         {log.totalTokens?.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right">

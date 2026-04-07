@@ -3,6 +3,7 @@ import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
+import { getSelectionStyles, themeVars } from '@/theme/theme'
 
 export default function ButtonRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
@@ -23,9 +24,7 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
     justifyContent: CSS_JUSTIFY[comp.Align] || 'center',
     textAlign: CSS_ALIGN[comp.Align] || 'center',
     boxSizing: 'border-box' as const,
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : '0 1px 3px rgba(0,0,0,0.15)',
+    ...getSelectionStyles(selected, 'default', themeVars.shadows.controlRest),
     transition: 'box-shadow 0.1s, outline 0.1s',
     zIndex: renderZIndex,
   }

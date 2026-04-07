@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { tweakModel, TWEAK_MODEL_NAME } from "@/lib/gemini";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
+import { sanitizeTweakResult } from "@/lib/component-security";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -191,7 +192,6 @@ export async function POST(req) {
               }
 
               rawText += text;
-              console.log(`[tweak-component] chunk: ${text}`);
             }
 
             if (usage) {
@@ -205,7 +205,7 @@ export async function POST(req) {
             }
 
             const parsed = parseJsonFromText(rawText);
-            const result = convertSingleTickLiterals(parsed);
+            const result = sanitizeTweakResult(convertSingleTickLiterals(parsed), component_context?.component || component);
             const completedAt = Date.now();
 
             console.log("[tweak-component] timings", {
@@ -214,6 +214,10 @@ export async function POST(req) {
               timeToFirstChunkMs: firstChunkAt ? firstChunkAt - modelStartedAt : null,
               promptChars: fullPrompt.length,
             });
+
+            if (!result) {
+              throw new Error("AI returned an invalid component payload");
+            }
 
             send("result", result);
           } catch (error) {

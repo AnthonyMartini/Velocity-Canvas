@@ -11,22 +11,23 @@ import HtmlTextSchema from '../../schemas/htmltext.json'
 import DatePickerSchema from '../../schemas/datepicker.json'
 import ComboBoxSchema from '../../schemas/combobox.json'
 import screenSchema from '../../schemas/screen.json'
+import { appTheme, applyThemeToSchema } from '@/theme/theme'
 
 // ── Schema lookup ─────────────────────────────────────────────────────────────
 export const SCHEMAS = {
-  Button: buttonSchema,
-  Label: labelSchema,
-  Container: containerSchema,
-  TextInput: textInputSchema,
-  Dropdown: dropdownSchema,
-  Gallery: gallerySchema,
-  Checkbox: CheckboxSchema,
-  Rectangle: RectangleSchema,
-  Icon: IconSchema,
-  HtmlText: HtmlTextSchema,
-  DatePicker: DatePickerSchema,
-  ComboBox: ComboBoxSchema,
-  Screen: screenSchema,
+  Button: applyThemeToSchema(buttonSchema, appTheme.controlDefaults.Button),
+  Label: applyThemeToSchema(labelSchema, appTheme.controlDefaults.Label),
+  Container: applyThemeToSchema(containerSchema, appTheme.controlDefaults.Container),
+  TextInput: applyThemeToSchema(textInputSchema, appTheme.controlDefaults.TextInput),
+  Dropdown: applyThemeToSchema(dropdownSchema, appTheme.controlDefaults.Dropdown),
+  Gallery: applyThemeToSchema(gallerySchema, appTheme.controlDefaults.Gallery),
+  Checkbox: applyThemeToSchema(CheckboxSchema, appTheme.controlDefaults.Checkbox),
+  Rectangle: applyThemeToSchema(RectangleSchema, appTheme.controlDefaults.Rectangle),
+  Icon: applyThemeToSchema(IconSchema, appTheme.controlDefaults.Icon),
+  HtmlText: applyThemeToSchema(HtmlTextSchema, appTheme.controlDefaults.HtmlText),
+  DatePicker: applyThemeToSchema(DatePickerSchema, appTheme.controlDefaults.DatePicker),
+  ComboBox: applyThemeToSchema(ComboBoxSchema, appTheme.controlDefaults.ComboBox),
+  Screen: applyThemeToSchema(screenSchema, appTheme.controlDefaults.Screen),
 }
 
 // ── Shared maps ───────────────────────────────────────────────────────────────

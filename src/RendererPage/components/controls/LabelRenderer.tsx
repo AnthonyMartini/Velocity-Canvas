@@ -3,6 +3,7 @@ import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN, CSS_BORDER_STYLE } from './
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
+import { getSelectionStyles } from '@/theme/theme'
 
 export default function LabelRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
@@ -26,9 +27,7 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
     border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && comp.BorderThickness > 0)
       ? `${comp.BorderThickness}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
       : 'none',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     overflow: 'hidden', zIndex: renderZIndex,
     lineHeight: comp.LineHeight,
     transition: 'box-shadow 0.1s, outline 0.1s',

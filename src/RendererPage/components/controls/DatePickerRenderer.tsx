@@ -2,6 +2,7 @@ import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getSelectionStyles, themeVars } from '@/theme/theme'
 // Inline calendar icon (no external dependency needed)
 const CalendarIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,8 +50,8 @@ export default function DatePickerRenderer({
   let currentFill = comp.Fill
   let currentColor = comp.Color
   if (comp.DisplayMode === 'DisplayMode.Disabled') {
-    if (comp.DisabledFill) currentFill = comp.DisabledFill
-    if (comp.DisabledColor) currentColor = comp.DisabledColor
+    currentFill = comp.DisabledFill || themeVars.colors.controlDisabledFill
+    currentColor = comp.DisabledColor || themeVars.colors.controlDisabled
   }
 
   const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
@@ -77,9 +78,7 @@ export default function DatePickerRenderer({
     display: 'flex',
     boxSizing: 'border-box',
     overflow: 'hidden',
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     zIndex: renderZIndex,
   }
 

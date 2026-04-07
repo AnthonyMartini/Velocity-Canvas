@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { rendererChatModel, RENDERER_CHAT_MODEL_NAME } from "@/lib/gemini";
 import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
+import { applyPatchToLookup, buildNodeLookup, sanitizeRendererPatch, sanitizeReplyText } from "@/lib/component-security";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -12,10 +13,17 @@ const ALLOWED_RENDERER_CHAT_MODELS = new Set([
   "gemini-3-flash-preview",
   "gemini-3.1-pro-preview",
 ]);
+const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_BYTES = 450 * 1024;
 const RENDERER_CHAT_MODEL_CREDIT_COST = {
   "gemini-3-flash-preview": 5,
   "gemini-3.1-pro-preview": 10,
 };
+
+function estimateBase64Bytes(base64 = "") {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
 
 function parseJsonFromText(rawText) {
   const start = rawText.indexOf("{");
@@ -113,39 +121,39 @@ function buildComponentPromptLine(component, { indent = "", siblingIndex = 0, pa
   return line;
 }
 
-function emitLegacyResultAsPatchEvents(legacyPayload, send) {
+function emitLegacyResultAsPatchEvents(legacyPayload, emitOperation, send) {
   if (legacyPayload?.reply) {
-    send("reply", { text: legacyPayload.reply });
+    send("reply", { text: sanitizeReplyText(legacyPayload.reply) });
   }
 
   for (const id of legacyPayload?.components_to_remove || []) {
-    send("patch", { op: "remove", id });
+    emitOperation({ op: "remove", id });
   }
 
   for (const item of legacyPayload?.components_to_reparent || []) {
     if (item?.id && item?.newParentId) {
-      send("patch", { op: "reparent", id: item.id, newParentId: item.newParentId });
+      emitOperation({ op: "reparent", id: item.id, newParentId: item.newParentId });
     }
   }
 
   for (const item of legacyPayload?.components_to_update || []) {
     if (!item?.id) continue;
     const { id, ...changes } = item;
-    send("patch", { op: "update", id, changes });
+    emitOperation({ op: "update", id, changes });
   }
 
   for (const component of legacyPayload?.components_to_add || []) {
-    send("patch", { op: "add", component, parentId: component?.parentId || null });
+    emitOperation({ op: "add", component, parentId: component?.parentId || null });
   }
 
-  send("done", { reply: legacyPayload?.reply || "Done!" });
+  send("done", { reply: sanitizeReplyText(legacyPayload?.reply) });
 }
 
-function finalizeRendererStream({ rawText, sawStructuredOps, sawDone, send }) {
+function finalizeRendererStream({ rawText, sawStructuredOps, sawDone, emitOperation, send }) {
   if (!sawStructuredOps) {
     const parsedPayload = parseJsonFromText(rawText);
     const legacyPayload = convertSingleTickLiterals(parsedPayload);
-    emitLegacyResultAsPatchEvents(legacyPayload, send);
+    emitLegacyResultAsPatchEvents(legacyPayload, emitOperation, send);
     return;
   }
 
@@ -184,8 +192,18 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
     }
 
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid or oversized request body. Try a smaller screenshot." },
+        { status: 400 }
+      );
+    }
+
     const { message, canvas_components, active_screen_id, canvas_width, canvas_height, image_data, image_mime_type, chat_history, model } =
-      await req.json();
+      body || {};
 
     const requestedModel = ALLOWED_RENDERER_CHAT_MODELS.has(model) ? model : RENDERER_CHAT_MODEL_NAME;
     const creditCost = RENDERER_CHAT_MODEL_CREDIT_COST[requestedModel] ?? 5;
@@ -201,11 +219,31 @@ export async function POST(req) {
       );
     }
 
-    if (!message) {
+    if (typeof message !== "string" || !message.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
+    if (image_data != null) {
+      if (typeof image_data !== "string" || !image_data.trim()) {
+        return NextResponse.json({ error: "Attached image data is invalid." }, { status: 400 });
+      }
+      if (!ALLOWED_IMAGE_MIME_TYPES.has(image_mime_type)) {
+        return NextResponse.json({ error: "Attached image type is not supported." }, { status: 400 });
+      }
+      if (estimateBase64Bytes(image_data) > MAX_IMAGE_BYTES) {
+        return NextResponse.json(
+          { error: "Attached screenshot is too large. Try a smaller or more compressed image." },
+          { status: 413 }
+        );
+      }
+    }
+
+    if (chat_history != null && !Array.isArray(chat_history)) {
+      return NextResponse.json({ error: "Chat history payload is invalid." }, { status: 400 });
+    }
+
     const screenParentId = active_screen_id || "screen";
+    const nodeLookup = buildNodeLookup(canvas_components || []);
     let canvas_ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
     canvas_ctx += `Active screen id: "${screenParentId}". Put new top-level components on this screen unless the user explicitly asks for a different screen.\n`;
     if (canvas_components && canvas_components.length > 0) {
@@ -267,18 +305,21 @@ export async function POST(req) {
             sawStructuredOps = true;
 
             if (op.op === "reply") {
-              send("reply", { text: op.text || "" });
+              send("reply", { text: sanitizeReplyText(op.text) });
               return;
             }
 
             if (op.op === "add" || op.op === "update" || op.op === "remove" || op.op === "reparent") {
-              send("patch", op);
+              const sanitizedPatch = sanitizeRendererPatch(op, nodeLookup);
+              if (!sanitizedPatch) return;
+              send("patch", sanitizedPatch);
+              applyPatchToLookup(sanitizedPatch, nodeLookup);
               return;
             }
 
             if (op.op === "done") {
               sawDone = true;
-              send("done", { reply: op.reply || "Done!" });
+              send("done", { reply: sanitizeReplyText(op.reply) });
             }
           };
 
@@ -313,7 +354,6 @@ export async function POST(req) {
 
               rawText += text;
               lineBuffer += text;
-              console.log(`[renderer-chat] chunk: ${text}`);
               flushLines(false);
             }
 
@@ -329,7 +369,7 @@ export async function POST(req) {
               ).catch(console.error);
             }
 
-            finalizeRendererStream({ rawText, sawStructuredOps, sawDone, send });
+            finalizeRendererStream({ rawText, sawStructuredOps, sawDone, emitOperation: processOperation, send });
 
             const completedAt = Date.now();
 
@@ -348,13 +388,6 @@ export async function POST(req) {
               hasImage: Boolean(image_data),
               selectedModel: requestedModel,
             });
-
-            console.log("[renderer-chat] final prompt", {
-              message,
-              fullPrompt: full_prompt,
-            });
-
-            console.log("[renderer-chat] final output", rawText);
 
           } catch (error) {
             console.error("Gemini API error:", error);

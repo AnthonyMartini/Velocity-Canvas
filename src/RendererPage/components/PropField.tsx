@@ -2,6 +2,7 @@ import * as React from 'react'
 import PropTypes from 'prop-types'
 import FormulaInput from './FormulaInput'
 import { flattenTree, findParent, validateProperty } from '../../common/helpers'
+import { sanitizeSvgFragment } from '@/lib/content-sanitizer'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
 function ValidatedNumberInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
@@ -417,7 +418,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
                 className={`flex items-center justify-center p-1.5 border rounded-lg transition-all duration-200 
                   ${isSelected ? 'border-accent bg-accent/10 text-accent ring-1 ring-accent/50' : 'border-overlay/20 bg-surface hover:bg-overlay/10 hover:border-overlay/40 text-subtext'}
                 `}
-                dangerouslySetInnerHTML={{ __html: o.svg }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSvgFragment(o.svg) }}
               />
             )
           })}

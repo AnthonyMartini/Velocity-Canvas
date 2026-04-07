@@ -2,6 +2,7 @@ import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
+import { getSelectionStyles } from '@/theme/theme'
 
 export default function DropdownRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const style: any = {
@@ -18,9 +19,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     paddingLeft: '10pt', paddingRight: '8pt',
     boxSizing: 'border-box' as const,
-    outline: selected ? '2px solid #0078d4' : 'none',
-    outlineOffset: selected ? '2px' : '0',
-    boxShadow: selected ? '0 0 0 3px rgba(0,120,212,0.25)' : 'none',
+    ...getSelectionStyles(selected),
     zIndex: renderZIndex,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }

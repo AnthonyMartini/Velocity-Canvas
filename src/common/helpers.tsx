@@ -3,6 +3,21 @@ import { parseFormula, evaluateAST } from './FormulaParser'
 import { ALL_ENUM_VALUES } from '../RendererPage/Functions'
 import { SCHEMAS } from '../RendererPage/constants'
 
+const PROPERTY_DEF_CACHE = new Map()
+
+function getPropertyDefsForType(type) {
+  if (!type) return []
+  if (PROPERTY_DEF_CACHE.has(type)) return PROPERTY_DEF_CACHE.get(type)
+
+  const schema = SCHEMAS?.[type]
+  const propertyDefs = schema?.groups
+    ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
+    : (schema?.properties || [])
+
+  PROPERTY_DEF_CACHE.set(type, propertyDefs)
+  return propertyDefs
+}
+
 /**
  * Copies `text` to the clipboard.
  * Falls back to the execCommand approach if the Clipboard API isn't available.
@@ -138,6 +153,60 @@ export function flattenTree(nodes, collapsedIds = new Set(), depth = 0) {
   return result
 }
 
+export function countComponentNodes(node) {
+  if (!node || typeof node !== 'object') return 0
+
+  let count = node.type && node.type !== 'App' && node.type !== 'Screen' ? 1 : 0
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      count += countComponentNodes(child)
+    }
+  }
+
+  return count
+}
+
+export function buildTreeMetadata(tree) {
+  const nodeById = new Map()
+  const parentById = new Map()
+  const screenById = new Map()
+  const componentCountByScreenId = new Map()
+
+  const walk = (nodes, parent = null, screen = null) => {
+    for (const node of nodes || []) {
+      nodeById.set(node.id, node)
+      parentById.set(node.id, parent)
+
+      const nextScreen = node.type === 'Screen' ? node : screen
+      if (node.type === 'Screen' && !componentCountByScreenId.has(node.id)) {
+        componentCountByScreenId.set(node.id, 0)
+      }
+      if (nextScreen) {
+        screenById.set(node.id, nextScreen)
+      }
+      if (nextScreen && node.type !== 'App' && node.type !== 'Screen') {
+        componentCountByScreenId.set(
+          nextScreen.id,
+          (componentCountByScreenId.get(nextScreen.id) || 0) + 1
+        )
+      }
+
+      if (node.children?.length) {
+        walk(node.children, node, nextScreen)
+      }
+    }
+  }
+
+  walk(tree)
+
+  return {
+    nodeById,
+    parentById,
+    screenById,
+    componentCountByScreenId,
+  }
+}
+
 /** Find the direct parent container of a node, or null if at root */
 export function findParent(nodes, id, parent = null) {
   for (const n of nodes) {
@@ -258,14 +327,14 @@ export function getNextAvailableName(baseName, existingNames) {
  * @param {Object} localVars - Vars for resolving formulas
  * @returns {{x: number, y: number}}
  */
-export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars = {}) {
+export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars = {}, treeMeta = null) {
   let x = 0, y = 0
   let currentId = nodeId
   
   while (currentId) {
-    const node = findNode(tree, currentId)
+    const node = treeMeta?.nodeById?.get(currentId) || findNode(tree, currentId)
     if (!node) break
-    const parent = findParent(tree, currentId)
+    const parent = treeMeta?.parentById?.get(currentId) ?? findParent(tree, currentId)
     
     // Resolve node properties (including X and Y formulas)
     const resolvedNode = resolveProperties(node, localVars, flatNodes, parent);
@@ -295,17 +364,15 @@ export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars 
  */
 export function resolveProperties(comp, localVars, flatNodes, parentNode = null) {
   const resolved = { ...comp }
-  const schema = SCHEMAS?.[comp?.type]
-  const propertyDefs = schema?.groups
-    ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
-    : (schema?.properties || [])
+  const propertyDefs = getPropertyDefsForType(comp?.type)
+  const propertyDefByKey = new Map<string, any>(propertyDefs.map((property: any) => [property.key || property.name, property]))
 
   for (const key of Object.keys(comp)) {
     if (key === 'id' || key === 'type' || key === 'name' || key === 'children' || key.startsWith('On')) {
       continue
     }
 
-    const propDef = propertyDefs.find((property: any) => (property.key || property.name) === key)
+    const propDef = propertyDefByKey.get(key)
     if (propDef?.propertyType === 'Output') {
       continue
     }
@@ -333,7 +400,7 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
  * Validates a single property on a component, mimicking the logic in PropField.
  * Returns an error string or null if valid.
  */
-export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode = null) {
+export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode = null, options: any = null) {
   if (value === undefined || value === null) return null
   const valStr = String(value)
 
@@ -347,11 +414,13 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
   
   try {
     const isAction = isEvent
+    const controlNames = options?.controlNames || null
+    const screens = options?.screens || null
     // Events don't expect a return value
     const ast = parseFormula(valStr, true)
     const context: any = { 
-      isControl: (name: any) => flatNodes.some((n: any) => n.name === name),
-      screens: flatNodes.filter((n: any) => n.type === 'Screen'),
+      isControl: (name: any) => controlNames ? controlNames.has(name) : flatNodes.some((n: any) => n.name === name),
+      screens: screens || flatNodes.filter((n: any) => n.type === 'Screen'),
       isActionContext: isAction
     }
     
@@ -417,9 +486,16 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
  * Gets all property validation errors in the app.
  * Returns an array of: { nodeId, nodeName, path, propName, error }
  */
-export function getAllAppErrors(tree, localVars, schemas) {
+export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
+  const { flatNodes: providedFlatNodes = null, treeMeta = null } = options
   const errors = []
-  const flatNodes = flattenTree(tree, new Set())
+  const flatNodes = providedFlatNodes || flattenTree(tree, new Set())
+  const parentById = treeMeta?.parentById || null
+  const screenById = treeMeta?.screenById || null
+  const validationContext = {
+    controlNames: new Set(flatNodes.map((n: any) => n.name).filter(Boolean)),
+    screens: flatNodes.filter((n: any) => n.type === 'Screen'),
+  }
 
   // Walk the tree
   for (const node of flatNodes) {
@@ -427,21 +503,19 @@ export function getAllAppErrors(tree, localVars, schemas) {
     const schema = schemas[node.type]
     if (!schema) continue
 
-    const parentNode = findParent(tree, node.id)
+    const parentNode = parentById?.get(node.id) ?? findParent(tree, node.id)
     
     // Attempt to find the screen name for the path
     let screenName = 'App'
     if (node.type === 'Screen') {
       screenName = node.name
     } else {
-      const screenNode = flatNodes.find(n => n.type === 'Screen' && isDescendant(tree, node.id, n.id))
+      const screenNode = screenById?.get(node.id) || flatNodes.find(n => n.type === 'Screen' && isDescendant(tree, node.id, n.id))
       if (screenNode) screenName = screenNode.name
     }
 
     // Check all properties defined in the schema
-    const allProps = schema.groups
-      ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
-      : (schema.properties || [])
+    const allProps = getPropertyDefsForType(node.type)
 
     for (const propDef of allProps) {
       const propKey = propDef.key || propDef.name
@@ -454,7 +528,7 @@ export function getAllAppErrors(tree, localVars, schemas) {
       
       // We validate anything that has a value or is explicitly in the schema
       if (value !== undefined && value !== null) {
-         const error = validateProperty(node, propDef, value, localVars, flatNodes, parentNode)
+         const error = validateProperty(node, propDef, value, localVars, flatNodes, parentNode, validationContext)
          if (error) {
            errors.push({
              nodeId: node.id,

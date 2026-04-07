@@ -35,9 +35,9 @@
 }
 
 body {
-  background-color: #1e1e2e;
-  color: #cdd6f4;
-  font-family: 'Selawik', 'Inter', system-ui, sans-serif;
+  background-color: var(--vc-color-base);
+  color: var(--vc-color-text);
+  font-family: var(--vc-font-sans);
   margin: 0;
 }
 
@@ -47,19 +47,19 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #313244;
+  background: var(--vc-color-surface);
 }
 ::-webkit-scrollbar-thumb {
-  background: #45475a;
+  background: var(--vc-color-overlay);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #89b4fa;
+  background: var(--vc-color-accent);
 }
 
 /* Code block syntax highlight feel */
 .code-output {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--vc-font-mono);
   font-size: 0.8rem;
   line-height: 1.7;
   letter-spacing: 0.01em;
