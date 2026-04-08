@@ -12,12 +12,14 @@ const SSE_HEADERS = {
 const ALLOWED_RENDERER_CHAT_MODELS = new Set([
   "gemini-3-flash-preview",
   "gemini-3.1-pro-preview",
+  "gemini-2.5-pro",
 ]);
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 450 * 1024;
 const RENDERER_CHAT_MODEL_CREDIT_COST = {
   "gemini-3-flash-preview": 5,
   "gemini-3.1-pro-preview": 10,
+  "gemini-2.5-pro": 10,
 };
 
 function estimateBase64Bytes(base64 = "") {
@@ -92,6 +94,14 @@ function summarizeItemsForPrompt(items) {
 
   return undefined;
 }
+
+const ENGINE_COMPATIBILITY_PROMPT = [
+  "Engine compatibility constraints:",
+  '- Only use supported component property keys and formulas that this renderer understands.',
+  '- Parent references are limited to "Parent.Width" and "Parent.Height" only.',
+  '- Never use unsupported Power Apps runtime references such as "Parent.TemplateWidth", "Parent.TemplateHeight", "Parent.X", "Parent.Y", "Self.*", or "App.*".',
+  '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
+].join("\n");
 
 function buildComponentPromptLine(component, { indent = "", siblingIndex = 0, parentId = "screen" } = {}) {
   const x = readComponentProp(component, "X", "x") ?? 0;
@@ -243,7 +253,14 @@ export async function POST(req) {
     }
 
     const screenParentId = active_screen_id || "screen";
-    const nodeLookup = buildNodeLookup(canvas_components || []);
+    const nodeLookup = buildNodeLookup([
+      {
+        id: screenParentId,
+        type: "Screen",
+        name: "ActiveScreen",
+        children: Array.isArray(canvas_components) ? canvas_components : [],
+      },
+    ]);
     let canvas_ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
     canvas_ctx += `Active screen id: "${screenParentId}". Put new top-level components on this screen unless the user explicitly asks for a different screen.\n`;
     if (canvas_components && canvas_components.length > 0) {
@@ -261,7 +278,7 @@ export async function POST(req) {
       canvas_ctx += `The active screen "${screenParentId}" is currently empty.`;
     }
 
-    const full_prompt = `${canvas_ctx}\n\nUser prompt: ${message.trim()}`;
+    const full_prompt = `${canvas_ctx}\n\n${ENGINE_COMPATIBILITY_PROMPT}\n\nUser prompt: ${message.trim()}`;
     const history = (chat_history || []).map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],

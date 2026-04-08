@@ -413,7 +413,12 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             return (
               <button
                 key={o.value}
-                onClick={() => onChange(o.value)}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onChange(o.value)
+                }}
                 title={o.label}
                 className={`flex items-center justify-center p-1.5 border rounded-lg transition-all duration-200 
                   ${isSelected ? 'border-accent bg-accent/10 text-accent ring-1 ring-accent/50' : 'border-overlay/20 bg-surface hover:bg-overlay/10 hover:border-overlay/40 text-subtext'}

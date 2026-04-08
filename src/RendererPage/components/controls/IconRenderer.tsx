@@ -47,6 +47,7 @@ export default function IconRenderer({ comp, selected, isPlaying, localVars, set
       data-icon-type={comp.Icon}
     >
       <div 
+        key={comp.Icon || 'default-icon'}
         className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:stroke-current [&>svg]:fill-none"
         dangerouslySetInnerHTML={{ __html: resolvedSvg }} 
       />

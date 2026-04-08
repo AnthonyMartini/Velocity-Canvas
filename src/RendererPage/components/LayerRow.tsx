@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 
 export default function LayerRow({ node, selectedIds, onSelect, onReorder, depth, isCollapsed, toggleCollapse, showNames = false }) {
-  const isContainer = node.type === 'Container' || node.type === 'Gallery' || node.type === 'Screen'
+  const isContainer = node.type === 'App' || node.type === 'Container' || node.type === 'Gallery' || node.type === 'Screen'
   const hasChildren = isContainer && node.children?.length > 0
   const isSelected = selectedIds.includes(node.id)
 
@@ -38,11 +38,9 @@ export default function LayerRow({ node, selectedIds, onSelect, onReorder, depth
         </div>
       )}
 
-      <button 
-        onClick={(e) => {
-          if (node.type !== 'App') onSelect(e, node.id)
-        }}
-        className={`flex items-center gap-1.5 truncate ${node.type === 'App' ? 'cursor-default' : 'cursor-pointer'} ${!showNames && 'justify-start w-full'}`}
+      <button
+        onClick={(e) => onSelect(e, node.id)}
+        className={`flex items-center gap-1.5 truncate cursor-pointer ${!showNames && 'justify-start w-full'}`}
       >
         <span className={`relative w-6 h-6 rounded flex items-center justify-center shrink-0 text-white ${colorClass}`}>
           {Icon && <Icon className="w-4 h-4" />}

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
@@ -25,7 +26,10 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'text' : 'move', userSelect: isPlaying ? 'auto' : 'none',
     display: 'flex', alignItems: 'center',
-    paddingLeft: '8pt', paddingRight: '8pt',
+    paddingLeft: `${comp.PaddingLeft || 0}pt`,
+    paddingRight: `${comp.PaddingRight || 0}pt`,
+    paddingTop: `${comp.PaddingTop || 0}pt`,
+    paddingBottom: `${comp.PaddingBottom || 0}pt`,
     boxSizing: 'border-box' as const,
     ...getSelectionStyles(selected),
     zIndex: renderZIndex,
@@ -39,10 +43,16 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
   const displayHint = resolveSampleText(rawHintValue)
   const displayValue = resolveSampleText(rawTextValue || displayDefaultValue)
   const hasDisplayValue = displayValue !== undefined && displayValue !== null && String(displayValue).trim() !== ''
+  const [liveValue, setLiveValue] = useState(hasDisplayValue ? String(displayValue) : '')
+
+  useEffect(() => {
+    setLiveValue(hasDisplayValue ? String(displayValue) : '')
+  }, [comp.id, displayValue, hasDisplayValue])
 
   const handleChange = (e) => {
     const val = e.target.value
     if (isPlaying) {
+      setLiveValue(val)
       if (updateProp) updateProp(comp.id, 'Text', val)
       if (comp.OnChange) {
         executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
@@ -55,10 +65,10 @@ export default function TextInputRenderer({ comp, selected, isPlaying, localVars
       <input
         type="text"
         style={{ ...style, outline: 'none', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill, lineHeight: comp.LineHeight }}
-        defaultValue={hasDisplayValue ? displayValue : ''}
+        value={liveValue}
         placeholder={displayHint || ''}
-        onMouseDown={onMouseDown}
-        onClick={onClick}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         onChange={handleChange}
       />
     )
@@ -87,6 +97,10 @@ TextInputRenderer.propTypes = {
     BorderThickness: PropTypes.number,
     BorderColor: PropTypes.string,
     Visible: PropTypes.bool,
+    PaddingLeft: PropTypes.number,
+    PaddingRight: PropTypes.number,
+    PaddingTop: PropTypes.number,
+    PaddingBottom: PropTypes.number,
     Default: PropTypes.string,
     HintText: PropTypes.string,
     LineHeight: PropTypes.number,

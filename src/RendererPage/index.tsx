@@ -25,9 +25,13 @@ import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 import { appTheme, themeVars } from '@/theme/theme'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
+const createInitialChatMessages = () => ([
+  { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+])
 const RENDERER_CHAT_MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
   { value: 'gemini-3.1-pro-preview', label: '3.1-pro-preview - 10 credits' },
+  { value: 'gemini-2.5-pro', label: '2.5-pro - 10 credits' },
 ] as const
 const DEFAULT_RENDERER_CHAT_MODEL = RENDERER_CHAT_MODEL_OPTIONS[0].value
 const AI_REQUEST_SUMMARY_KEYS = new Set([
@@ -414,10 +418,14 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
 
         <button 
           onClick={() => setIsTweaking(!isTweaking)}
+          style={isTweaking ? {
+            backgroundImage: themeVars.gradients.askAi,
+            boxShadow: `0 12px 28px ${appTheme.editor.askAi.glow}, inset 0 1px 0 ${appTheme.editor.askAi.insetHighlight}, inset 0 -1px 0 ${appTheme.editor.askAi.insetShadow}`,
+          } : undefined}
           className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
             isTweaking 
-              ? 'bg-violet-500/25 text-violet-200 border-violet-500/50 ring-2 ring-violet-500/20' 
-              : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:bg-accent/10 hover:text-accent hover:border-accent/40 active:scale-95'
+              ? 'text-white border-white/10 ring-2 ring-accent/25' 
+              : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:text-white hover:border-accent/30 active:scale-95'
           }`}
         >
           <span className="text-sm">✨</span>
@@ -473,8 +481,7 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
   const yaml = (() => {
-    if (!node) return screenToYaml(tree)
-    if (node.type === 'App') return null // No YAML for the App node
+    if (!node || node.type === 'App') return screenToYaml(tree)
     if (node.type === 'Screen') {
       // Wrap the single screen as a full Screens: document
       const screenBody = componentToYaml(node, 2)
@@ -484,8 +491,6 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
   })()
 
   const handleCopy = () => {
-    if (!yaml) return
-
     // Prevent copying if there are validation errors in the selected node (or whole screen if none selected)
     const hasErrors = node 
       ? globalErrors.some(err => err.nodeId === node.id || isDescendant(tree, err.nodeId, node.id))
@@ -497,6 +502,7 @@ function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking,
     }
 
     navigator.clipboard.writeText(yaml).then(() => {
+      notify('Power Apps YAML copied to clipboard.', 'Success')
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     })
@@ -802,6 +808,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
   const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
   const [showPropertiesPane, setShowPropertiesPane] = useState(false) // Toggle visibility of Properties Pane
+  const [showMobilePaneMenu, setShowMobilePaneMenu] = useState(false)
   const showLayerNames = true // Always show layer names/full size
 
   const [chatOpen, setChatOpen] = useState(false)
@@ -844,6 +851,18 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setChatLoading(false)
     setTweakLoading(false)
     setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
+  }, [])
+
+  const handleClearChat = useCallback(() => {
+    if (chatAbortControllerRef.current) {
+      chatAbortControllerRef.current.abort()
+      chatAbortControllerRef.current = null
+    }
+    setChatLoading(false)
+    setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
+    setChatMessages(createInitialChatMessages())
+    setChatInput('')
+    setChatImage(null)
   }, [])
   
   // Sidebar/Pane Resizing state
@@ -1064,6 +1083,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   
   const chatEndRef = useRef(null)
   const chatInputRef = useRef(null)
+  const mobilePaneMenuRef = useRef<HTMLDivElement | null>(null)
 
   const dragRef = useRef(null)
   const resizeRef = useRef(null)
@@ -1218,6 +1238,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   // Derived
   const selectedNode = selectedIds.length === 1 ? findNode(tree, selectedIds[0]) : null
   const schema = selectedNode ? SCHEMAS[selectedNode.type] : null
+  const isAppSelected = selectedNode?.type === 'App'
+  const projectDisplayName = typeof activeProject === 'object' && activeProject?.name
+    ? activeProject.name
+    : tree[0]?.name || 'Untitled Project'
+  const screenCount = tree[0]?.children?.length || 0
   const flatNodes = flattenTree(tree, collapsedIds)
   const fullFlatNodes = flattenTree(tree, new Set())
   const totalCount = fullFlatNodes.length // Total count shouldn't hide skipped nodes
@@ -1266,6 +1291,75 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setShowLocalData(false)
     }
   }, [selectedIds, showLocalData])
+
+  useEffect(() => {
+    if (!showMobilePaneMenu) return
+
+    const handlePointerDown = (event) => {
+      if (!mobilePaneMenuRef.current?.contains(event.target as Node)) {
+        setShowMobilePaneMenu(false)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowMobilePaneMenu(false)
+      }
+    }
+
+    const handleResize = () => {
+      if (window.innerWidth >= 1280) {
+        setShowMobilePaneMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [showMobilePaneMenu])
+
+  const toggleErrorsPane = useCallback(() => {
+    setShowErrorsPane(prev => {
+      const next = !prev
+      if (next) {
+        setShowPropertiesPane(false)
+        setShowLocalData(false)
+      }
+      return next
+    })
+    setShowMobilePaneMenu(false)
+  }, [])
+
+  const togglePropertiesPane = useCallback(() => {
+    setShowPropertiesPane(prev => {
+      const next = !prev
+      if (next) {
+        setShowLocalData(false)
+        setShowErrorsPane(false)
+      }
+      return next
+    })
+    setShowMobilePaneMenu(false)
+  }, [])
+
+  const toggleVariablesPane = useCallback(() => {
+    setShowLocalData(prev => {
+      const next = !prev
+      if (next) {
+        setShowPropertiesPane(false)
+        setShowErrorsPane(false)
+      }
+      return next
+    })
+    setSelectedIds([])
+    setShowMobilePaneMenu(false)
+  }, [])
 
   // Always re-derive the node from the tree so name/fill changes are reflected live
   const activeScreenNode = findNode(tree, activeScreenId)
@@ -1388,6 +1482,21 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       return next
     })
   }, [saveHistory])
+
+  const updateAppName = useCallback((val) => {
+    const nextName = val.trim()
+    if (!nextName) return
+
+    setTree(prev => {
+      const appId = prev[0]?.id
+      if (!appId) return prev
+      const next = updateNode(prev, appId, () => ({ name: nextName }))
+      saveHistory(next)
+      return next
+    })
+
+    setActiveProject(prev => typeof prev === 'object' ? { ...prev, name: nextName } : prev)
+  }, [saveHistory, setActiveProject])
 
   // ── Reorder a node in z-space ─────────────────────────────────────────────
   const handleReorder = useCallback((id, direction) => {
@@ -2140,6 +2249,33 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     if (!isNaN(h) && h > 0) setCanvasH(h)
   }
 
+  const handleExportToPowerApps = useCallback(() => {
+    const exportNode = selectedNode?.type === 'App' ? null : selectedNode
+    const yaml = (() => {
+      if (!exportNode) return screenToYaml(tree)
+      if (exportNode.type === 'Screen') {
+        const screenBody = componentToYaml(exportNode, 2)
+        return `Screens:\n${screenBody}`
+      }
+      return componentToYaml(exportNode)
+    })()
+
+    const hasErrors = exportNode
+      ? globalErrors.some(err => err.nodeId === exportNode.id || isDescendant(tree, err.nodeId, exportNode.id))
+      : globalErrors.length > 0
+
+    if (hasErrors) {
+      notify('Cannot copy YAML with validation errors. Please fix them in the Errors pane first.', 'Error')
+      return
+    }
+
+    navigator.clipboard.writeText(yaml).then(() => {
+      notify('Power Apps YAML copied to clipboard.', 'Success')
+    }).catch(() => {
+      notify('Failed to copy YAML to clipboard.', 'Error')
+    })
+  }, [selectedNode, tree, globalErrors, notify])
+
   // ── AI Component Tweaking ───────────────────────────────────────────────────
   const handleTweakSubmit = useCallback(async () => {
     const msg = tweakInput.trim()
@@ -2282,6 +2418,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const handleChatSubmit = useCallback(async () => {
     const msg = chatInput.trim()
     if ((!msg && !chatImage) || chatLoading) return
+    const requestStartedAt = performance.now()
     setChatInput('')
 
     const imagePayload = chatImage
@@ -2422,7 +2559,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           content: data.reply || 'Done!',
           added: addsCount,
           mods: modsCount,
-          usage: data.usage
+          usage: data.usage,
+          responseMs: Math.round(performance.now() - requestStartedAt)
         }])
       } else {
         if (streamMutatedTree) {
@@ -2433,7 +2571,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           role: 'assistant',
           content: response.reply || 'Done!',
           added: response.added || 0,
-          mods: response.mods || 0
+          mods: response.mods || 0,
+          responseMs: Math.round(performance.now() - requestStartedAt)
         }])
       }
     } catch (err) {
@@ -2469,7 +2608,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />
 
       {/* Top Bar */}
-      <div id="top-menu" className="relative flex items-center justify-center gap-4 px-5 py-2.5 border-b border-overlay/30 bg-surface/30 shrink-0 min-h-[58px]">
+      <div id="top-menu" className="relative flex items-center justify-center gap-4 px-5 py-2.5 border-b border-overlay/40 bg-surface/55 shrink-0 min-h-[58px]">
         <div className="absolute left-5 z-10 flex items-center gap-4">
         {/* Editable Project Name */}
         <input
@@ -2484,7 +2623,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           placeholder="Untitled Project"
           title="Click to rename project"
         />
-        <div className="flex items-center gap-2">
+        <div className="hidden">
           <label className="text-xs text-subtext">W</label>
           <input type="number" value={canvasWInput} onChange={e => setCanvasWInput(e.target.value)}
             onBlur={commitCanvasSize} onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
@@ -2496,10 +2635,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             className="w-20 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right" />
           <span className="text-xs text-subtext/40">px</span>
         </div>
-        <div className="flex items-center gap-1.5 ml-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-overlay" />
-          <span className="text-xs text-subtext/50">{totalCount} component{totalCount !== 1 ? 's' : ''}</span>
-        </div>
+
         </div>
         {/* Toolbar Right */}
         <div className="flex items-center">
@@ -2567,8 +2703,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
           <button
             id="errors-trigger"
-            onClick={() => setShowErrorsPane(!showErrorsPane)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showErrorsPane ? 'bg-red/20 text-red border border-red/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            onClick={toggleErrorsPane}
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showErrorsPane ? 'bg-red/20 text-red border border-red/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
               }`}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -2585,22 +2721,33 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           <button
             id="yaml-trigger"
             onClick={() => setShowCodePane(!showCodePane)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showCodePane ? 'bg-accent/20 text-accent border border-accent/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 [&>span:first-of-type]:hidden ${showCodePane ? 'bg-accent/20 text-accent border border-accent/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
               }`}
           >
             <span className="text-[13px]">💻</span>
-            YAML Code
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 6 3 12l5 6" />
+              <path d="m16 6 5 6-5 6" />
+              <path d="M14 4 10 20" />
+            </svg>
+            View Code
           </button>
 
           <button
-            onClick={() => {
-              setShowPropertiesPane(v => !v)
-              if (!showPropertiesPane) {
-                setShowLocalData(false)
-                setShowErrorsPane(false)
-              }
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showPropertiesPane ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            onClick={handleExportToPowerApps}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v12" />
+              <path d="m7 10 5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+            Export to PA
+          </button>
+
+          <button
+            onClick={togglePropertiesPane}
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showPropertiesPane ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
               }`}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2610,15 +2757,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           </button>
 
           <button
-            onClick={() => {
-              setShowLocalData(v => !v)
-              if (!showLocalData) {
-                setShowPropertiesPane(false)
-                setShowErrorsPane(false)
-              }
-              setSelectedIds([])
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showLocalData ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
+            onClick={toggleVariablesPane}
+            className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 ${showLocalData ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
               }`}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2627,6 +2767,78 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             </svg>
             Variables
           </button>
+
+          <div ref={mobilePaneMenuRef} className="relative mr-3 xl:hidden">
+            <button
+              onClick={() => setShowMobilePaneMenu(prev => !prev)}
+              aria-label="Open panel menu"
+              title="Panels"
+              className={`relative flex h-9 w-9 items-center justify-center rounded-lg border transition-all cursor-pointer ${
+                showMobilePaneMenu || showErrorsPane || showPropertiesPane || showLocalData
+                  ? 'border-accent/40 bg-accent/15 text-accent'
+                  : 'border-overlay/30 bg-surface/50 text-subtext/80 hover:bg-surface hover:text-text'
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+              </svg>
+              {globalErrors.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-[16px] h-4 items-center justify-center rounded-full bg-red px-1 text-[9px] font-bold text-white">
+                  {globalErrors.length}
+                </span>
+              )}
+            </button>
+
+            {showMobilePaneMenu && (
+              <div
+                className="absolute right-0 top-full z-30 mt-2 min-w-[180px] overflow-hidden rounded-2xl border border-overlay/30 shadow-[var(--vc-shadow-floating-panel)]"
+                style={{ backgroundColor: themeVars.colors.panel }}
+              >
+                <button
+                  onClick={toggleErrorsPane}
+                  className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors cursor-pointer ${
+                    showErrorsPane ? 'bg-red/10 text-red' : 'text-text hover:bg-surface/60'
+                  }`}
+                >
+                  <span>Errors</span>
+                  {globalErrors.length > 0 && (
+                    <span className="rounded-full bg-red px-2 py-0.5 text-[10px] font-bold text-white">
+                      {globalErrors.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCodePane(prev => !prev)
+                    setShowMobilePaneMenu(false)
+                  }}
+                  className={`flex w-full items-center px-4 py-3 text-left text-sm transition-colors cursor-pointer ${
+                    showCodePane ? 'bg-accent/10 text-accent' : 'text-text hover:bg-surface/60'
+                  }`}
+                >
+                  <span>View Code</span>
+                </button>
+                <button
+                  onClick={togglePropertiesPane}
+                  className={`flex w-full items-center px-4 py-3 text-left text-sm transition-colors cursor-pointer ${
+                    showPropertiesPane ? 'bg-blue-500/10 text-blue-300' : 'text-text hover:bg-surface/60'
+                  }`}
+                >
+                  <span>Properties</span>
+                </button>
+                <button
+                  onClick={toggleVariablesPane}
+                  className={`flex w-full items-center px-4 py-3 text-left text-sm transition-colors cursor-pointer ${
+                    showLocalData ? 'bg-emerald-500/10 text-emerald-300' : 'text-text hover:bg-surface/60'
+                  }`}
+                >
+                  <span>Variables</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Undo / Redo Buttons */}
           <div className="flex items-center gap-1 bg-surface/50 border border-overlay/40 rounded-lg p-0.5 divide-x divide-overlay/40 mr-4">
@@ -2661,14 +2873,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               setCurrentTourStep(0)
               setIsTourActive(true)
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all cursor-pointer shadow-sm"
+            aria-label="Open tutorial"
+            title="Tutorial"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-white transition-all hover:scale-105 hover:bg-emerald-400 active:scale-95 cursor-pointer"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            Tutorial
+            ?
           </button>
         </div>
       </div>
@@ -2677,11 +2886,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left Toolbar */}
-        <div id="left-toolbar" style={{ width: 256 }} className="shrink-0 border-r border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
+        <div id="left-toolbar" style={{ width: 256 }} className="shrink-0 border-r border-overlay/40 bg-surface/40 flex flex-col overflow-hidden relative">
 
           {/* Component Library */}
-          <div className="max-h-[50%] flex flex-col overflow-hidden border-b border-overlay/20">
-            <div className="flex items-center pt-3 pb-2 px-3 justify-between shrink-0 border-b border-overlay/20 shadow-sm bg-surface/30">
+          <div className="max-h-[50%] flex flex-col overflow-hidden border-b border-overlay/25">
+            <div className="flex items-center pt-3 pb-2 px-3 justify-between shrink-0 border-b border-overlay/25 shadow-sm bg-surface/50">
               <p className="text-[10px] font-semibold text-subtext/60 uppercase tracking-widest truncate mr-1">
                 {selectedNode?.type === 'Container' ? 'Add To Container' : 'Add Component'}
               </p>
@@ -2721,7 +2930,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
           {/* Layers */}
           <div className="flex-1 max-h-[50%] flex flex-col overflow-hidden">
-            <div id="layers-panel" className="p-2 border-b border-overlay/30 bg-surface flex items-center justify-between shrink-0 border-t border-overlay/20">
+          <div id="layers-panel" className="p-2 border-b border-overlay/35 bg-surface/65 flex items-center justify-between shrink-0 border-t border-overlay/25">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-text px-2">Layers</span>
               </div>
@@ -2752,6 +2961,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     if (!e.shiftKey) {
                       const nextScreenId = getScreenIdForNode(id)
                       if (nextScreenId) setActiveScreenId(nextScreenId)
+                      setShowPropertiesPane(true)
                     }
                     setShowErrorsPane(false)
                   }}
@@ -2916,9 +3126,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               {/* Screen name label above canvas */}
               {activeScreenNode && (
                 <div style={{ marginBottom: 6, marginLeft: 2 }} className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-black tracking-wide select-none">
-                    {activeScreenNode.name || activeScreenNode.id} - {activeScreenComponentCount} component{activeScreenComponentCount !== 1 ? 's' : ''}
-                  </span>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-overlay/40 bg-base/90 px-3 py-1 shadow-sm backdrop-blur-sm">
+                    <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] font-semibold text-text tracking-wide select-none">
+                      {activeScreenNode.name || activeScreenNode.id} - {activeScreenComponentCount} component{activeScreenComponentCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                 </div>
               )}
               <div
@@ -3200,10 +3413,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             />
             <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-overlay/20 bg-surface/40 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.25 2.25A.75.75 0 0 1 9 3v.75h2.25V3a.75.75 0 0 1 1.5 0v.75H15V3a.75.75 0 0 1 1.5 0v.75h.75a3 3 0 0 1 3 3v.75H21A.75.75 0 0 1 21 9h-.75v2.25H21a.75.75 0 0 1 0 1.5h-.75V15H21a.75.75 0 0 1 0 1.5h-.75v.75a3 3 0 0 1-3 3h-.75V21a.75.75 0 0 1-1.5 0v-.75h-2.25V21a.75.75 0 0 1-1.5 0v-.75H9V21a.75.75 0 0 1-1.5 0v-.75h-.75a3 3 0 0 1-3-3v-.75H3A.75.75 0 0 1 3 15h.75v-2.25H3a.75.75 0 0 1 0-1.5h.75V9H3a.75.75 0 0 1 0-1.5h.75v-.75a3 3 0 0 1 3-3h.75V3a.75.75 0 0 1 .75-.75ZM6 6.75A.75.75 0 0 1 6.75 6h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75H6.75a.75.75 0 0 1-.75-.75V6.75Z" clipRule="evenodd" />
-                  </svg>
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-overlay/30 bg-base/70 shadow-sm overflow-hidden">
+                  <NextImage
+                    src={logo}
+                    alt="Velocity Canvas"
+                    width={18}
+                    height={18}
+                    className="h-[18px] w-[18px] object-contain"
+                    priority
+                  />
                 </div>
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs font-semibold text-text whitespace-nowrap">AI Canvas Assistant</span>
@@ -3228,12 +3446,20 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   )}
                 </div>
               </div>
-              <button onClick={() => setChatOpen(false)}
-                className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleClearChat}
+                  className="rounded-lg border border-overlay/30 bg-base/60 px-2.5 py-1 text-[11px] font-medium text-subtext/80 transition-colors hover:border-overlay/50 hover:bg-surface hover:text-text cursor-pointer"
+                >
+                  Clear chat
+                </button>
+                <button onClick={() => setChatOpen(false)}
+                  className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
               {chatMessages.map((msg, i) => <ChatMessage key={i} msg={msg} />)}
@@ -3370,7 +3596,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             />
           </div>
         ) : showLocalData ? (
-          <div style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
+          <div style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/40 bg-surface/40 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 
               className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
@@ -3430,7 +3656,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             </div>
           </div>
         ) : showPropertiesPane ? (
-          <div id="props-panel" style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/30 bg-surface/20 flex flex-col overflow-hidden relative">
+          <div id="props-panel" style={{ width: rightWidth }} className="shrink-0 border-l border-overlay/40 bg-surface/40 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 
               className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-accent/30 transition-colors z-[60]"
@@ -3439,7 +3665,76 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 document.body.style.cursor = 'col-resize'
               }}
             />
-            {selectedNode && schema ? (
+            {selectedNode && isAppSelected ? (
+              <>
+                <div className="px-4 py-3 border-b border-overlay/20 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] bg-accent/15 text-accent border border-accent/25 px-2 py-0.5 rounded-full font-medium">
+                      App
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setShowPropertiesPane(false)}
+                        className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <NameInput
+                    key={`app-name-${projectDisplayName}`}
+                    initialValue={projectDisplayName}
+                    checkDuplicate={(val) => (!val.trim() ? 'Name cannot be empty.' : null)}
+                    onCommit={updateAppName}
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-2">
+                  <div className="flex flex-col gap-4 py-1">
+                    <div className="rounded-xl border border-overlay/25 bg-overlay/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-subtext/60">Canvas Size</p>
+                          <p className="mt-1 text-xs text-subtext/60">Set the base width and height for every screen in this app.</p>
+                        </div>
+                        <div className="rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-semibold text-accent">
+                          {canvasW} x {canvasH}
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Width</span>
+                          <input
+                            type="number"
+                            value={canvasWInput}
+                            onChange={e => setCanvasWInput(e.target.value)}
+                            onBlur={commitCanvasSize}
+                            onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Height</span>
+                          <input
+                            type="number"
+                            value={canvasHInput}
+                            onChange={e => setCanvasHInput(e.target.value)}
+                            onBlur={commitCanvasSize}
+                            onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-overlay/20 bg-overlay/5 px-3 py-2.5 text-xs text-subtext/65">
+                      {screenCount} screen{screenCount !== 1 ? 's' : ''} in this app.
+                      {activeScreenNode ? ` Currently editing ${activeScreenNode.name || activeScreenNode.id}.` : ''}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : selectedNode && schema ? (
               <>
                 <div className="px-4 py-3 border-b border-overlay/20 flex flex-col gap-2">
                   <div className="flex items-center justify-between">

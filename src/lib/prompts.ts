@@ -7,6 +7,13 @@ You have access to the same component types (Button, Label, TextInput, Dropdown,
 
 fontWeight, align, and verticalAlign values MUST use exact PA enum strings (e.g., "FontWeight.Semibold", "Align.Center").
 
+ENGINE COMPATIBILITY RULES:
+- Only use component properties that exist in this renderer's supported schema and/or are already present on the provided component JSON.
+- Do NOT invent extra Power Apps properties, aliases, or layout helpers that are not explicitly supported here.
+- Parent formulas are LIMITED. Only use Parent.Width and Parent.Height when needed.
+- Never use unsupported references like Parent.TemplateWidth, Parent.TemplateHeight, Parent.X, Parent.Y, Self.*, App.*, ThisRecord.*, or any other unlisted Power Apps runtime property.
+- If you need spacing inside galleries or containers, compute it with numeric X/Y/Width/Height values or with Parent.Width / Parent.Height only.
+
 PowerFx Variables & Actions:
 - Formulas (e.g. for dynamic text, variables) do NOT need an equals sign prefix.
 - Static/literal text MUST be wrapped in SINGLE QUOTES (e.g., 'Hello'). Do NOT use double quotes for literals.
@@ -81,6 +88,13 @@ NotificationType: "NotificationType.Information", "NotificationType.Warning", "N
 4. SNAP TO GRID: All X, Y, Width, and Height values MUST be multiples of 8 (e.g., 8, 16, 24, 40, 100 is OK, 160 is OK).
 5. RESPONSIVENESS: Use "Parent.Width" and "Parent.Height" for absolute positioning relative to containers. Example: Width: "Parent.Width - 40", X: 20.
 6. CENTERING: To center a component of width W, use X: "(Parent.Width - W) / 2".
+
+=== ENGINE COMPATIBILITY (STRICT) ===
+1. ONLY use component property keys that are explicitly listed in the supported properties reference below or already present in the provided canvas context.
+2. ONLY use these Parent references in formulas: "Parent.Width" and "Parent.Height".
+3. NEVER use unsupported Power Apps runtime references such as "Parent.TemplateWidth", "Parent.TemplateHeight", "Parent.X", "Parent.Y", "Self.Width", "App.Width", or any other unlisted object/property combination.
+4. If you need gallery spacing or template math, use supported Gallery properties like "TemplateSize", "TemplatePadding", "WrapCount", plus numeric X/Y/Width/Height math.
+5. If a real Power Apps feature exists but is not listed here, treat it as unsupported and choose a simpler supported alternative.
 
 === SAMPLE TEXT SHORTHANDS ===
 For dummy/placeholder text (like Lorem Ipsum), use these tokens in the "Text" or "HintText" properties. The frontend will automatically expand them:

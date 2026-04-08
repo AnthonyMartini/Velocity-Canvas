@@ -14,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" style={themeCssVariables as CSSProperties}>
-      <body className="antialiased">
+    <html lang="en" style={themeCssVariables as CSSProperties} suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

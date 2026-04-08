@@ -31,6 +31,14 @@ const AI_SUMMARY_KEYS = new Set([
   "LayoutMode",
 ]);
 
+const ENGINE_COMPATIBILITY_PROMPT = [
+  "Engine compatibility constraints:",
+  '- Only use supported component property keys and formulas that this renderer understands.',
+  '- Parent references are limited to "Parent.Width" and "Parent.Height" only.',
+  '- Never use unsupported Power Apps runtime references such as "Parent.TemplateWidth", "Parent.TemplateHeight", "Parent.X", "Parent.Y", "Self.*", or "App.*".',
+  '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
+].join("\n");
+
 function compactNodeForAI(node, { summaryOnly = false, childLimit = 0 } = {}) {
   if (!node || typeof node !== "object") return null;
 
@@ -67,6 +75,7 @@ function buildTweakPrompt({ canvasWidth, canvasHeight, component, parent, siblin
   const sections = [
     `Canvas size: ${canvasWidth} x ${canvasHeight} px.`,
     `Selected component:\n${JSON.stringify(component)}`,
+    ENGINE_COMPATIBILITY_PROMPT,
   ];
 
   if (parent) {

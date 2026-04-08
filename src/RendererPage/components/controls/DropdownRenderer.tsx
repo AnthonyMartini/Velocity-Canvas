@@ -17,7 +17,10 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
     opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'pointer' : 'move', userSelect: isPlaying ? 'auto' : 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    paddingLeft: '10pt', paddingRight: '8pt',
+    paddingLeft: `${comp.PaddingLeft || 0}pt`,
+    paddingRight: `${comp.PaddingRight || 0}pt`,
+    paddingTop: `${comp.PaddingTop || 0}pt`,
+    paddingBottom: `${comp.PaddingBottom || 0}pt`,
     boxSizing: 'border-box' as const,
     ...getSelectionStyles(selected),
     zIndex: renderZIndex,
@@ -44,7 +47,7 @@ export default function DropdownRenderer({ comp, selected, isPlaying, localVars,
   if (isPlaying) {
     return (
       <select
-        style={{ ...style, outline: 'none', appearance: 'auto', paddingRight: '4px', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill }}
+        style={{ ...style, outline: 'none', appearance: 'auto', background: comp.Fill === 'transparent' ? 'transparent' : comp.Fill }}
         defaultValue={(displayValue !== undefined && displayValue !== null) ? displayValue : (items[0] || '')}
         onMouseDown={onMouseDown}
         onClick={onClick}
@@ -78,6 +81,10 @@ DropdownRenderer.propTypes = {
     BorderThickness: PropTypes.number,
     BorderColor: PropTypes.string,
     Visible: PropTypes.bool,
+    PaddingLeft: PropTypes.number,
+    PaddingRight: PropTypes.number,
+    PaddingTop: PropTypes.number,
+    PaddingBottom: PropTypes.number,
     Default: PropTypes.string,
     Items: PropTypes.string,
   }).isRequired,

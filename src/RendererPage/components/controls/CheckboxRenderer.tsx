@@ -48,7 +48,10 @@ export default function CheckboxRenderer({ comp, selected, isPlaying, localVars,
     pointerEvents: (comp.DisplayMode === 'DisplayMode.Disabled' && isPlaying) ? 'none' : 'auto',
     ...getInsetSelectionStyles(selected),
     boxSizing: 'border-box',
-    padding: '4pt 8pt',
+    paddingLeft: `${comp.PaddingLeft || 0}pt`,
+    paddingRight: `${comp.PaddingRight || 0}pt`,
+    paddingTop: `${comp.PaddingTop || 0}pt`,
+    paddingBottom: `${comp.PaddingBottom || 0}pt`,
     zIndex: renderZIndex
   }
 
@@ -86,6 +89,10 @@ CheckboxRenderer.propTypes = {
     Text: PropTypes.string,
     Default: PropTypes.oneOfType([PropTypes.string, PropTypes.bool]),
     CheckboxSize: PropTypes.number,
+    PaddingLeft: PropTypes.number,
+    PaddingRight: PropTypes.number,
+    PaddingTop: PropTypes.number,
+    PaddingBottom: PropTypes.number,
     OnCheck: PropTypes.string,
     OnUncheck: PropTypes.string,
     OnChange: PropTypes.string,
