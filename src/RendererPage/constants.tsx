@@ -10,6 +10,9 @@ import IconSchema from '../../schemas/icon.json'
 import HtmlTextSchema from '../../schemas/htmltext.json'
 import DatePickerSchema from '../../schemas/datepicker.json'
 import ComboBoxSchema from '../../schemas/combobox.json'
+import ToggleSchema from '../../schemas/toggle.json'
+import RadioSchema from '../../schemas/radio.json'
+import SliderSchema from '../../schemas/slider.json'
 import screenSchema from '../../schemas/screen.json'
 import { appTheme, applyThemeToSchema } from '@/theme/theme'
 
@@ -27,6 +30,9 @@ export const SCHEMAS = {
   HtmlText: applyThemeToSchema(HtmlTextSchema, appTheme.controlDefaults.HtmlText),
   DatePicker: applyThemeToSchema(DatePickerSchema, appTheme.controlDefaults.DatePicker),
   ComboBox: applyThemeToSchema(ComboBoxSchema, appTheme.controlDefaults.ComboBox),
+  Toggle: applyThemeToSchema(ToggleSchema, appTheme.controlDefaults.Toggle),
+  Radio: applyThemeToSchema(RadioSchema, appTheme.controlDefaults.Radio),
+  Slider: applyThemeToSchema(SliderSchema, appTheme.controlDefaults.Slider),
   Screen: applyThemeToSchema(screenSchema, appTheme.controlDefaults.Screen),
 }
 

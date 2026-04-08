@@ -212,6 +212,28 @@ export const appTheme = {
     Screen: {
       Fill: 'RGBA(255, 255, 255, 1)',
     },
+    Toggle: {
+      BorderColor: '#605e5c',
+      Color: '#323130',
+      FalseFill: '#8a8886',
+      Fill: 'rgba(0,0,0,0)',
+      HandleFill: '#ffffff',
+      TrueFill: '#0078d4',
+    },
+    Radio: {
+      BorderColor: 'rgba(0,0,0,0)',
+      Color: '#323130',
+      Fill: 'rgba(0,0,0,0)',
+      RadioBorderColor: '#605e5c',
+      RadioSelectionFill: '#0078d4',
+    },
+    Slider: {
+      BorderColor: 'rgba(0,0,0,0)',
+      Fill: 'rgba(0,0,0,0)',
+      HandleFill: '#0078d4',
+      RailFill: '#c8c6c4',
+      ValueFill: '#0078d4',
+    },
     TextInput: {
       BorderColor: '#8a8886',
       Color: '#201f1e',

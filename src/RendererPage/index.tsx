@@ -11,6 +11,9 @@ import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, Con
   HtmlTextRenderer,
   DatePickerRenderer,
   ComboBoxRenderer,
+  ToggleRenderer,
+  RadioRenderer,
+  SliderRenderer,
 } from './components/controls'
 import { SCHEMAS } from './constants'
 import PropField from './components/PropField'
@@ -20,7 +23,7 @@ import ProjectsDashboard from './ProjectsDashboard'
 import { resolveSampleTextDeep } from './components/controls/sampleText'
 import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
-import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
+import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, ensureUniqueNodeNames, ensureUniqueNodeListNames, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 import { appTheme, themeVars } from '@/theme/theme'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
@@ -31,7 +34,6 @@ const createInitialChatMessages = () => ([
 const RENDERER_CHAT_MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
   { value: 'gemini-3.1-pro-preview', label: '3.1-pro-preview - 10 credits' },
-  { value: 'gemini-2.5-pro', label: '2.5-pro - 10 credits' },
 ] as const
 const DEFAULT_RENDERER_CHAT_MODEL = RENDERER_CHAT_MODEL_OPTIONS[0].value
 const AI_REQUEST_SUMMARY_KEYS = new Set([
@@ -344,6 +346,15 @@ function RendererSwitch({ comp, sharedProps }) {
   )
   if (comp.type === 'ComboBox') return (
     <ComboBoxRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'Toggle') return (
+    <ToggleRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'Radio') return (
+    <RadioRenderer key={comp.id} {...sharedProps} />
+  )
+  if (comp.type === 'Slider') return (
+    <SliderRenderer key={comp.id} {...sharedProps} />
   )
   return null
 }
@@ -1363,6 +1374,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   // Always re-derive the node from the tree so name/fill changes are reflected live
   const activeScreenNode = findNode(tree, activeScreenId)
+  const visibleCanvasErrors = useMemo(() => {
+    if (!activeScreenId) return []
+    return globalErrors.filter(err => getScreenIdForNode(err.nodeId) === activeScreenId)
+  }, [globalErrors, getScreenIdForNode, activeScreenId])
   const activeScreenComponentCount = useMemo(() => {
     if (!activeScreenNode) return 0;
     return flattenTree(activeScreenNode.children || [], new Set()).length;
@@ -1431,23 +1446,28 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     const siblingCount = targetParent?.children?.length || 0
     const baseInset = targetParent?.type === 'Container' ? 16 : 20
     const offset = siblingCount * 16
+    const compId = uid()
     const comp = createComponent(sch, {
+      id: compId,
       X: isGallery ? 0 : baseInset,
       Y: isGallery ? 0 : baseInset + offset,
     })
     
     setTree(prev => {
-      const next = insertNode(prev, comp, parentId)
+      const currentNames = flattenTree(prev).map(n => n.name)
+      const uniqueComp = ensureUniqueNodeNames(comp, currentNames)
+      const next = insertNode(prev, uniqueComp, parentId)
       saveHistory(next)
       return next
     })
-    setSelectedIds([comp.id])
+    setSelectedIds([compId])
   }, [selectedNode, activeScreenNode, tree, saveHistory])
 
   // ── Add a new Screen ────────────────────────────────────────────────────────
   const addScreen = useCallback(() => {
+    const compId = uid()
     const comp = {
-      id: uid(),
+      id: compId,
       type: 'Screen',
       name: nextName('Screen'),
       Fill: appTheme.controlDefaults.Screen.Fill,
@@ -1458,12 +1478,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       // Insert into the root 'App'
       const appRootId = prev[0]?.id
       if (!appRootId) return prev
-      const next = insertNode(prev, comp, appRootId)
+      const currentNames = flattenTree(prev).map(n => n.name)
+      const uniqueComp = ensureUniqueNodeNames(comp, currentNames)
+      const next = insertNode(prev, uniqueComp, appRootId)
       saveHistory(next)
       return next
     })
-    setActiveScreenId(comp.id)
-    setSelectedIds([comp.id])
+    setActiveScreenId(compId)
+    setSelectedIds([compId])
     // Un-collapse App node to show the new screen
     setCollapsedIds(prev => {
       const next = new Set(prev)
@@ -1521,21 +1543,22 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const changes = resolveSampleTextDeep({ ...patch.changes })
         if (changes.name) {
           const currentNames = flattenTree(nextTree).filter(n => n.id !== patch.id).map(n => n.name)
-          if (currentNames.includes(changes.name)) {
+          if (currentNames.some(name => String(name || '').trim().toLowerCase() === String(changes.name || '').trim().toLowerCase())) {
             changes.name = getNextAvailableName(changes.name, currentNames)
           }
+        }
+        if (Array.isArray(changes.children)) {
+          const existingTreeWithoutCurrentNode = removeNode(nextTree, patch.id)[0]
+          const currentNames = flattenTree(existingTreeWithoutCurrentNode).map(n => n.name)
+          changes.children = ensureUniqueNodeListNames(changes.children, currentNames)
         }
         nextTree = updateNode(nextTree, patch.id, () => changes)
       } else if (patch.op === 'add' && patch.component) {
         const allIds = new Set(flattenTree(nextTree).map(n => n.id))
         const comp = createFromSpec(patch.component, allIds)
         if (comp) {
-          if (comp.name) {
-            const currentNames = flattenTree(nextTree).map(n => n.name)
-            if (currentNames.includes(comp.name)) {
-              comp.name = getNextAvailableName(comp.name, currentNames)
-            }
-          }
+          const currentNames = flattenTree(nextTree).map(n => n.name)
+          const uniqueComp = ensureUniqueNodeNames(comp, currentNames)
           const requestedParentId = patch.parentId || patch.component.parentId || null
           const requestedParentNode = requestedParentId ? findNode(nextTree, requestedParentId) : null
           const parentId =
@@ -1545,7 +1568,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             (requestedParentNode?.type === 'Screen' && requestedParentId !== activeScreenIdRef.current)
               ? activeScreenIdRef.current
               : requestedParentId
-          nextTree = insertNode(nextTree, comp, parentId)
+          nextTree = insertNode(nextTree, uniqueComp, parentId)
         }
       }
 
@@ -2512,9 +2535,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   const changes = resolveSampleTextDeep(rawChanges)
                   if (changes.name) {
                     const currentNames = flattenTree(nextTree).filter(n => n.id !== id).map(n => n.name)
-                    if (currentNames.includes(changes.name)) {
+                    if (currentNames.some(name => String(name || '').trim().toLowerCase() === String(changes.name || '').trim().toLowerCase())) {
                       changes.name = getNextAvailableName(changes.name, currentNames)
                     }
+                  }
+                  if (Array.isArray(changes.children)) {
+                    const existingTreeWithoutCurrentNode = removeNode(nextTree, id)[0]
+                    const currentNames = flattenTree(existingTreeWithoutCurrentNode).map(n => n.name)
+                    changes.children = ensureUniqueNodeListNames(changes.children, currentNames)
                   }
                   nextTree = updateNode(nextTree, id, () => changes)
                 }
@@ -2525,13 +2553,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               data.components_to_add.forEach(spec => {
                 const comp = createFromSpec(spec, allIds)
                 if (comp) {
-                  if (comp.name) {
-                    const currentNames = flattenTree(nextTree).map(n => n.name)
-                    if (currentNames.includes(comp.name)) {
-                      comp.name = getNextAvailableName(comp.name, currentNames)
-                    }
-                  }
-                  nextTree = insertNode(nextTree, comp, spec.parentId || activeScreenNode?.id)
+                  const currentNames = flattenTree(nextTree).map(n => n.name)
+                  const uniqueComp = ensureUniqueNodeNames(comp, currentNames)
+                  nextTree = insertNode(nextTree, uniqueComp, spec.parentId || activeScreenNode?.id)
                 }
               })
             }
@@ -3284,7 +3308,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
                 {/* Error Indicators */}
                 {(() => {
-                  const errorNodeIds = new Set(globalErrors.map(e => e.nodeId));
+                  const errorNodeIds = new Set(visibleCanvasErrors.map(e => e.nodeId));
                   return Array.from(errorNodeIds).map(nodeId => {
                     const comp = findNode(tree, nodeId);
                     if (!comp || comp.type === 'Screen' || comp.type === 'App') return null;
@@ -3865,5 +3889,8 @@ export {
   CheckboxRenderer,
   RectangleRenderer,
   IconRenderer,
+  ToggleRenderer,
+  RadioRenderer,
+  SliderRenderer,
   createFromSpec
 }

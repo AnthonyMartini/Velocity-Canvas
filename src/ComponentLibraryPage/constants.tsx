@@ -10,6 +10,9 @@ import iconSchema from '../../schemas/icon.json'
 import htmlTextSchema from '../../schemas/htmltext.json'
 import datePickerSchema from '../../schemas/datepicker.json'
 import comboBoxSchema from '../../schemas/combobox.json'
+import toggleSchema from '../../schemas/toggle.json'
+import radioSchema from '../../schemas/radio.json'
+import sliderSchema from '../../schemas/slider.json'
 
 const PROP_TYPE_COLORS = {
   text: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
@@ -30,6 +33,9 @@ const SCHEMAS = [
   htmlTextSchema,
   datePickerSchema,
   comboBoxSchema,
+  toggleSchema,
+  radioSchema,
+  sliderSchema,
   containerSchema,
   gallerySchema
 ]

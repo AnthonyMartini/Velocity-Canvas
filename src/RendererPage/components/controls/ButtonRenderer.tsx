@@ -6,6 +6,10 @@ import { resolveSampleText } from './sampleText'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 
 export default function ButtonRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
+  const isViewMode = comp.DisplayMode === 'DisplayMode.View'
+  const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled' || comp.Disabled
+  const isInteractive = isPlaying && !isViewMode && !isDisabledMode
+
   const style: any = {
     position: 'absolute',
     left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
@@ -17,8 +21,8 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
     textDecoration: comp.Underline ? 'underline' : 'none',
     borderRadius: `${comp.RadiusTopLeft}pt`, // Simplified for now
     border: `${comp.BorderThickness}pt solid ${comp.BorderColor}`,
-    opacity: comp.Visible ? 1 : 0.3,
-    cursor: isPlaying ? 'pointer' : 'move', userSelect: 'none',
+    opacity: comp.Visible === false ? 0.3 : (isDisabledMode ? 0.5 : 1),
+    cursor: isInteractive ? 'pointer' : (isPlaying ? 'default' : 'move'), userSelect: 'none',
     display: 'flex', 
     alignItems: CSS_VALIGN[comp.VerticalAlign] || 'center',
     justifyContent: CSS_JUSTIFY[comp.Align] || 'center',
@@ -33,8 +37,9 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
     zIndex: renderZIndex,
   }
   const handleClick = (e) => {
+    if (!isInteractive) return
     onClick(e)
-    if (isPlaying && comp.OnSelect) {
+    if (comp.OnSelect) {
       executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
     }
   }
@@ -42,7 +47,7 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
   const displayText = resolveSampleText((comp.Text !== undefined && comp.Text !== null) ? comp.Text : 'Button')
 
   return (
-    <button style={style} onMouseDown={onMouseDown} onClick={handleClick} disabled={comp.Disabled}>
+    <button style={style} onMouseDown={onMouseDown} onClick={handleClick} disabled={isPlaying && (isViewMode || isDisabledMode)}>
       {displayText}
     </button>
   )
@@ -65,6 +70,7 @@ ButtonRenderer.propTypes = {
     BorderColor: PropTypes.string,
     Visible: PropTypes.bool,
     Disabled: PropTypes.bool,
+    DisplayMode: PropTypes.string,
     PaddingLeft: PropTypes.number,
     PaddingRight: PropTypes.number,
     PaddingTop: PropTypes.number,

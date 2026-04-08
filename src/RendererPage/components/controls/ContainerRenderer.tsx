@@ -10,6 +10,9 @@ import IconRenderer from './IconRenderer'
 import HtmlTextRenderer from './HtmlTextRenderer'
 import DatePickerRenderer from './DatePickerRenderer'
 import ComboBoxRenderer from './ComboBoxRenderer'
+import ToggleRenderer from './ToggleRenderer'
+import RadioRenderer from './RadioRenderer'
+import SliderRenderer from './SliderRenderer'
 import { CSS_BORDER_STYLE } from './cssProps'
 import { resolveProperties } from '../../../common/helpers'
 import { getDragOutlineStyles, getSelectionStyles } from '@/theme/theme'
@@ -98,6 +101,9 @@ export default function ContainerRenderer({
         if (child.type === 'HtmlText') return <HtmlTextRenderer key={child.id} {...childProps} />
         if (child.type === 'DatePicker') return <DatePickerRenderer key={child.id} {...childProps} />
         if (child.type === 'ComboBox') return <ComboBoxRenderer key={child.id} {...childProps} />
+        if (child.type === 'Toggle') return <ToggleRenderer key={child.id} {...childProps} />
+        if (child.type === 'Radio') return <RadioRenderer key={child.id} {...childProps} />
+        if (child.type === 'Slider') return <SliderRenderer key={child.id} {...childProps} />
         if (child.type === 'Container') return (
           <ContainerRenderer
             key={child.id} {...childProps}

@@ -12,14 +12,12 @@ const SSE_HEADERS = {
 const ALLOWED_RENDERER_CHAT_MODELS = new Set([
   "gemini-3-flash-preview",
   "gemini-3.1-pro-preview",
-  "gemini-2.5-pro",
 ]);
 const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 450 * 1024;
 const RENDERER_CHAT_MODEL_CREDIT_COST = {
   "gemini-3-flash-preview": 5,
   "gemini-3.1-pro-preview": 10,
-  "gemini-2.5-pro": 10,
 };
 
 function estimateBase64Bytes(base64 = "") {
@@ -98,8 +96,10 @@ function summarizeItemsForPrompt(items) {
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
   '- Only use supported component property keys and formulas that this renderer understands.',
-  '- Parent references are limited to "Parent.Width" and "Parent.Height" only.',
-  '- Never use unsupported Power Apps runtime references such as "Parent.TemplateWidth", "Parent.TemplateHeight", "Parent.X", "Parent.Y", "Self.*", or "App.*".',
+  '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
+  '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
+  '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
+  '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", "Self.*", or "App.*".',
   '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
 ].join("\n");
 
@@ -380,9 +380,7 @@ export async function POST(req) {
               logTokenUsage(
                 uid,
                 requestedModel,
-                usage.promptTokenCount || 0,
-                usage.candidatesTokenCount || 0,
-                usage.cachedContentTokenCount || 0
+                usage
               ).catch(console.error);
             }
 

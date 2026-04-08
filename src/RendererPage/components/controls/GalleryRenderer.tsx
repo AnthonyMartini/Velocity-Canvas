@@ -9,6 +9,9 @@ import IconRenderer from './IconRenderer'
 import HtmlTextRenderer from './HtmlTextRenderer'
 import DatePickerRenderer from './DatePickerRenderer'
 import ComboBoxRenderer from './ComboBoxRenderer'
+import ToggleRenderer from './ToggleRenderer'
+import RadioRenderer from './RadioRenderer'
+import SliderRenderer from './SliderRenderer'
 import ContainerRenderer from './ContainerRenderer'
 import { resolveProperties } from '../../../common/helpers'
 import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
@@ -92,6 +95,9 @@ export default function GalleryRenderer({
       if (child.type === 'HtmlText')   return <HtmlTextRenderer key={child.id} {...childProps} />
       if (child.type === 'DatePicker') return <DatePickerRenderer key={child.id} {...childProps} />
       if (child.type === 'ComboBox')   return <ComboBoxRenderer key={child.id} {...childProps} />
+      if (child.type === 'Toggle')     return <ToggleRenderer key={child.id} {...childProps} />
+      if (child.type === 'Radio')      return <RadioRenderer key={child.id} {...childProps} />
+      if (child.type === 'Slider')     return <SliderRenderer key={child.id} {...childProps} />
       if (child.type === 'Container')  return (
         <ContainerRenderer key={child.id} {...childProps}
           onChildMouseDown={onChildMouseDown} onChildClick={onChildClick}

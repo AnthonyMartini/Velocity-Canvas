@@ -18,10 +18,19 @@ const formatK = (num: number) => {
   return num.toString();
 };
 
+const getPromptTokens = (log: any) => Number(log.promptTokens ?? log.inputTokens ?? 0);
+const getToolUsePromptTokens = (log: any) => Number(log.toolUsePromptTokens ?? 0);
+const getInputTokens = (log: any) => Number(log.inputTokens ?? (getPromptTokens(log) + getToolUsePromptTokens(log)));
+const getCandidateTokens = (log: any) => Number(log.candidateTokens ?? log.outputTokens ?? 0);
+const getThoughtsTokens = (log: any) => Number(log.thoughtsTokens ?? 0);
+const getOutputTokens = (log: any) => Number(log.outputTokens ?? (getCandidateTokens(log) + getThoughtsTokens(log)));
+const getCachedTokens = (log: any) => Number(log.cachedTokens ?? 0);
+const getTotalTokens = (log: any) => Number(log.totalTokens ?? (getInputTokens(log) + getOutputTokens(log)));
+
 export default function AdminPage({ user }: AdminPageProps) {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [timeframe, setTimeframe] = useState('today'); // 'today', '7d', '30d', 'all'
+  const [timeframe, setTimeframe] = useState('today');
   const [selectedModel, setSelectedModel] = useState('all');
   const [error, setError] = useState('');
 
@@ -52,7 +61,6 @@ export default function AdminPage({ user }: AdminPageProps) {
     fetchUsage();
   }, [timeframe, user]);
 
-  // Calculations
   const filteredLogs = selectedModel === 'all' ? logs : logs.filter(l => l.modelName === selectedModel);
 
   let totalInput = 0;
@@ -63,17 +71,19 @@ export default function AdminPage({ user }: AdminPageProps) {
   let totalCacheSavings = 0;
 
   filteredLogs.forEach(log => {
-    totalInput += log.inputTokens || 0;
-    totalOutput += log.outputTokens || 0;
-    totalCached += log.cachedTokens || 0;
+    const inputTokens = getInputTokens(log);
+    const outputTokens = getOutputTokens(log);
+    const cachedTokens = getCachedTokens(log);
     const modelPrice = PRICING[log.modelName] || { input: 0, output: 0, cachedInput: 0 };
-    // Cached tokens are billed at cachedInput rate; non-cached at full input rate
-    const nonCachedInput = (log.inputTokens || 0) - (log.cachedTokens || 0);
+    const nonCachedInput = inputTokens - cachedTokens;
+
+    totalInput += inputTokens;
+    totalOutput += outputTokens;
+    totalCached += cachedTokens;
     totalCost += (nonCachedInput / 1_000_000) * modelPrice.input;
-    totalCost += ((log.cachedTokens || 0) / 1_000_000) * modelPrice.cachedInput;
-    totalCost += ((log.outputTokens || 0) / 1_000_000) * modelPrice.output;
-    // Savings = what cached tokens would have cost at full price minus what they actually cost
-    totalCacheSavings += ((log.cachedTokens || 0) / 1_000_000) * (modelPrice.input - modelPrice.cachedInput);
+    totalCost += (cachedTokens / 1_000_000) * modelPrice.cachedInput;
+    totalCost += (outputTokens / 1_000_000) * modelPrice.output;
+    totalCacheSavings += (cachedTokens / 1_000_000) * (modelPrice.input - modelPrice.cachedInput);
   });
 
   return (
@@ -87,11 +97,8 @@ export default function AdminPage({ user }: AdminPageProps) {
             Monitor vertex AI API usage and estimated costs.
           </p>
         </div>
-        
-        {/* Filters */}
+
         <div className="flex flex-col md:flex-row items-center gap-4 shrink-0">
-          
-          {/* Model Filter */}
           <div className="flex items-center gap-2">
             <select
               value={selectedModel}
@@ -112,27 +119,26 @@ export default function AdminPage({ user }: AdminPageProps) {
             )}
           </div>
 
-          {/* Time Filters */}
           <div className="flex items-center gap-2 bg-surface/50 border border-overlay/40 rounded-xl p-1 shrink-0">
-          {[
-            { id: 'today', label: 'Today' },
-            { id: '7d', label: '7 Days' },
-            { id: '30d', label: '30 Days' },
-            { id: 'all', label: 'All Time' }
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setTimeframe(f.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer uppercase tracking-wider ${
-                timeframe === f.id
-                  ? 'bg-accent text-base shadow-md shadow-accent/30'
-                  : 'text-subtext hover:text-text hover:bg-overlay/35'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+            {[
+              { id: 'today', label: 'Today' },
+              { id: '7d', label: '7 Days' },
+              { id: '30d', label: '30 Days' },
+              { id: 'all', label: 'All Time' }
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setTimeframe(f.id)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer uppercase tracking-wider ${
+                  timeframe === f.id
+                    ? 'bg-accent text-base shadow-md shadow-accent/30'
+                    : 'text-subtext hover:text-text hover:bg-overlay/35'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -142,7 +148,6 @@ export default function AdminPage({ user }: AdminPageProps) {
         </div>
       )}
 
-      {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-6xl mx-auto mb-12">
         <div className="bg-surface/40 border border-overlay/30 rounded-3xl p-6 flex flex-col items-center justify-center animate-slide-up" style={{ animationDelay: '0ms' }}>
           <div className="text-subtext text-[10px] uppercase font-black tracking-widest mb-2">Estimated Cost</div>
@@ -167,7 +172,6 @@ export default function AdminPage({ user }: AdminPageProps) {
         </div>
       </div>
 
-      {/* Logs Table */}
       <div className="max-w-6xl mx-auto bg-surface/40 border border-overlay/30 rounded-3xl overflow-hidden shadow-2xl animate-slide-up" style={{ animationDelay: '200ms' }}>
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-surface/60">
           <h3 className="text-lg font-bold text-text">Recent Requests</h3>
@@ -197,11 +201,15 @@ export default function AdminPage({ user }: AdminPageProps) {
               <tbody>
                 {filteredLogs.map((log) => {
                   const modelPrice = PRICING[log.modelName] || { input: 0, output: 0, cachedInput: 0 };
-                  const nonCachedInput = (log.inputTokens || 0) - (log.cachedTokens || 0);
-                  const rowCost = 
+                  const inputTokens = getInputTokens(log);
+                  const outputTokens = getOutputTokens(log);
+                  const cachedTokens = getCachedTokens(log);
+                  const thoughtsTokens = getThoughtsTokens(log);
+                  const nonCachedInput = inputTokens - cachedTokens;
+                  const rowCost =
                     ((nonCachedInput / 1_000_000) * modelPrice.input) +
-                    (((log.cachedTokens || 0) / 1_000_000) * modelPrice.cachedInput) +
-                    (((log.outputTokens || 0) / 1_000_000) * modelPrice.output);
+                    ((cachedTokens / 1_000_000) * modelPrice.cachedInput) +
+                    ((outputTokens / 1_000_000) * modelPrice.output);
 
                   return (
                     <tr key={log.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
@@ -224,18 +232,22 @@ export default function AdminPage({ user }: AdminPageProps) {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-subtext text-xs">{log.inputTokens?.toLocaleString()}</span>
-                        {(log.cachedTokens > 0) && (
+                        <span className="text-subtext text-xs">{inputTokens.toLocaleString()}</span>
+                        {cachedTokens > 0 && (
                           <>
                             <span className="text-subtext/40 mx-1">/</span>
-                            <span className="text-emerald-400 text-xs font-bold" title="Cached tokens">{log.cachedTokens?.toLocaleString()} 💾</span>
+                            <span className="text-emerald-400 text-xs font-bold" title="Cached tokens">
+                              {cachedTokens.toLocaleString()} cached
+                            </span>
                           </>
                         )}
                         <span className="text-subtext/40 mx-1">/</span>
-                        <span className="text-subtext text-xs">{log.outputTokens?.toLocaleString()}</span>
+                        <span className="text-subtext text-xs" title={thoughtsTokens > 0 ? `Includes ${thoughtsTokens.toLocaleString()} thoughts tokens` : undefined}>
+                          {outputTokens.toLocaleString()}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-right text-text font-black text-sm">
-                        {log.totalTokens?.toLocaleString()}
+                        {getTotalTokens(log).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className="text-accent font-black text-sm">

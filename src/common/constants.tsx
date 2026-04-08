@@ -111,6 +111,30 @@ export const ComboBoxIcon = ({ className = 'w-4 h-4' }) => (
   </svg>
 )
 
+export const ToggleIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="10" width="24" height="12" rx="6" />
+    <circle cx="20" cy="16" r="4" fill={ACCENT_COLOR} fillOpacity="0.25" />
+  </svg>
+)
+
+export const RadioIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <circle cx="10" cy="10" r="4" />
+    <circle cx="10" cy="10" r="1.8" fill={ACCENT_COLOR} stroke="none" />
+    <circle cx="10" cy="22" r="4" />
+    <line x1="18" y1="10" x2="26" y2="10" />
+    <line x1="18" y1="22" x2="26" y2="22" />
+  </svg>
+)
+
+export const SliderIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <line x1="6" y1="16" x2="26" y2="16" />
+    <circle cx="18" cy="16" r="4" fill={ACCENT_COLOR} fillOpacity="0.25" />
+  </svg>
+)
+
 // Lookup map: component type → icon component
 export const TYPE_ICONS = {
   App:       AppIcon,
@@ -127,6 +151,9 @@ export const TYPE_ICONS = {
   HtmlText:  HtmlTextIcon,
   DatePicker: DatePickerIcon,
   ComboBox:  ComboBoxIcon,
+  Toggle:    ToggleIcon,
+  Radio:     RadioIcon,
+  Slider:    SliderIcon,
 }
 
 // Lookup map: component type → Tailwind background colour class
@@ -145,4 +172,7 @@ export const TYPE_COLORS = {
   HtmlText:  'bg-fuchsia-400',
   DatePicker: 'bg-teal-400',
   ComboBox:  'bg-orange-400',
+  Toggle:    'bg-sky-500',
+  Radio:     'bg-rose-500',
+  Slider:    'bg-lime-500',
 }

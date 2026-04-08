@@ -365,14 +365,23 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
         else if (propName === 'Height') rawVal = 768
       }
 
-      // Special Gallery Template dimension logic
-      // In Power Apps, Parent.Height in a vertical gallery is the TemplateSize, not the Gallery Height.
-      if (targetNode.type === 'Gallery' && (propName === 'Width' || propName === 'Height')) {
+      // Special Gallery Template dimension logic.
+      // In Power Apps, gallery children can read template dimensions even though
+      // those are not explicit editable properties in the control schema.
+      if (targetNode.type === 'Gallery' && (propName === 'Width' || propName === 'Height' || propName === 'TemplateWidth' || propName === 'TemplateHeight')) {
         const isVertical = targetNode.Variant ? targetNode.Variant.includes('Vertical') : true
         if (isVertical && propName === 'Height') {
           rawVal = targetNode.TemplateSize || 100
         } else if (!isVertical && propName === 'Width') {
           rawVal = targetNode.TemplateSize || 100
+        } else if (isVertical && propName === 'TemplateHeight') {
+          rawVal = targetNode.TemplateSize || 100
+        } else if (isVertical && propName === 'TemplateWidth') {
+          rawVal = getPropertyValue(targetNode, 'Width') ?? 0
+        } else if (!isVertical && propName === 'TemplateWidth') {
+          rawVal = targetNode.TemplateSize || 100
+        } else if (!isVertical && propName === 'TemplateHeight') {
+          rawVal = getPropertyValue(targetNode, 'Height') ?? 0
         }
       }
 

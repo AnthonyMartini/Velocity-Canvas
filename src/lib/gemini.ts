@@ -51,11 +51,62 @@ export const MODEL_NAME = "gemini-3-flash-preview";
 export const TWEAK_MODEL_NAME = "gemini-3.1-flash-lite-preview";
 export const RENDERER_CHAT_MODEL_NAME = "gemini-3-flash-preview";
 
+const THINKING_LEVEL_VALUES = new Set(["HIGH", "MEDIUM", "LOW", "MINIMAL", "THINKING_LEVEL_UNSPECIFIED"]);
+
+function isGeminiThreeFamily(modelName: string) {
+  return /^gemini-3(\.|-|$)/i.test(modelName);
+}
+
+function isGeminiThreeFlash(modelName: string) {
+  return /^gemini-3(?:\.\d+)?-flash(?:-|$)/i.test(modelName);
+}
+
+function parseEnvInteger(name: string) {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return null;
+  const parsed = Number.parseInt(String(raw).trim(), 10);
+  if (!Number.isFinite(parsed)) {
+    console.warn(`[gemini] Ignoring invalid integer env ${name}=${raw}`);
+    return null;
+  }
+  return parsed;
+}
+
+function parseEnvThinkingLevel(name: string) {
+  const raw = process.env[name];
+  if (!raw) return null;
+  const normalized = String(raw).trim().toUpperCase();
+  if (!THINKING_LEVEL_VALUES.has(normalized)) {
+    console.warn(`[gemini] Ignoring invalid thinking level env ${name}=${raw}`);
+    return null;
+  }
+  return normalized;
+}
+
+function resolveThinkingConfig(modelName: string, envPrefix?: string) {
+  const scopedLevel = envPrefix ? parseEnvThinkingLevel(`${envPrefix}_THINKING_LEVEL`) : null;
+  const globalLevel = parseEnvThinkingLevel("GEMINI_THINKING_LEVEL");
+  const scopedBudget = envPrefix ? parseEnvInteger(`${envPrefix}_THINKING_BUDGET`) : null;
+  const globalBudget = parseEnvInteger("GEMINI_THINKING_BUDGET");
+
+  if (isGeminiThreeFamily(modelName)) {
+    let thinkingLevel = scopedLevel ?? globalLevel;
+    if ((thinkingLevel === "MINIMAL" || thinkingLevel === "MEDIUM") && !isGeminiThreeFlash(modelName)) {
+      console.warn(`[gemini] ${modelName} does not support thinking level ${thinkingLevel}; falling back to LOW`);
+      thinkingLevel = "LOW";
+    }
+    return thinkingLevel ? { thinkingLevel } : null;
+  }
+
+  const thinkingBudget = scopedBudget ?? globalBudget;
+  return thinkingBudget != null ? { thinkingBudget } : null;
+}
+
 /**
  * Creates a thin wrapper around the new @google/genai SDK that matches
  * the call signature used across the API routes.
  */
-function createModel(systemInstruction: string, modelName: string = MODEL_NAME) {
+function createModel(systemInstruction: string, modelName: string = MODEL_NAME, options: { envPrefix?: string } = {}) {
   function buildGenerateParams(content: any) {
     let contents: any;
     let config = { systemInstruction } as Record<string, any>;
@@ -73,6 +124,14 @@ function createModel(systemInstruction: string, modelName: string = MODEL_NAME) 
       rest = remaining;
     } else {
       contents = content;
+    }
+
+    const thinkingConfig = resolveThinkingConfig(modelName, options.envPrefix);
+    if (thinkingConfig) {
+      config.thinkingConfig = {
+        ...(config.thinkingConfig || {}),
+        ...thinkingConfig,
+      };
     }
 
     return {
@@ -121,5 +180,5 @@ async function* wrapStream(stream: AsyncGenerator<any>) {
 // ── Exported Models ──────────────────────────────────────────────────────────
 
 
-export const tweakModel = createModel(TWEAK_SYSTEM_PROMPT, TWEAK_MODEL_NAME);
-export const rendererChatModel = createModel(RENDERER_CHAT_SYSTEM_PROMPT, RENDERER_CHAT_MODEL_NAME);
+export const rendererChatModel = createModel(RENDERER_CHAT_SYSTEM_PROMPT, RENDERER_CHAT_MODEL_NAME, { envPrefix: "RENDERER_CHAT" });
+export const tweakModel = createModel(TWEAK_SYSTEM_PROMPT, TWEAK_MODEL_NAME, { envPrefix: "TWEAK" });

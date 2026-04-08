@@ -299,24 +299,75 @@ export function reorderNode(nodes, id, direction) {
  * @param {string[]} existingNames - List of all names currently in the tree
  */
 export function getNextAvailableName(baseName, existingNames) {
+  const normalizedBaseName = String(baseName || '').trim() || 'Component'
+  const takenNames = new Set(
+    (existingNames || [])
+      .map(name => String(name || '').trim().toLowerCase())
+      .filter(Boolean)
+  )
+
   // Regex to match "Name" and optionally "_N" or just a number (for backward compatibility)
   // We prioritize the _N pattern requested by the user.
-  const match = baseName.match(/^(.*?)(?:_(\d+))?$/)
-  const nameWithoutSuffix = match[1]
-  
+  const match = normalizedBaseName.match(/^(.*?)(?:_(\d+))?$/)
+  const nameWithoutSuffix = match?.[1] || normalizedBaseName
+
   let counter = 1
   // If the baseName itself already has a _N suffix, we start incrementing from there
-  if (match[2]) {
+  if (match?.[2]) {
     counter = parseInt(match[2], 10) + 1
   }
 
   let newName = `${nameWithoutSuffix}_${counter}`
-  while (existingNames.includes(newName)) {
+  while (takenNames.has(newName.toLowerCase())) {
     counter++
     newName = `${nameWithoutSuffix}_${counter}`
   }
-  
+
   return newName
+}
+
+export function ensureUniqueNodeNames(node, existingNames = []) {
+  if (!node || typeof node !== 'object') return node
+
+  const reservedNames = [...(existingNames || [])]
+
+  const reserveUniqueName = (candidateName, fallbackName = 'Component') => {
+    const normalizedName = String(candidateName || '').trim() || fallbackName
+    const takenNames = new Set(reservedNames.map(name => String(name || '').trim().toLowerCase()).filter(Boolean))
+    const nextName = takenNames.has(normalizedName.toLowerCase())
+      ? getNextAvailableName(normalizedName, reservedNames)
+      : normalizedName
+
+    reservedNames.push(nextName)
+    return nextName
+  }
+
+  const walk = (currentNode) => {
+    if (!currentNode || typeof currentNode !== 'object') return currentNode
+
+    const uniqueName = reserveUniqueName(currentNode.name, currentNode.type || 'Component')
+    const nextNode = { ...currentNode, name: uniqueName }
+
+    if (Array.isArray(currentNode.children)) {
+      nextNode.children = currentNode.children.map(child => walk(child))
+    }
+
+    return nextNode
+  }
+
+  return walk(node)
+}
+
+export function ensureUniqueNodeListNames(nodes, existingNames = []) {
+  if (!Array.isArray(nodes)) return nodes
+
+  const reservedNames = [...(existingNames || [])]
+  return nodes.map(node => {
+    const uniqueNode = ensureUniqueNodeNames(node, reservedNames)
+    const uniqueNames = flattenTree([uniqueNode]).map(n => n.name)
+    reservedNames.push(...uniqueNames)
+    return uniqueNode
+  })
 }
 
 /**

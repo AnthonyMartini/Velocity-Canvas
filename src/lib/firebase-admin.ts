@@ -238,24 +238,75 @@ export async function checkUserIsAdmin(uid: string): Promise<boolean> {
  * Logs token usage for a user to Firestore.
  * @param cachedTokens - tokens served from context cache (0 if caching not used)
  */
+function toSafeTokenNumber(value: unknown): number {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+export function normalizeUsageMetadataForLogging(usageMetadata: any = null) {
+  const promptTokens = toSafeTokenNumber(usageMetadata?.promptTokenCount);
+  const candidateTokens = toSafeTokenNumber(usageMetadata?.candidatesTokenCount);
+  const thoughtsTokens = toSafeTokenNumber(usageMetadata?.thoughtsTokenCount);
+  const toolUsePromptTokens = toSafeTokenNumber(usageMetadata?.toolUsePromptTokenCount);
+  const cachedTokens = toSafeTokenNumber(usageMetadata?.cachedContentTokenCount);
+
+  // Vertex exposes tool-use prompt tokens separately from the base prompt bucket.
+  // Treat them as additional input tokens because they are fed back into the model.
+  const inputTokens = promptTokens + toolUsePromptTokens;
+
+  // Vertex total token counts can exceed visible candidate tokens when the model
+  // emits hidden reasoning/"thoughts". Count those as output for billing parity.
+  const outputTokens = candidateTokens + thoughtsTokens;
+
+  const totalTokens = toSafeTokenNumber(usageMetadata?.totalTokenCount) || (inputTokens + outputTokens);
+
+  return {
+    inputTokens,
+    outputTokens,
+    cachedTokens,
+    totalTokens,
+    promptTokens,
+    candidateTokens,
+    thoughtsTokens,
+    toolUsePromptTokens,
+  };
+}
+
 export async function logTokenUsage(
   uid: string,
   modelName: string,
-  inputTokens: number,
-  outputTokens: number,
+  usageOrInputTokens: any,
+  outputTokens: number = 0,
   cachedTokens: number = 0
 ): Promise<void> {
   if (!adminDb) return;
   try {
-    const totalTokens = inputTokens + outputTokens;
+    const normalized = typeof usageOrInputTokens === 'object' && usageOrInputTokens !== null
+      ? normalizeUsageMetadataForLogging(usageOrInputTokens)
+      : {
+          inputTokens: toSafeTokenNumber(usageOrInputTokens),
+          outputTokens: toSafeTokenNumber(outputTokens),
+          cachedTokens: toSafeTokenNumber(cachedTokens),
+          totalTokens: toSafeTokenNumber(usageOrInputTokens) + toSafeTokenNumber(outputTokens),
+          promptTokens: toSafeTokenNumber(usageOrInputTokens),
+          candidateTokens: toSafeTokenNumber(outputTokens),
+          thoughtsTokens: 0,
+          toolUsePromptTokens: 0,
+        };
+
     await adminDb.collection('token_usage').add({
       uid,
       modelName,
-      inputTokens,
-      outputTokens,
-      cachedTokens,
-      totalTokens,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      inputTokens: normalized.inputTokens,
+      outputTokens: normalized.outputTokens,
+      cachedTokens: normalized.cachedTokens,
+      totalTokens: normalized.totalTokens,
+      promptTokens: normalized.promptTokens,
+      candidateTokens: normalized.candidateTokens,
+      thoughtsTokens: normalized.thoughtsTokens,
+      toolUsePromptTokens: normalized.toolUsePromptTokens,
+      usageMetadata: usageOrInputTokens,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
   } catch (error) {
     console.error('Error logging token usage:', error);

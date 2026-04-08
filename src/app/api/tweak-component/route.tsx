@@ -34,8 +34,10 @@ const AI_SUMMARY_KEYS = new Set([
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
   '- Only use supported component property keys and formulas that this renderer understands.',
-  '- Parent references are limited to "Parent.Width" and "Parent.Height" only.',
-  '- Never use unsupported Power Apps runtime references such as "Parent.TemplateWidth", "Parent.TemplateHeight", "Parent.X", "Parent.Y", "Self.*", or "App.*".',
+  '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
+  '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
+  '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
+  '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", "Self.*", or "App.*".',
   '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
 ].join("\n");
 
@@ -207,9 +209,7 @@ export async function POST(req) {
               logTokenUsage(
                 uid,
                 TWEAK_MODEL_NAME,
-                usage.promptTokenCount || 0,
-                usage.candidatesTokenCount || 0,
-                usage.cachedContentTokenCount || 0
+                usage
               ).catch(console.error);
             }
 
