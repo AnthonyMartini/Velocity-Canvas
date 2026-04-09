@@ -9,6 +9,10 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
   const isViewMode = comp.DisplayMode === 'DisplayMode.View'
   const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled' || comp.Disabled
   const isInteractive = isPlaying && !isViewMode && !isDisabledMode
+  const radiusTopLeft = comp.RadiusTopLeft ?? comp.BorderRadius ?? 0
+  const radiusTopRight = comp.RadiusTopRight ?? comp.BorderRadius ?? 0
+  const radiusBottomRight = comp.RadiusBottomRight ?? comp.BorderRadius ?? 0
+  const radiusBottomLeft = comp.RadiusBottomLeft ?? comp.BorderRadius ?? 0
 
   const style: any = {
     position: 'absolute',
@@ -19,7 +23,7 @@ export default function ButtonRenderer({ comp, selected, isPlaying, localVars, s
     fontWeight: CSS_FW[comp.FontWeight] || comp.FontWeight,
     fontStyle: comp.Italic ? 'italic' : 'normal',
     textDecoration: comp.Underline ? 'underline' : 'none',
-    borderRadius: `${comp.RadiusTopLeft}pt`, // Simplified for now
+    borderRadius: `${radiusTopLeft}pt ${radiusTopRight}pt ${radiusBottomRight}pt ${radiusBottomLeft}pt`,
     border: `${comp.BorderThickness}pt solid ${comp.BorderColor}`,
     opacity: comp.Visible === false ? 0.3 : (isDisabledMode ? 0.5 : 1),
     cursor: isInteractive ? 'pointer' : (isPlaying ? 'default' : 'move'), userSelect: 'none',
@@ -66,6 +70,7 @@ ButtonRenderer.propTypes = {
     Italic: PropTypes.bool,
     Underline: PropTypes.bool,
     RadiusTopLeft: PropTypes.number,
+    BorderRadius: PropTypes.number,
     BorderThickness: PropTypes.number,
     BorderColor: PropTypes.string,
     Visible: PropTypes.bool,

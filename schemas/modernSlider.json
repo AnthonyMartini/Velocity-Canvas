@@ -1,0 +1,36 @@
+{
+  "type": "ModernSlider",
+  "control": "Slider (Modern)",
+  "defaults": {
+    "AccessibleLabel": "\"\"",
+    "BasePaletteColor": "",
+    "DisplayMode": "DisplayMode.Edit",
+    "Height": 44,
+    "Layout": "Layout.Horizontal",
+    "Max": 100,
+    "Min": 0,
+    "OnChange": "",
+    "Size": 14,
+    "Value": 35,
+    "Visible": true,
+    "Width": 240,
+    "X": 80,
+    "Y": 80
+  },
+  "properties": [
+    { "key": "Value", "label": "Value", "type": "number", "propertyType": "Input" },
+    { "key": "Min", "label": "Min", "type": "number", "propertyType": "Input" },
+    { "key": "Max", "label": "Max", "type": "number", "propertyType": "Input" },
+    { "key": "AccessibleLabel", "label": "Accessible Label", "type": "text", "propertyType": "Input" },
+    { "key": "BasePaletteColor", "label": "Base Palette", "type": "color", "propertyType": "Input" },
+    { "key": "Layout", "label": "Layout", "type": "select", "options": ["Layout.Horizontal", "Layout.Vertical"], "propertyType": "Input" },
+    { "key": "Size", "label": "Font Size", "type": "number", "propertyType": "Input" },
+    { "key": "X", "label": "X", "type": "number", "propertyType": "Input" },
+    { "key": "Y", "label": "Y", "type": "number", "propertyType": "Input" },
+    { "key": "Width", "label": "Width", "type": "number", "propertyType": "Input" },
+    { "key": "Height", "label": "Height", "type": "number", "propertyType": "Input" },
+    { "key": "DisplayMode", "label": "Display Mode", "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
+    { "key": "Visible", "label": "Visible", "type": "boolean", "propertyType": "Input" },
+    { "key": "OnChange", "label": "OnChange", "type": "text", "propertyType": "Event" }
+  ]
+}

@@ -80,7 +80,14 @@ export default function ProjectsDashboard({ user, onOpenProject }) {
       await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ projectId: proj.id, name: newName, tree: proj.tree, canvasW: proj.canvasW, canvasH: proj.canvasH })
+        body: JSON.stringify({
+          projectId: proj.id,
+          name: newName,
+          tree: proj.tree,
+          canvasW: proj.canvasW,
+          canvasH: proj.canvasH,
+          canvasTheme: proj.canvasTheme,
+        })
       });
     } catch (err) {
       // Revert on failure

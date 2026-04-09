@@ -29,12 +29,20 @@ export function createFromSpec(spec, usedIds?: Set<string>) {
   )
   
   const schema = typeKey ? SCHEMAS[typeKey] : null
-  if (!schema) {
+  if (!schema && spec.type !== 'UnknownPowerAppsObject') {
     console.warn(`No schema found for type: ${spec.type}`)
     return null
   }
 
-  const base = JSON.parse(JSON.stringify(schema.defaults))
+  const base = schema
+    ? JSON.parse(JSON.stringify(schema.defaults))
+    : {
+        X: 40,
+        Y: 40,
+        Width: 180,
+        Height: 96,
+        Visible: true,
+      }
   
   // Flatten children/Children
   const childrenList = spec.children || spec.Children || []
@@ -55,8 +63,8 @@ export function createFromSpec(spec, usedIds?: Set<string>) {
     ...base, 
     ...normalizedRest, 
     id: finalId, 
-    type: schema.type, 
-    name: spec.name || nextName(schema.type), 
+    type: schema?.type || spec.type, 
+    name: spec.name || nextName(schema?.type || spec.type), 
     children: processedChildren 
   }
 }
@@ -117,21 +125,74 @@ export function componentToYaml(node, col = 0) {
   const sp = (n) => ' '.repeat(n)   // exact column indent
   const safeName = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').replace(/^\d+/, '') || 'Ctrl'
 
+  if (node.type === 'UnknownPowerAppsObject' && node._rawPowerAppsYaml) {
+    return String(node._rawPowerAppsYaml)
+      .split('\n')
+      .map(line => line ? `${sp(col)}${line}` : '')
+      .join('\n')
+  }
+
   // Use explicit name if set, otherwise derive from text
-  const name = node.name
-    ? node.name
-    : node.type === 'Container'
-      ? 'Container'
-      : node.type === 'Button'
-        ? (safeName(node.text) || 'Button') + 'Button'
-        : node.type === 'TextInput'
-          ? (safeName(node.HintText) || 'TextInput') + 'Input'
-          : node.type === 'Dropdown'
-            ? (safeName(node.Default) || 'Dropdown') + 'Dropdown'
-            : (safeName(node.Text) || 'Label')  + 'Label'
+  let name = node.name
+  if (!name) {
+    if (node.type === 'Container') {
+      name = 'Container'
+    } else if (node.type === 'Button' || node.type === 'ModernButton') {
+      name = (safeName(node.Text) || 'Button') + 'Button'
+    } else if (node.type === 'ModernCheckbox') {
+      name = (safeName(node.Label) || 'Checkbox') + 'Checkbox'
+    } else if (node.type === 'ModernDropdown') {
+      name = 'Dropdown'
+    } else if (node.type === 'ModernComboBox') {
+      name = 'ComboBox'
+    } else if (node.type === 'ModernProgressBar') {
+      name = 'ProgressBar'
+    } else if (node.type === 'ModernSlider') {
+      name = 'Slider'
+    } else if (node.type === 'ModernSpinner') {
+      name = (safeName(node.Label) || 'Spinner') + 'Spinner'
+    } else if (node.type === 'ModernText') {
+      name = (safeName(node.Text) || 'Text') + 'Text'
+    } else if (node.type === 'ModernTextInput') {
+      name = (safeName(node.Placeholder || node.Default) || 'TextInput') + 'Input'
+    } else if (node.type === 'ModernToggle') {
+      name = (safeName(node.Label) || 'Toggle') + 'Toggle'
+    } else if (node.type === 'Link') {
+      name = (safeName(node.Text) || 'Link') + 'Link'
+    } else if (node.type === 'NumberInput') {
+      name = (safeName(node.HintText) || 'NumberInput') + 'Input'
+    } else if (node.type === 'ModernDatePicker') {
+      name = 'DatePicker'
+    } else if (node.type === 'RichTextEditor') {
+      name = 'RichTextEditor'
+    } else if (node.type === 'Rating') {
+      name = 'Rating'
+    } else if (node.type === 'TextInput') {
+      name = (safeName(node.HintText) || 'TextInput') + 'Input'
+    } else if (node.type === 'Dropdown') {
+      name = (safeName(node.Default) || 'Dropdown') + 'Dropdown'
+    } else {
+      name = (safeName(node.Text) || 'Label') + 'Label'
+    }
+  }
 
   const controlMap = {
     Button:    'Classic/Button@2.2.0',
+    ModernButton: 'Button@0.0.45',
+    ModernDropdown: 'Dropdown',
+    ModernCheckbox: 'Checkbox',
+    ModernComboBox: 'Combobox',
+    ModernProgressBar: 'ProgressBar',
+    ModernSlider: 'Slider',
+    ModernSpinner: 'Spinner',
+    ModernText: 'Text',
+    ModernTextInput: 'TextInput',
+    ModernToggle: 'Toggle',
+    Link: 'Link',
+    NumberInput: 'NumberInput',
+    ModernDatePicker: 'DatePicker',
+    RichTextEditor: 'RichTextEditor',
+    Rating: 'Rating',
     Label:     'Label@2.5.1',
     Container: 'GroupContainer@1.4.0',
     TextInput: 'Classic/TextInput@2.3.2',
@@ -237,6 +298,10 @@ export function componentToYaml(node, col = 0) {
   }
 
   if (node.type === 'Button') {
+    const radiusTopLeft = node.RadiusTopLeft ?? node.BorderRadius
+    const radiusTopRight = node.RadiusTopRight ?? node.BorderRadius
+    const radiusBottomLeft = node.RadiusBottomLeft ?? node.BorderRadius
+    const radiusBottomRight = node.RadiusBottomRight ?? node.BorderRadius
     p('Text', node.Text || '"Button"')
     p('X', node.X)
     p('Y', node.Y)
@@ -249,10 +314,10 @@ export function componentToYaml(node, col = 0) {
     p('FontWeight', node.FontWeight)
     p('Align', node.Align)
     p('VerticalAlign', node.VerticalAlign)
-    p('RadiusTopLeft', node.RadiusTopLeft)
-    p('RadiusTopRight', node.RadiusTopRight)
-    p('RadiusBottomLeft', node.RadiusBottomLeft)
-    p('RadiusBottomRight', node.RadiusBottomRight)
+    p('RadiusTopLeft', radiusTopLeft)
+    p('RadiusTopRight', radiusTopRight)
+    p('RadiusBottomLeft', radiusBottomLeft)
+    p('RadiusBottomRight', radiusBottomRight)
     p('BorderColor', toRgba(node.BorderColor))
     p('BorderThickness', node.BorderThickness)
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
@@ -269,6 +334,402 @@ export function componentToYaml(node, col = 0) {
     if (node.Strikethrough) p('Strikethrough', 'true')
     if (node.Visible === false) p('Visible', 'false')
     if (node.DisplayMode === 'DisplayMode.Disabled') p('DisplayMode', 'DisplayMode.Disabled')
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+  } else if (node.type === 'ModernButton') {
+    const modernAppearanceMap = {
+      'ModernButtonAppearance.Primary': "'ButtonCanvas.Appearance'.Primary",
+      'ModernButtonAppearance.Secondary': "'ButtonCanvas.Appearance'.Secondary",
+      'ModernButtonAppearance.Outline': "'ButtonCanvas.Appearance'.Outline",
+      'ModernButtonAppearance.Subtle': "'ButtonCanvas.Appearance'.Subtle",
+      'ModernButtonAppearance.Transparent': "'ButtonCanvas.Appearance'.Transparent",
+    }
+    const modernLayoutMap = {
+      'ModernButtonLayout.TextOnly': "'ButtonCanvas.Layout'.TextOnly",
+      'ModernButtonLayout.IconBefore': "'ButtonCanvas.Layout'.IconBefore",
+      'ModernButtonLayout.IconAfter': "'ButtonCanvas.Layout'.IconAfter",
+      'ModernButtonLayout.IconOnly': "'ButtonCanvas.Layout'.IconOnly",
+    }
+    const modernIconStyleMap = {
+      'ModernButtonIconStyle.Outline': "'ButtonCanvas.IconStyle'.Outline",
+      'ModernButtonIconStyle.Filled': "'ButtonCanvas.IconStyle'.Filled",
+    }
+
+    p('Text', node.Text || '"Button"')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    p('BorderRadius', node.BorderRadius)
+    p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    p('FontSize', node.FontSize)
+    p('FontWeight', node.FontWeight)
+    if (node.FontItalic) p('FontItalic', 'true')
+    if (node.FontUnderline) p('FontUnderline', 'true')
+    if (node.FontStrikethrough) p('FontStrikethrough', 'true')
+    if (node.Icon) p('Icon', node.Icon)
+    if (node.IconRotation) p('IconRotation', node.IconRotation)
+    if (node.AcceptsFocus === false) p('AcceptsFocus', 'false')
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode && node.DisplayMode !== 'DisplayMode.Edit') p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+    if (node.Appearance && modernAppearanceMap[node.Appearance]) {
+      lines.push(`${sp(col + 6)}Appearance: =${modernAppearanceMap[node.Appearance]}`)
+    }
+    if (node.Layout && modernLayoutMap[node.Layout]) {
+      lines.push(`${sp(col + 6)}Layout: =${modernLayoutMap[node.Layout]}`)
+    }
+    if (node.IconStyle && modernIconStyleMap[node.IconStyle]) {
+      lines.push(`${sp(col + 6)}IconStyle: =${modernIconStyleMap[node.IconStyle]}`)
+    }
+  } else if (node.type === 'ModernDropdown') {
+    if (node.Items) p('Items', node.Items)
+    if (node.DefaultSelectedItems) p('DefaultSelectedItems', node.DefaultSelectedItems)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    p('FontSize', node.FontSize)
+    if (node.Required !== undefined) p('Required', node.Required ? 'true' : 'false')
+    if (node.ValidationState) p('ValidationState', node.ValidationState)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernCheckbox') {
+    p('Label', node.Label || '"Checkbox"')
+    p('Checked', node.Checked ? 'true' : 'false')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    p('FontSize', node.FontSize)
+    p('FontWeight', node.FontWeight)
+    if (node.FontItalic) p('FontItalic', 'true')
+    if (node.FontUnderline) p('FontUnderline', 'true')
+    if (node.FontStrikethrough) p('FontStrikethrough', 'true')
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnCheck) p('OnCheck', node.OnCheck)
+    if (node.OnUncheck) p('OnUncheck', node.OnUncheck)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+  } else if (node.type === 'ModernComboBox') {
+    if (node.Items) p('Items', node.Items)
+    if (node.DefaultSelectedItems) p('DefaultSelectedItems', node.DefaultSelectedItems)
+    if (node.SelectMultiple) p('SelectMultiple', 'true')
+    if (node.AllowMultipleSelection) p('AllowMultipleSelection', 'true')
+    if (node.IsSearchable === false) p('IsSearchable', 'false')
+    if (node.AllowSearching === false) p('AllowSearching', 'false')
+    if (node.ItemDisplayText) p('ItemDisplayText', node.ItemDisplayText)
+    if (node.MultiValueDelimiter) p('MultiValueDelimiter', node.MultiValueDelimiter)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Appearance) p('Appearance', node.Appearance)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Color) p('Color', toRgba(node.Color))
+    if (node.Fill) p('Fill', toRgba(node.Fill))
+    p('Size', node.Size)
+    if (node.Font) p('Font', node.Font)
+    p('FontWeight', node.FontWeight)
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    p('InputTextPlaceholder', node.InputTextPlaceholder || '""')
+    p('PaddingTop', node.PaddingTop)
+    p('PaddingRight', node.PaddingRight)
+    p('PaddingBottom', node.PaddingBottom)
+    p('PaddingLeft', node.PaddingLeft)
+    p('RadiusTopLeft', node.RadiusTopLeft)
+    p('RadiusTopRight', node.RadiusTopRight)
+    p('RadiusBottomLeft', node.RadiusBottomLeft)
+    p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Required !== undefined) p('Required', node.Required ? 'true' : 'false')
+    if (node.ValidationState) p('ValidationState', node.ValidationState)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernProgressBar') {
+    p('Value', node.Value)
+    p('Max', node.Max)
+    if (node.Indeterminate !== undefined) p('Indeterminate', node.Indeterminate ? 'true' : 'false')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.ProgressColor) p('ProgressColor', node.ProgressColor)
+    if (node.Shape) p('Shape', node.Shape)
+    if (node.Thickness) p('Thickness', node.Thickness)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernSlider') {
+    p('Value', node.Value)
+    p('Min', node.Min)
+    p('Max', node.Max)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Layout) p('Layout', node.Layout)
+    p('Size', node.Size)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernSpinner') {
+    p('Label', node.Label || '"Loading"')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Appearance) p('Appearance', node.Appearance)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    p('FontSize', node.FontSize)
+    p('FontWeight', node.FontWeight)
+    if (node.FontItalic) p('FontItalic', 'true')
+    if (node.FontUnderline) p('FontUnderline', 'true')
+    if (node.FontStrikethrough) p('FontStrikethrough', 'true')
+    if (node.LabelPosition) p('LabelPosition', node.LabelPosition)
+    if (node.SpinnerSize) p('SpinnerSize', node.SpinnerSize)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernText') {
+    p('Text', node.Text || '"Text"')
+    p('Align', node.Align)
+    p('VerticalAlign', node.VerticalAlign)
+    if (node.AutoHeight !== undefined) p('AutoHeight', node.AutoHeight ? 'true' : 'false')
+    if (node.Wrap !== undefined) p('Wrap', node.Wrap ? 'true' : 'false')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    p('Color', toRgba(node.Color))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    if (node.Font) p('Font', node.Font)
+    p('Size', node.Size)
+    p('FontWeight', node.FontWeight)
+    if (node.Italic) p('Italic', 'true')
+    if (node.Underline) p('Underline', 'true')
+    if (node.Strikethrough) p('Strikethrough', 'true')
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    p('PaddingTop', node.PaddingTop)
+    p('PaddingRight', node.PaddingRight)
+    p('PaddingBottom', node.PaddingBottom)
+    p('PaddingLeft', node.PaddingLeft)
+    p('RadiusTopLeft', node.RadiusTopLeft)
+    p('RadiusTopRight', node.RadiusTopRight)
+    p('RadiusBottomLeft', node.RadiusBottomLeft)
+    p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+  } else if (node.type === 'ModernTextInput') {
+    if (node.Default !== undefined) p('Default', node.Default)
+    if (node.Text !== undefined) p('Text', node.Text)
+    if (node.Placeholder) p('Placeholder', node.Placeholder)
+    if (node.Type) p('Type', node.Type)
+    if (node.TriggerOutput !== undefined) p('TriggerOutput', node.TriggerOutput ? 'true' : 'false')
+    if (node.Required !== undefined) p('Required', node.Required ? 'true' : 'false')
+    if (node.ValidationState) p('ValidationState', node.ValidationState)
+    p('Align', node.Align)
+    if (node.Appearance) p('Appearance', node.Appearance)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    p('Color', toRgba(node.Color))
+    p('Fill', toRgba(node.Fill))
+    if (node.Font) p('Font', node.Font)
+    p('Size', node.Size)
+    p('FontWeight', node.FontWeight)
+    if (node.Italic) p('Italic', 'true')
+    if (node.Underline) p('Underline', 'true')
+    if (node.Strikethrough) p('Strikethrough', 'true')
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    if (node.MaxLength) p('MaxLength', node.MaxLength)
+    p('PaddingTop', node.PaddingTop)
+    p('PaddingRight', node.PaddingRight)
+    p('PaddingBottom', node.PaddingBottom)
+    p('PaddingLeft', node.PaddingLeft)
+    p('RadiusTopLeft', node.RadiusTopLeft)
+    p('RadiusTopRight', node.RadiusTopRight)
+    p('RadiusBottomLeft', node.RadiusBottomLeft)
+    p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernToggle') {
+    p('Label', node.Label || '"Toggle"')
+    p('Checked', node.Checked ? 'true' : 'false')
+    if (node.LabelPosition || node.LabelPostion) p('LabelPosition', node.LabelPosition || node.LabelPostion)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    p('FontSize', node.FontSize)
+    p('FontWeight', node.FontWeight)
+    if (node.FontItalic) p('FontItalic', 'true')
+    if (node.FontUnderline) p('FontUnderline', 'true')
+    if (node.FontStrikethrough) p('FontStrikethrough', 'true')
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnCheck) p('OnCheck', node.OnCheck)
+    if (node.OnUncheck) p('OnUncheck', node.OnUncheck)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+  } else if (node.type === 'Link') {
+    p('Text', node.Text || '"Open link"')
+    if (node.Url) p('Url', node.Url)
+    if (node.Type) p('Type', node.Type)
+    p('Align', node.Align)
+    p('VerticalAlign', node.VerticalAlign)
+    if (node.AutoHeight !== undefined) p('AutoHeight', node.AutoHeight ? 'true' : 'false')
+    if (node.Wrap !== undefined) p('Wrap', node.Wrap ? 'true' : 'false')
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    p('Color', toRgba(node.Color))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    if (node.Font) p('Font', node.Font)
+    p('Size', node.Size)
+    p('FontWeight', node.FontWeight)
+    if (node.Italic) p('Italic', 'true')
+    if (node.Underline) p('Underline', 'true')
+    if (node.Strikethrough) p('Strikethrough', 'true')
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    p('PaddingTop', node.PaddingTop)
+    p('PaddingRight', node.PaddingRight)
+    p('PaddingBottom', node.PaddingBottom)
+    p('PaddingLeft', node.PaddingLeft)
+    p('RadiusTopLeft', node.RadiusTopLeft)
+    p('RadiusTopRight', node.RadiusTopRight)
+    p('RadiusBottomLeft', node.RadiusBottomLeft)
+    p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+  } else if (node.type === 'NumberInput') {
+    p('Default', node.Default)
+    p('Value', node.Value)
+    if (node.HintText) p('HintText', node.HintText)
+    p('Min', node.Min)
+    p('Max', node.Max)
+    p('Step', node.Step)
+    p('Precision', node.Precision)
+    if (node.ValidationState) p('ValidationState', node.ValidationState)
+    p('Align', node.Align)
+    if (node.Appearance) p('Appearance', node.Appearance)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    p('Color', toRgba(node.Color))
+    p('Fill', toRgba(node.Fill))
+    if (node.Font) p('Font', node.Font)
+    p('Size', node.Size)
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    p('PaddingTop', node.PaddingTop)
+    p('PaddingRight', node.PaddingRight)
+    p('PaddingBottom', node.PaddingBottom)
+    p('PaddingLeft', node.PaddingLeft)
+    p('RadiusTopLeft', node.RadiusTopLeft)
+    p('RadiusTopRight', node.RadiusTopRight)
+    p('RadiusBottomLeft', node.RadiusBottomLeft)
+    p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernDatePicker') {
+    if (node.SelectedDate) p('SelectedDate', node.SelectedDate)
+    if (node.StartDate) p('StartDate', node.StartDate)
+    if (node.EndDate) p('EndDate', node.EndDate)
+    if (node.Format) p('Format', node.Format)
+    if (node.PlaceHolder) p('PlaceHolder', node.PlaceHolder)
+    if (node.StartOfWeek) p('StartOfWeek', node.StartOfWeek)
+    if (node.Required !== undefined) p('Required', node.Required ? 'true' : 'false')
+    if (node.IsEditable !== undefined) p('IsEditable', node.IsEditable ? 'true' : 'false')
+    if (node.ValidationState) p('ValidationState', node.ValidationState)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    p('FontSize', node.FontSize)
+    p('FontWeight', node.FontWeight)
+    if (node.FontItalic) p('FontItalic', 'true')
+    if (node.FontUnderline) p('FontUnderline', 'true')
+    if (node.FontStrikethrough) p('FontStrikethrough', 'true')
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'RichTextEditor') {
+    if (node.Default) p('Default', node.Default)
+    if (node.EnableSpellCheck !== undefined) p('EnableSpellCheck', node.EnableSpellCheck ? 'true' : 'false')
+    p('TabIndex', node.TabIndex)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+  } else if (node.type === 'Rating') {
+    p('Default', node.Default)
+    p('Value', node.Value)
+    p('Max', node.Max)
+    if (node.ShowValue !== undefined) p('ShowValue', node.ShowValue ? 'true' : 'false')
+    if (node.ReadOnly !== undefined) p('ReadOnly', node.ReadOnly ? 'true' : 'false')
+    if (node.Reset !== undefined) p('Reset', node.Reset ? 'true' : 'false')
+    if (node.Tooltip) p('Tooltip', node.Tooltip)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    if (node.RatingFill) p('RatingFill', toRgba(node.RatingFill))
+    p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    if (node.FocusedBorderColor) p('FocusedBorderColor', toRgba(node.FocusedBorderColor))
+    p('FocusedBorderThickness', node.FocusedBorderThickness)
+    p('TabIndex', node.TabIndex)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
     if (node.OnSelect) p('OnSelect', node.OnSelect)
   } else if (node.type === 'Label') {
     p('Text', node.Text || '"Label"')
@@ -612,8 +1073,17 @@ export function componentToYaml(node, col = 0) {
 }
 
 // ── Screen-level YAML renderer ───────────────────────────────────────────────
-export function screenToYaml(tree) {
+export function screenToYaml(tree, canvasTheme = null, screensOverride = null) {
   if (!tree?.length) return '# Empty canvas — add components to get started'
-  // Tree[0] is always the single App root node
-  return componentToYaml(tree[0], 0)
+  const screens = Array.isArray(screensOverride)
+    ? screensOverride
+    : (tree[0]?.type === 'App' ? (tree[0]?.children || []) : tree)
+
+  const sections = []
+  sections.push('Screens:')
+  for (const screen of screens) {
+    sections.push(componentToYaml(screen, 2))
+  }
+
+  return sections.join('\n')
 }

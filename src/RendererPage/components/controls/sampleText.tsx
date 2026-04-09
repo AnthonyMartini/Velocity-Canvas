@@ -1,3 +1,5 @@
+import { normalizeSingleQuotedStringLiteralsDeep } from '@/lib/powerfx-string-normalization'
+
 export const SAMPLE_TEXT = {
   short: "Lorem ipsum dolor sit amet.",
   medium: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
@@ -21,7 +23,7 @@ export function resolveSampleText(text: any): any {
 
 export function resolveSampleTextDeep(value: any): any {
   if (typeof value === 'string') {
-    return resolveSampleText(value)
+    return normalizeSingleQuotedStringLiteralsDeep(resolveSampleText(value))
   }
 
   if (Array.isArray(value)) {

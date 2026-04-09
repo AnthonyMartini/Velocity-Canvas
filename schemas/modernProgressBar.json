@@ -1,0 +1,38 @@
+{
+  "type": "ModernProgressBar",
+  "control": "Progress Bar (Modern)",
+  "defaults": {
+    "AccessibleLabel": "\"\"",
+    "BasePaletteColor": "",
+    "DisplayMode": "DisplayMode.Edit",
+    "Height": 28,
+    "Indeterminate": false,
+    "Max": 100,
+    "OnChange": "",
+    "ProgressColor": "\"brand\"",
+    "Shape": "\"rounded\"",
+    "Thickness": "\"medium\"",
+    "Value": 48,
+    "Visible": true,
+    "Width": 240,
+    "X": 80,
+    "Y": 80
+  },
+  "properties": [
+    { "key": "Value", "label": "Value", "type": "number", "propertyType": "Input" },
+    { "key": "Max", "label": "Max", "type": "number", "propertyType": "Input" },
+    { "key": "Indeterminate", "label": "Indeterminate", "type": "boolean", "propertyType": "Input" },
+    { "key": "AccessibleLabel", "label": "Accessible Label", "type": "text", "propertyType": "Input" },
+    { "key": "BasePaletteColor", "label": "Base Palette", "type": "color", "propertyType": "Input" },
+    { "key": "ProgressColor", "label": "Progress Color", "type": "text", "propertyType": "Input" },
+    { "key": "Shape", "label": "Shape", "type": "text", "propertyType": "Input" },
+    { "key": "Thickness", "label": "Thickness", "type": "text", "propertyType": "Input" },
+    { "key": "X", "label": "X", "type": "number", "propertyType": "Input" },
+    { "key": "Y", "label": "Y", "type": "number", "propertyType": "Input" },
+    { "key": "Width", "label": "Width", "type": "number", "propertyType": "Input" },
+    { "key": "Height", "label": "Height", "type": "number", "propertyType": "Input" },
+    { "key": "DisplayMode", "label": "Display Mode", "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
+    { "key": "Visible", "label": "Visible", "type": "boolean", "propertyType": "Input" },
+    { "key": "OnChange", "label": "OnChange", "type": "text", "propertyType": "Event" }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "type": "ModernDropdown",
+  "control": "Dropdown (Modern Preview)",
+  "defaults": {
+    "AccessibleLabel": "\"\"",
+    "BasePaletteColor": "",
+    "DefaultSelectedItems": "[\"Option 1\"]",
+    "DisplayMode": "DisplayMode.Edit",
+    "FontSize": 14,
+    "Height": 36,
+    "Items": "[\"Option 1\", \"Option 2\", \"Option 3\"]",
+    "OnChange": "",
+    "Required": false,
+    "Selected": "\"Option 1\"",
+    "ValidationState": "\"None\"",
+    "Visible": true,
+    "Width": 220,
+    "X": 80,
+    "Y": 80
+  },
+  "properties": [
+    { "key": "Items", "label": "Items", "type": "text", "propertyType": "Input" },
+    { "key": "DefaultSelectedItems", "label": "Default Selected", "type": "text", "propertyType": "Input" },
+    { "key": "Selected", "label": "Selected", "type": "text", "propertyType": "Output" },
+    { "key": "AccessibleLabel", "label": "Accessible Label", "type": "text", "propertyType": "Input" },
+    { "key": "BasePaletteColor", "label": "Base Palette", "type": "color", "propertyType": "Input" },
+    { "key": "FontSize", "label": "Font Size", "type": "number", "propertyType": "Input" },
+    { "key": "Required", "label": "Required", "type": "boolean", "propertyType": "Input" },
+    { "key": "ValidationState", "label": "Validation State", "type": "text", "propertyType": "Input" },
+    { "key": "X", "label": "X", "type": "number", "propertyType": "Input" },
+    { "key": "Y", "label": "Y", "type": "number", "propertyType": "Input" },
+    { "key": "Width", "label": "Width", "type": "number", "propertyType": "Input" },
+    { "key": "Height", "label": "Height", "type": "number", "propertyType": "Input" },
+    { "key": "DisplayMode", "label": "Display Mode", "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
+    { "key": "Visible", "label": "Visible", "type": "boolean", "propertyType": "Input" },
+    { "key": "OnChange", "label": "OnChange", "type": "text", "propertyType": "Event" }
+  ]
+}

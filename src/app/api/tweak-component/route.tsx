@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { tweakModel, TWEAK_MODEL_NAME } from "@/lib/gemini";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 import { sanitizeTweakResult } from "@/lib/component-security";
+import { normalizeSingleQuotedStringLiteralsDeep } from "@/lib/powerfx-string-normalization";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -37,8 +38,9 @@ const ENGINE_COMPATIBILITY_PROMPT = [
   '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
   '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
   '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
-  '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", "Self.*", or "App.*".',
+  '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", or "Self.*". The only supported App path is "App.Theme.*".',
   '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
+  '- Use double quotes for string literals in component properties and formulas. Never emit single-quoted strings.',
 ].join("\n");
 
 function compactNodeForAI(node, { summaryOnly = false, childLimit = 0 } = {}) {
@@ -101,25 +103,6 @@ function parseJsonFromText(rawText) {
   }
 
   return JSON.parse(rawText.substring(start, end + 1).trim());
-}
-
-function convertSingleTickLiterals(value) {
-  const singleTickRe = /^'([\s\S]*)'$/;
-
-  if (typeof value === "string") {
-    const match = value.match(singleTickRe);
-    return match ? `"${match[1]}"` : value;
-  }
-
-  if (Array.isArray(value)) return value.map(convertSingleTickLiterals);
-
-  if (value !== null && typeof value === "object") {
-    const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = convertSingleTickLiterals(v);
-    return out;
-  }
-
-  return value;
 }
 
 export async function POST(req) {
@@ -214,7 +197,7 @@ export async function POST(req) {
             }
 
             const parsed = parseJsonFromText(rawText);
-            const result = sanitizeTweakResult(convertSingleTickLiterals(parsed), component_context?.component || component);
+            const result = sanitizeTweakResult(normalizeSingleQuotedStringLiteralsDeep(parsed), component_context?.component || component);
             const completedAt = Date.now();
 
             console.log("[tweak-component] timings", {

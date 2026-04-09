@@ -162,6 +162,7 @@ export async function saveUserProject(uid: string, projectId: string | null, pay
       tree: safePayload.tree,
       canvasW: safePayload.canvasW,
       canvasH: safePayload.canvasH,
+      canvasTheme: safePayload.canvasTheme,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 

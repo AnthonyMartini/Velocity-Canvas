@@ -1,5 +1,6 @@
 import { SCHEMAS } from "@/RendererPage/constants";
 import { sanitizeHtmlFragment, sanitizeSvgFragment } from "@/lib/content-sanitizer";
+import { normalizeCanvasThemeState } from "@/theme/canvasTheme";
 
 const DEFAULT_SCREEN_FILL = "RGBA(255, 255, 255, 1)";
 const MAX_COMPONENT_DEPTH = 12;
@@ -12,6 +13,7 @@ const DEFAULT_CANVAS_WIDTH = 1366;
 const DEFAULT_CANVAS_HEIGHT = 768;
 const MIN_CANVAS_SIZE = 240;
 const MAX_CANVAS_SIZE = 8192;
+const UNKNOWN_POWERAPPS_TYPE = "UnknownPowerAppsObject";
 
 const ALLOWED_CHILD_CONTAINERS = new Set(["App", "Screen", "Container", "Gallery"]);
 const SCHEMA_TYPES = new Set(Object.keys(SCHEMAS));
@@ -59,6 +61,16 @@ function getPropertyMapForType(type: string) {
 
 function sanitizePropertyValue(type: string, key: string, value: unknown) {
   if (value == null) return undefined;
+
+  if (type === UNKNOWN_POWERAPPS_TYPE) {
+    if (key === "_rawPowerAppsYaml" || key === "sourceControl") {
+      return sanitizeString(value, MAX_STRING_LENGTH);
+    }
+    if (typeof value === "string") return sanitizeString(value);
+    if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+    if (typeof value === "boolean") return value;
+    return undefined;
+  }
 
   if (key === "HtmlText" && typeof value === "string") {
     return sanitizeHtmlFragment(value);
@@ -141,7 +153,7 @@ function sanitizeComponentNode(node: unknown, options: { depth?: number; countRe
   }
 
   const rawType = sanitizeString(node.type, 40).trim();
-  if (rawType !== "App" && !SCHEMA_TYPES.has(rawType)) return null;
+  if (rawType !== "App" && rawType !== UNKNOWN_POWERAPPS_TYPE && !SCHEMA_TYPES.has(rawType)) return null;
 
   countRef.value += 1;
 
@@ -164,7 +176,7 @@ function sanitizeComponentNode(node: unknown, options: { depth?: number; countRe
       continue;
     }
 
-    if (rawType !== "App" && !propertyMap.has(key)) continue;
+    if (rawType !== "App" && rawType !== UNKNOWN_POWERAPPS_TYPE && !propertyMap.has(key)) continue;
 
     const safeValue = sanitizePropertyValue(rawType, key, value);
     if (safeValue !== undefined) {
@@ -216,7 +228,7 @@ function sanitizeComponentChanges(type: string, changes: unknown) {
       continue;
     }
 
-    if (!propertyMap.has(key)) continue;
+    if (type !== UNKNOWN_POWERAPPS_TYPE && !propertyMap.has(key)) continue;
 
     const safeValue = sanitizePropertyValue(type, key, value);
     if (safeValue !== undefined) {
@@ -386,6 +398,7 @@ export function sanitizeProjectRecord(project: any) {
     tree: finalTree,
     canvasW: clampCanvasSize(source.canvasW, DEFAULT_CANVAS_WIDTH),
     canvasH: clampCanvasSize(source.canvasH, DEFAULT_CANVAS_HEIGHT),
+    canvasTheme: normalizeCanvasThemeState(source.canvasTheme),
   };
 }
 
@@ -398,6 +411,7 @@ export function sanitizeProjectPayload(payload: any) {
     tree: sanitized.tree,
     canvasW: sanitized.canvasW,
     canvasH: sanitized.canvasH,
+    canvasTheme: sanitized.canvasTheme,
   };
 }
 

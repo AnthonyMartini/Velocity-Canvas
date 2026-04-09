@@ -70,3 +70,19 @@ body {
     transform: translateX(100%);
   }
 }
+
+@keyframes vc-progress-slide {
+  0% {
+    transform: translateX(-130%);
+  }
+  50% {
+    transform: translateX(90%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+.vc-progress-indeterminate {
+  animation: vc-progress-slide 1.25s ease-in-out infinite;
+}

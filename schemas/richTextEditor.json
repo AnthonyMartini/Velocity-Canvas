@@ -1,0 +1,30 @@
+{
+  "type": "RichTextEditor",
+  "control": "Rich Text Editor",
+  "defaults": {
+    "AccessibleLabel": "\"\"",
+    "Default": "\"<p>Type here</p>\"",
+    "DisplayMode": "DisplayMode.Edit",
+    "EnableSpellCheck": true,
+    "Height": 180,
+    "HTMLText": "\"<p>Type here</p>\"",
+    "TabIndex": 0,
+    "Visible": true,
+    "Width": 300,
+    "X": 80,
+    "Y": 80
+  },
+  "properties": [
+    { "key": "Default", "label": "Default", "type": "text", "propertyType": "Input" },
+    { "key": "HTMLText", "label": "HTMLText", "type": "text", "propertyType": "Output" },
+    { "key": "EnableSpellCheck", "label": "Enable Spell Check", "type": "boolean", "propertyType": "Input" },
+    { "key": "AccessibleLabel", "label": "Accessible Label", "type": "text", "propertyType": "Input" },
+    { "key": "TabIndex", "label": "Tab Index", "type": "number", "propertyType": "Input" },
+    { "key": "X", "label": "X", "type": "number", "propertyType": "Input" },
+    { "key": "Y", "label": "Y", "type": "number", "propertyType": "Input" },
+    { "key": "Width", "label": "Width", "type": "number", "propertyType": "Input" },
+    { "key": "Height", "label": "Height", "type": "number", "propertyType": "Input" },
+    { "key": "DisplayMode", "label": "Display Mode", "type": "select", "options": ["DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"], "propertyType": "Input" },
+    { "key": "Visible", "label": "Visible", "type": "boolean", "propertyType": "Input" }
+  ]
+}

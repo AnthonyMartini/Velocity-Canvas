@@ -2,6 +2,7 @@ import React from 'react'
 import { parseFormula, evaluateAST } from './FormulaParser'
 import { ALL_ENUM_VALUES } from '../RendererPage/Functions'
 import { SCHEMAS } from '../RendererPage/constants'
+import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
 
 const PROPERTY_DEF_CACHE = new Map()
 
@@ -93,7 +94,10 @@ export function findNode(nodes, id) {
 /** Update a node in the tree, returning a new tree */
 export function updateNode(nodes, id, updater) {
   return nodes.map(n => {
-    if (n.id === id) return { ...n, ...updater(n) }
+    if (n.id === id) {
+      const updates = updater(n) || {}
+      return { ...n, ...mergePreservedPowerAppsYaml(n, updates) }
+    }
     if (n.children?.length) return { ...n, children: updateNode(n.children, id, updater) }
     return n
   })
@@ -419,7 +423,7 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
   const propertyDefByKey = new Map<string, any>(propertyDefs.map((property: any) => [property.key || property.name, property]))
 
   for (const key of Object.keys(comp)) {
-    if (key === 'id' || key === 'type' || key === 'name' || key === 'children' || key.startsWith('On')) {
+    if (key === 'id' || key === 'type' || key === 'name' || key === 'children' || key === 'sourceControl' || key.startsWith('_') || key.startsWith('On')) {
       continue
     }
 
@@ -462,6 +466,10 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
   }
 
   const isEvent = propDef.propertyType === 'Event' || (propDef.type === 'string' && propDef.name?.startsWith('On')) || propDef.type === 'event'
+
+  if (!isEvent && (propDef.type === 'string' || propDef.type === 'text') && valStr.includes("'")) {
+    return 'Single quotes are not allowed in text properties. Use double quotes instead.'
+  }
   
   try {
     const isAction = isEvent
@@ -498,8 +506,16 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
 
     // Enum validation: if the property has predefined options, the evaluated value must be one of them
     if (propDef.options && Array.isArray(propDef.options)) {
+      let valToCheck = evaluated
+      
+      // ModernButton 'Icon' secretly expects primitive strings, but AI often provides 'Icon.Add' or unquoted 'Add' 
+      // (which evaluates to 'Icon.Add'). Strip the prefix for validation to correctly match the schema.
+      if (node.type === 'ModernButton' && propDef.key === 'Icon' && typeof valToCheck === 'string' && valToCheck.startsWith('Icon.')) {
+         valToCheck = valToCheck.replace('Icon.', '')
+      }
+
       const validValues = propDef.options.map((opt: any) => (typeof opt === 'object' && opt !== null && 'value' in opt) ? opt.value : opt)
-      if (!validValues.includes(evaluated)) {
+      if (!validValues.includes(valToCheck)) {
         return `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`
       }
     }

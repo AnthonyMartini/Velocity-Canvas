@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,3 +17,33 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
 export const db = getFirestore(app)
+
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+})
+
+export async function upsertUserProfile(user) {
+  if (!user?.uid) return
+
+  const userRef = doc(db, 'users', user.uid)
+  const existing = await getDoc(userRef)
+
+  await setDoc(
+    userRef,
+    {
+      uid: user.uid,
+      email: user.email || null,
+      displayName: user.displayName || null,
+      photoURL: user.photoURL || null,
+      providerId: user.providerData?.[0]?.providerId || 'google.com',
+      lastLoginAt: serverTimestamp(),
+      ...(existing.exists()
+        ? {}
+        : {
+            createdAt: serverTimestamp(),
+            credits: 100,
+          }),
+    },
+    { merge: true },
+  )
+}

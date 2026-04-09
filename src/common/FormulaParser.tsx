@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES } from '../RendererPage/Functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle } from '../RendererPage/Functions'
 import { SCHEMAS } from '../RendererPage/constants'
 
 /**
@@ -20,7 +20,7 @@ export function parseFormula(formula, strict = false) {
   // Tokenizer
   const tokens = []
   // Updated regex to include # for hex colors and maybe some basic logical operators
-  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z0-9_]+)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:.]|(?:\r?\n)+)/g
+  const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:.]|(?:\r?\n)+)/g
   let match
   
   while ((match = regex.exec(text)) !== null) {
@@ -278,13 +278,26 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       return flatNodes.find(n => n.children?.some((c: any) => c.id === nodeId))
     }
 
-    const [compName, propName] = path.split('.')
+    const segments = String(path || '').split('.').filter(Boolean)
+    const compName = segments[0]
+    const propName = segments[1]
+    const remainingParts = segments.slice(1)
+    if (!compName || remainingParts.length === 0) return handleError(`Invalid property path: ${path}`)
+
+    const getValueFromPath = (target: any, parts: string[]) => {
+      let current = target
+      for (const part of parts) {
+        if (current == null) return undefined
+        current = getPropertyValue(current, part)
+      }
+      return current
+    }
 
     // Cycle detection: Resolve relative keywords to absolute component names
     // so that "Parent.Width" at different levels are tracked as distinct paths.
     let absolutePath = path
-    if (compName.toLowerCase() === 'parent' && parentNode) absolutePath = `${parentNode.name}.${propName}`
-    else if (compName.toLowerCase() === 'self' && selfNode) absolutePath = `${selfNode.name}.${propName}`
+    if (compName.toLowerCase() === 'parent' && parentNode) absolutePath = `${parentNode.name}.${remainingParts.join('.')}`
+    else if (compName.toLowerCase() === 'self' && selfNode) absolutePath = `${selfNode.name}.${remainingParts.join('.')}`
 
     if (visited.has(absolutePath)) return handleError('#CYCLE!')
     const nextVisited = new Set(visited).add(absolutePath)
@@ -309,7 +322,8 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
       // ── Runtime: GalleryRenderer injected ThisItem for this row ───────────
       if (item && typeof item === 'object' && !Array.isArray(item)) {
-        return propName in item ? item[propName] : ''
+        const itemValue = getValueFromPath(item, remainingParts)
+        return itemValue !== undefined ? itemValue : ''
       }
 
       // ── Validation time: ThisItem not in localVars yet.
@@ -356,7 +370,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     if (!targetNode && ALL_ENUM_VALUES.has(path)) return path
 
     if (targetNode) {
-      let rawVal = getPropertyValue(targetNode, propName)
+      let rawVal = remainingParts.length === 1 ? getPropertyValue(targetNode, propName) : getValueFromPath(targetNode, remainingParts)
       const targetPropDef = getSchemaPropertyDef(targetNode, propName)
 
       // Provide implicit fallbacks for Screen/App dimensions if not explicitly set
@@ -368,7 +382,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       // Special Gallery Template dimension logic.
       // In Power Apps, gallery children can read template dimensions even though
       // those are not explicit editable properties in the control schema.
-      if (targetNode.type === 'Gallery' && (propName === 'Width' || propName === 'Height' || propName === 'TemplateWidth' || propName === 'TemplateHeight')) {
+      if (targetNode.type === 'Gallery' && remainingParts.length === 1 && (propName === 'Width' || propName === 'Height' || propName === 'TemplateWidth' || propName === 'TemplateHeight')) {
         const isVertical = targetNode.Variant ? targetNode.Variant.includes('Vertical') : true
         if (isVertical && propName === 'Height') {
           rawVal = targetNode.TemplateSize || 100
@@ -387,11 +401,11 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
       if (rawVal !== undefined) {
         // If resolving from an enum, return literal value and don't re-evaluate
-        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat].includes(targetNode)
+        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle].includes(targetNode)
         if (isEnum) return rawVal
 
         // If the property itself is a formula, parse and evaluate it
-        if (targetPropDef?.propertyType === 'Output') {
+        if (remainingParts.length > 1 || targetPropDef?.propertyType === 'Output') {
           return rawVal
         }
 
@@ -440,6 +454,12 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       const compNode = findNodeByName(node.name)
       if (compNode && strict) return compNode
       if (compNode && !strict) return node.name
+
+      // Implicitly resolve known enum keys (e.g. typing "Add" instead of "Icon.Add")
+      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle]
+      for (const enumObj of implicitEnums) {
+          if (enumObj[node.name] !== undefined) return enumObj[node.name]
+      }
       
       // In non-strict mode (normal rendering), an unknown token should return blank
       // EXCEPT for single identifiers which might be unquoted literals like colors (white, red, etc)

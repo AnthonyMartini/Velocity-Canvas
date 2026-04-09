@@ -1,0 +1,1317 @@
+{
+  "generatedAt": "2026-04-08T23:07:42.514Z",
+  "scope": "Power Apps canvas formula functions only, sourced from the official canvas-app-specific Power Fx formula reference. Power Automate expressions and non-function canvas formula elements are excluded from the functions array.",
+  "source": {
+    "repo": "MicrosoftDocs/power-platform",
+    "repoPath": "power-platform/power-fx/formula-reference-canvas-apps.md",
+    "rawUrl": "https://raw.githubusercontent.com/MicrosoftDocs/power-platform/main/power-platform/power-fx/formula-reference-canvas-apps.md",
+    "learnUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/formula-reference-canvas-apps",
+    "docLastUpdated": "06/18/2025"
+  },
+  "counts": {
+    "totalFunctions": 200,
+    "excludedNonFunctionEntries": 14
+  },
+  "excludedNonFunctionEntries": [
+    {
+      "name": "Acceleration",
+      "category": "A",
+      "description": "Reads the acceleration sensor in your device.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/signals",
+      "entryType": "signal"
+    },
+    {
+      "name": "App",
+      "category": "A",
+      "description": "Provides information about the currently running app and lets you control the app's behavior.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/object-app",
+      "entryType": "object"
+    },
+    {
+      "name": "As",
+      "category": "A",
+      "description": "Names the current record in gallery, form, and record scope functions like ForAll, With, and Sum.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#thisitem-thisrecord-and-as-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "Color",
+      "category": "C",
+      "description": "Sets a property to a built-in color value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-colors",
+      "entryType": "enumeration"
+    },
+    {
+      "name": "Compass",
+      "category": "C",
+      "description": "Returns your compass heading.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/signals",
+      "entryType": "signal"
+    },
+    {
+      "name": "Connection",
+      "category": "C",
+      "description": "Returns information about your network connection.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/signals",
+      "entryType": "signal"
+    },
+    {
+      "name": "exactin",
+      "category": "E",
+      "description": "Checks if a text string is contained within another text string or table, case dependent. Also used to check if a record is in a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#in-and-exactin-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "Host",
+      "category": "H",
+      "description": "Provides information about the current host running the app.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/object-host",
+      "entryType": "object"
+    },
+    {
+      "name": "in",
+      "category": "I",
+      "description": "Checks if a text string is contained within another text string or table, case independent. Also used to check if a record is in a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#in-and-exactin-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "Location",
+      "category": "L",
+      "description": "Returns your location as a map coordinate by using the Global Positioning System (GPS) and other information.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/signals",
+      "entryType": "signal"
+    },
+    {
+      "name": "Parent",
+      "category": "P",
+      "description": "Provides access to a container control's properties.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#self-and-parent-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "Self",
+      "category": "S",
+      "description": "Provides access to the properties of the current control.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#self-and-parent-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "ThisItem",
+      "category": "T",
+      "description": "Returns the record for the current item in a gallery or form control.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#thisitem-thisrecord-and-as-operators",
+      "entryType": "operator"
+    },
+    {
+      "name": "ThisRecord",
+      "category": "T",
+      "description": "Returns the record for the current item in a record scope function, such as ForAll, With, and Sum.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/operators#thisitem-thisrecord-and-as-operators",
+      "entryType": "operator"
+    }
+  ],
+  "functions": [
+    {
+      "name": "Abs",
+      "category": "A",
+      "description": "Returns the absolute value of a number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "Acos",
+      "category": "A",
+      "description": "Returns the arccosine of a number, in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Acot",
+      "category": "A",
+      "description": "Returns the arccotangent of a number, in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "AddColumns",
+      "category": "A",
+      "description": "Returns a table with additional columns.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-shaping"
+    },
+    {
+      "name": "AIClassify",
+      "category": "A",
+      "description": "Classifies text into one or more categories.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "AIExtract",
+      "category": "A",
+      "description": "Extracts specified entities like registration numbers, phone numbers, or people’s names.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "AIReply",
+      "category": "A",
+      "description": "Drafts a reply to the message that you provide.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "AISentiment",
+      "category": "A",
+      "description": "Detects the sentiment of the text that you provide.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "AISummarize",
+      "category": "A",
+      "description": "Summarizes the text that you provide.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "AITranslate",
+      "category": "A",
+      "description": "Translates text from one language to another.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ai"
+    },
+    {
+      "name": "And",
+      "category": "A",
+      "description": "Boolean logic AND. Returns true if all arguments are true. You can also use the && operator.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-logicals"
+    },
+    {
+      "name": "Asin",
+      "category": "A",
+      "description": "Returns the arcsine of a number, in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Assert",
+      "category": "A",
+      "description": "Evaluates to true or false in a test.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-assert"
+    },
+    {
+      "name": "AsType",
+      "category": "A",
+      "description": "Treats a record reference as a specific table type.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-astype-istype"
+    },
+    {
+      "name": "Atan",
+      "category": "A",
+      "description": "Returns the arctangent of a number, in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Atan2",
+      "category": "A",
+      "description": "Returns the arctangent based on an (_x_,_y_) coordinate, in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Average",
+      "category": "A",
+      "description": "Calculates the average of a table expression or a set of arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "Back",
+      "category": "B",
+      "description": "Shows the previous screen.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-navigate"
+    },
+    {
+      "name": "Blank",
+      "category": "B",
+      "description": "Returns a _blank_ value you can use to insert a NULL value in a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-isblank-isempty"
+    },
+    {
+      "name": "Boolean",
+      "category": "B",
+      "description": "Converts a text string, number, or dynamic value to a Boolean value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-boolean"
+    },
+    {
+      "name": "Calendar",
+      "category": "C",
+      "description": "Retrieves information about the calendar for the current locale.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-clock-calendar"
+    },
+    {
+      "name": "Char",
+      "category": "C",
+      "description": "Translates a character code into a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-char"
+    },
+    {
+      "name": "Choices",
+      "category": "C",
+      "description": "Returns a table of the possible values for a lookup column.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-choices"
+    },
+    {
+      "name": "Clear",
+      "category": "C",
+      "description": "Deletes all data from a collection.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-clear-collect-clearcollect"
+    },
+    {
+      "name": "ClearCollect",
+      "category": "C",
+      "description": "Deletes all data from a collection and then adds a set of records.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-clear-collect-clearcollect"
+    },
+    {
+      "name": "ClearData",
+      "category": "C",
+      "description": "Clears a collection or all collections from an app host such as a local device.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-savedata-loaddata"
+    },
+    {
+      "name": "Clock",
+      "category": "C",
+      "description": "Retrieves information about the clock for the current locale.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-clock-calendar"
+    },
+    {
+      "name": "Coalesce",
+      "category": "C",
+      "description": "Replaces _blank_ values while leaving non-_blank_ values unchanged.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-isblank-isempty"
+    },
+    {
+      "name": "Collect",
+      "category": "C",
+      "description": "Creates a collection or adds data to a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-clear-collect-clearcollect"
+    },
+    {
+      "name": "ColorFade",
+      "category": "C",
+      "description": "Fades a color value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-colors"
+    },
+    {
+      "name": "ColorValue",
+      "category": "C",
+      "description": "Translates a CSS color name or a hex code to a color value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-colors"
+    },
+    {
+      "name": "Column",
+      "category": "C",
+      "description": "Retrieves column names and values from a Dynamic value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-columnnames-column"
+    },
+    {
+      "name": "ColumnNames",
+      "category": "C",
+      "description": "Retrieves column names and values from a Dynamic value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-columnnames-column"
+    },
+    {
+      "name": "Concat",
+      "category": "C",
+      "description": "Concatenates strings in a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-concatenate"
+    },
+    {
+      "name": "Concatenate",
+      "category": "C",
+      "description": "Concatenates strings.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-concatenate"
+    },
+    {
+      "name": "Concurrent",
+      "category": "C",
+      "description": "Evaluates multiple formulas concurrently with one another.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-concurrent"
+    },
+    {
+      "name": "Confirm",
+      "category": "C",
+      "description": "Display a confirmation dialog box.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-confirm"
+    },
+    {
+      "name": "Copy",
+      "category": "C",
+      "description": "Copies text to the clipboard on the device where the app is running.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-copy"
+    },
+    {
+      "name": "Cos",
+      "category": "C",
+      "description": "Returns the cosine of an angle specified in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Cot",
+      "category": "C",
+      "description": "Returns the cotangent of an angle specified in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Count",
+      "category": "C",
+      "description": "Counts table records that contain numbers.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-counts"
+    },
+    {
+      "name": "CountA",
+      "category": "C",
+      "description": "Counts table records that aren't empty.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-counts"
+    },
+    {
+      "name": "CountIf",
+      "category": "C",
+      "description": "Counts table records that satisfy a condition.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-counts"
+    },
+    {
+      "name": "CountRows",
+      "category": "C",
+      "description": "Counts table records.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-counts"
+    },
+    {
+      "name": "DataSourceInfo",
+      "category": "D",
+      "description": "Provides information about a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datasourceinfo"
+    },
+    {
+      "name": "Date",
+      "category": "D",
+      "description": "Returns a date/time value, based on Year, Month, and Day values.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-date-time"
+    },
+    {
+      "name": "DateAdd",
+      "category": "D",
+      "description": "Adds days, months, quarters, or years to a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-dateadd-datediff"
+    },
+    {
+      "name": "DateDiff",
+      "category": "D",
+      "description": "Subtracts two date values, and shows the result in days, months, quarters, or years.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-dateadd-datediff"
+    },
+    {
+      "name": "DateTime",
+      "category": "D",
+      "description": "Returns a date/time value, based on both date and time components.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-date-time"
+    },
+    {
+      "name": "DateTimeValue",
+      "category": "D",
+      "description": "Converts a date and time string to a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datevalue-timevalue"
+    },
+    {
+      "name": "DateValue",
+      "category": "D",
+      "description": "Converts a date-only string to a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datevalue-timevalue"
+    },
+    {
+      "name": "Day",
+      "category": "D",
+      "description": "Retrieves the day portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "Dec2Hex",
+      "category": "D",
+      "description": "Convert a number to a hexadecimal text string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-hexdec"
+    },
+    {
+      "name": "Defaults",
+      "category": "D",
+      "description": "Returns the default values for a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-defaults"
+    },
+    {
+      "name": "Degrees",
+      "category": "D",
+      "description": "Converts radians to degrees.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Disable",
+      "category": "D",
+      "description": "Disables a signal, such as Location for reading the GPS.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-enable-disable"
+    },
+    {
+      "name": "Distinct",
+      "category": "D",
+      "description": "Summarizes records of a table, removing duplicates.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-distinct"
+    },
+    {
+      "name": "Download",
+      "category": "D",
+      "description": "Downloads a file from the web to the local device.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-download"
+    },
+    {
+      "name": "DropColumns",
+      "category": "D",
+      "description": "Returns a table with one or more columns removed.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-shaping"
+    },
+    {
+      "name": "EDate",
+      "category": "E",
+      "description": "Adds or subtracts months to a date, without changing the day of the month.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-edate-eomonth"
+    },
+    {
+      "name": "EditForm",
+      "category": "E",
+      "description": "Resets a form control for editing of an item.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form"
+    },
+    {
+      "name": "Enable",
+      "category": "E",
+      "description": "Enables a signal, such as Location for reading the GPS.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-enable-disable"
+    },
+    {
+      "name": "EncodeHTML",
+      "category": "E",
+      "description": "Encodes characters that need to be escaped to be used in an HTML context.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-encode-decode"
+    },
+    {
+      "name": "EncodeUrl",
+      "category": "E",
+      "description": "Encodes special characters using URL encoding.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-encode-decode"
+    },
+    {
+      "name": "EndsWith",
+      "category": "E",
+      "description": "Checks whether a text string ends with another text string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-startswith"
+    },
+    {
+      "name": "EOMonth",
+      "category": "E",
+      "description": "Adds or subtracts months to a date, returning the last day of that month.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-edate-eomonth"
+    },
+    {
+      "name": "Error",
+      "category": "E",
+      "description": "Create a custom error or pass through an error.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-iferror"
+    },
+    {
+      "name": "Errors",
+      "category": "E",
+      "description": "Provides error information for previous changes to a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-errors"
+    },
+    {
+      "name": "Exit",
+      "category": "E",
+      "description": "Exits the currently running app and optionally signs out the current user.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-exit"
+    },
+    {
+      "name": "Exp",
+      "category": "E",
+      "description": "Returns _e_ raised to a power.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "Filter",
+      "category": "F",
+      "description": "Returns a filtered table based on one or more criteria.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-filter-lookup"
+    },
+    {
+      "name": "Find",
+      "category": "F",
+      "description": "Checks whether one string appears within another and returns the location.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-find"
+    },
+    {
+      "name": "First",
+      "category": "F",
+      "description": "Returns the first record of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-first-last"
+    },
+    {
+      "name": "FirstN",
+      "category": "F",
+      "description": "Returns the first set of records (N records) of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-first-last"
+    },
+    {
+      "name": "Float",
+      "category": "F",
+      "description": "Converts a string to a Float value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-value"
+    },
+    {
+      "name": "ForAll",
+      "category": "F",
+      "description": "Calculates values and performs actions for all records of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-forall"
+    },
+    {
+      "name": "GroupBy",
+      "category": "G",
+      "description": "Returns a table with records grouped together.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-groupby"
+    },
+    {
+      "name": "GUID",
+      "category": "G",
+      "description": "Converts a GUID string to a GUID value or creates a new GUID value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-guid"
+    },
+    {
+      "name": "HashTags",
+      "category": "H",
+      "description": "Extracts the hashtags (#strings) from a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-hashtags"
+    },
+    {
+      "name": "Hex2Dec",
+      "category": "H",
+      "description": "Convert a hexadecimal text string to a number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-hexdec"
+    },
+    {
+      "name": "Hour",
+      "category": "H",
+      "description": "Returns the hour portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "If",
+      "category": "I",
+      "description": "Returns one value if a condition is true and another value if not.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-if"
+    },
+    {
+      "name": "IfError",
+      "category": "I",
+      "description": "Detects errors and provides an alternative value or takes action.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-iferror"
+    },
+    {
+      "name": "Index",
+      "category": "I",
+      "description": "Returns a record from a table based on ordered position.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-first-last"
+    },
+    {
+      "name": "Int",
+      "category": "I",
+      "description": "Rounds down to the nearest integer.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-round"
+    },
+    {
+      "name": "IsBlank",
+      "category": "I",
+      "description": "Checks for a blank value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-isblank-isempty"
+    },
+    {
+      "name": "IsBlankOrError",
+      "category": "I",
+      "description": "Checks for a blank value or error.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-iferror"
+    },
+    {
+      "name": "IsEmpty",
+      "category": "I",
+      "description": "Checks for an empty table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-isblank-isempty"
+    },
+    {
+      "name": "IsError",
+      "category": "I",
+      "description": "Checks for an error.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-iferror"
+    },
+    {
+      "name": "IsMatch",
+      "category": "I",
+      "description": "Checks a string against a pattern. Regular expressions can be used.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ismatch"
+    },
+    {
+      "name": "IsNumeric",
+      "category": "I",
+      "description": "Checks for a numeric value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-isnumeric"
+    },
+    {
+      "name": "ISOWeekNum",
+      "category": "I",
+      "description": "Returns the ISO week number of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-weeknum"
+    },
+    {
+      "name": "IsToday",
+      "category": "I",
+      "description": "Checks whether a date/time value is sometime today in the user's time zone.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-now-today-istoday"
+    },
+    {
+      "name": "IsType",
+      "category": "I",
+      "description": "Checks whether a record reference refers to a specific table type.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-astype-istype"
+    },
+    {
+      "name": "JSON",
+      "category": "J",
+      "description": "Generates a JSON text string for a table, a record, or a value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-json"
+    },
+    {
+      "name": "Language",
+      "category": "L",
+      "description": "Returns the language tag of the current user.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-language"
+    },
+    {
+      "name": "Last",
+      "category": "L",
+      "description": "Returns the last record of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-first-last"
+    },
+    {
+      "name": "LastN",
+      "category": "L",
+      "description": "Returns the last set of records (N records) of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-first-last"
+    },
+    {
+      "name": "Launch",
+      "category": "L",
+      "description": "Launches a webpage or a canvas app.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-param"
+    },
+    {
+      "name": "Left",
+      "category": "L",
+      "description": "Returns the left-most portion of a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-left-mid-right"
+    },
+    {
+      "name": "Len",
+      "category": "L",
+      "description": "Returns the length of a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-len"
+    },
+    {
+      "name": "Ln",
+      "category": "L",
+      "description": "Returns the natural log.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "LoadData",
+      "category": "L",
+      "description": "Loads a collection from an app host such as a local device.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-savedata-loaddata"
+    },
+    {
+      "name": "Log",
+      "category": "L",
+      "description": "Returns the logarithm in any base of a number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "LookUp",
+      "category": "L",
+      "description": "Looks up a single record in a table based on one or more criteria.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-filter-lookup"
+    },
+    {
+      "name": "Lower",
+      "category": "L",
+      "description": "Converts letters in a string of text to all lowercase.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-lower-upper-proper"
+    },
+    {
+      "name": "Match",
+      "category": "M",
+      "description": "Extracts a substring based on a pattern. Regular expressions can be used.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ismatch"
+    },
+    {
+      "name": "MatchAll",
+      "category": "M",
+      "description": "Extracts multiple substrings based on a pattern. Regular expressions can be used.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-ismatch"
+    },
+    {
+      "name": "Max",
+      "category": "M",
+      "description": "Maximum value of a table expression or a set of arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "Mid",
+      "category": "M",
+      "description": "Returns the middle portion of a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-left-mid-right"
+    },
+    {
+      "name": "Min",
+      "category": "M",
+      "description": "Minimum value of a table expression or a set of arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "Minute",
+      "category": "M",
+      "description": "Retrieves the minute portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "Mod",
+      "category": "M",
+      "description": "Returns the remainder after a dividend is divided by a divisor.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-mod"
+    },
+    {
+      "name": "Month",
+      "category": "M",
+      "description": "Retrieves the month portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "Navigate",
+      "category": "N",
+      "description": "Changes which screen is displayed.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-navigate"
+    },
+    {
+      "name": "NewForm",
+      "category": "N",
+      "description": "Resets a form control for creation of an item.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form"
+    },
+    {
+      "name": "Not",
+      "category": "N",
+      "description": "Boolean logic NOT. Returns true if its argument is false, and returns false if its argument is true. You can also use the ! operator.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-logicals"
+    },
+    {
+      "name": "Notify",
+      "category": "N",
+      "description": "Displays a banner message to the user.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-showerror"
+    },
+    {
+      "name": "Now",
+      "category": "N",
+      "description": "Returns the current date/time value in the user's time zone.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-now-today-istoday"
+    },
+    {
+      "name": "Or",
+      "category": "O",
+      "description": "Boolean logic OR. Returns true if any of its arguments are true. You can also use the || operator.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-logicals"
+    },
+    {
+      "name": "Param",
+      "category": "P",
+      "description": "Access parameters passed to a canvas app when launched.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-param"
+    },
+    {
+      "name": "ParseJSON",
+      "category": "P",
+      "description": "Converts JSON document represented as text to a Dynamic value value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-parsejson"
+    },
+    {
+      "name": "Patch",
+      "category": "P",
+      "description": "Modifies or creates a record in a data source, or merges records outside of a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-patch"
+    },
+    {
+      "name": "PDF",
+      "category": "P",
+      "description": "Export contents from the current screen to an object for use in multiple scenarios.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-pdf"
+    },
+    {
+      "name": "Pi",
+      "category": "P",
+      "description": "Returns the number pi.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "PlainText",
+      "category": "P",
+      "description": "Removes HTML and XML tags from a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-encode-decode"
+    },
+    {
+      "name": "Power",
+      "category": "P",
+      "description": "Returns a number raised to a power. You can also use the ^ operator.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "Print",
+      "category": "P",
+      "description": "Opens the current screen in the default browser print dialog.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-print"
+    },
+    {
+      "name": "Proper",
+      "category": "P",
+      "description": "Converts the first letter of each word in a string to uppercase, and converts the rest to lowercase.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-lower-upper-proper"
+    },
+    {
+      "name": "Radians",
+      "category": "R",
+      "description": "Converts degrees to radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Rand",
+      "category": "R",
+      "description": "Returns a pseudo-random number between 0 and 1.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-rand"
+    },
+    {
+      "name": "RandBetween",
+      "category": "R",
+      "description": "Returns a pseudo-random number between two numbers.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-rand"
+    },
+    {
+      "name": "ReadNFC",
+      "category": "R",
+      "description": "Reads a Near Field Communication (NFC) tag.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-readnfc"
+    },
+    {
+      "name": "RecordInfo",
+      "category": "R",
+      "description": "Provides information about a record of a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-recordinfo"
+    },
+    {
+      "name": "RecordOf",
+      "category": "R",
+      "description": "Extracts the type of a record from a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-type"
+    },
+    {
+      "name": "Refresh",
+      "category": "R",
+      "description": "Refreshes the records of a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-refresh"
+    },
+    {
+      "name": "Relate",
+      "category": "R",
+      "description": "Relates records of two tables through a one-to-many or many-to-many relationship.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-relate-unrelate"
+    },
+    {
+      "name": "Remove",
+      "category": "R",
+      "description": "Removes one or more specific records from a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-remove-removeif"
+    },
+    {
+      "name": "RemoveIf",
+      "category": "R",
+      "description": "Removes records from a data source based on a condition.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-remove-removeif"
+    },
+    {
+      "name": "RenameColumns",
+      "category": "R",
+      "description": "Renames columns of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-shaping"
+    },
+    {
+      "name": "Replace",
+      "category": "R",
+      "description": "Replaces part of a string with another string, by starting position of the string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-replace-substitute"
+    },
+    {
+      "name": "RequestHide",
+      "category": "R",
+      "description": "Hides a SharePoint form.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-requesthide"
+    },
+    {
+      "name": "Reset",
+      "category": "R",
+      "description": "Resets an input control to its default value, discarding any user changes.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-reset"
+    },
+    {
+      "name": "ResetForm",
+      "category": "R",
+      "description": "Resets a form control for editing of an existing item.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form"
+    },
+    {
+      "name": "Revert",
+      "category": "R",
+      "description": "Reloads and clears errors for the records of a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-revert"
+    },
+    {
+      "name": "RGBA",
+      "category": "R",
+      "description": "Returns a color value for a set of red, green, blue, and alpha components.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-colors"
+    },
+    {
+      "name": "Right",
+      "category": "R",
+      "description": "Returns the right-most portion of a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-left-mid-right"
+    },
+    {
+      "name": "Round",
+      "category": "R",
+      "description": "Rounds to the closest number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-round"
+    },
+    {
+      "name": "RoundDown",
+      "category": "R",
+      "description": "Rounds down to the largest previous number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-round"
+    },
+    {
+      "name": "RoundUp",
+      "category": "R",
+      "description": "Rounds up to the smallest next number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-round"
+    },
+    {
+      "name": "SaveData",
+      "category": "S",
+      "description": "Saves a collection to an app host such as a local device.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-savedata-loaddata"
+    },
+    {
+      "name": "Search",
+      "category": "S",
+      "description": "Finds records in a table that contain a string in one of their columns.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-filter-lookup"
+    },
+    {
+      "name": "Second",
+      "category": "S",
+      "description": "Retrieves the second portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "Select",
+      "category": "S",
+      "description": "Simulates a select action on a control, causing the OnSelect formula to be evaluated.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-select"
+    },
+    {
+      "name": "Sequence",
+      "category": "S",
+      "description": "Generate a table of sequential numbers, useful when iterating with ForAll.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-sequence"
+    },
+    {
+      "name": "Set",
+      "category": "S",
+      "description": "Sets the value of a global variable.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-set"
+    },
+    {
+      "name": "SetFocus",
+      "category": "S",
+      "description": "Moves input focus to a specific control.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-setfocus"
+    },
+    {
+      "name": "SetProperty",
+      "category": "S",
+      "description": "Simulates interactions with input controls.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-setproperty"
+    },
+    {
+      "name": "ShowColumns",
+      "category": "S",
+      "description": "Returns a table with only selected columns.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table-shaping"
+    },
+    {
+      "name": "ShowHostInfo",
+      "category": "S",
+      "description": "Displays information to the user in the app.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/showhostinfo"
+    },
+    {
+      "name": "Shuffle",
+      "category": "S",
+      "description": "Randomly reorders the records of a table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-shuffle"
+    },
+    {
+      "name": "Sin",
+      "category": "S",
+      "description": "Returns the sine of an angle specified in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Sort",
+      "category": "S",
+      "description": "Returns a sorted table based on a formula.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-sort"
+    },
+    {
+      "name": "SortByColumns",
+      "category": "S",
+      "description": "Returns a sorted table based on one or more columns.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-sort"
+    },
+    {
+      "name": "Split",
+      "category": "S",
+      "description": "Splits a text string into a table of substrings.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-split"
+    },
+    {
+      "name": "Sqrt",
+      "category": "S",
+      "description": "Returns the square root of a number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-numericals"
+    },
+    {
+      "name": "StartsWith",
+      "category": "S",
+      "description": "Checks if a text string begins with another text string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-startswith"
+    },
+    {
+      "name": "StdevP",
+      "category": "S",
+      "description": "Returns the standard deviation of its arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "SubmitForm",
+      "category": "S",
+      "description": "Saves the item in a form control to the data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form"
+    },
+    {
+      "name": "Substitute",
+      "category": "S",
+      "description": "Replaces part of a string with another string, by matching strings.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-replace-substitute"
+    },
+    {
+      "name": "Sum",
+      "category": "S",
+      "description": "Calculates the sum of a table expression or a set of arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "Switch",
+      "category": "S",
+      "description": "Matches with a set of values and then evaluates a corresponding formula.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-if"
+    },
+    {
+      "name": "Table",
+      "category": "T",
+      "description": "Creates a temporary table.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-table"
+    },
+    {
+      "name": "Tan",
+      "category": "T",
+      "description": "Returns the tangent of an angle specified in radians.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trig"
+    },
+    {
+      "name": "Text",
+      "category": "T",
+      "description": "Converts any value and formats a number or date/time value to a string of text.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-text"
+    },
+    {
+      "name": "Time",
+      "category": "T",
+      "description": "Returns a date/time value, based on Hour, Minute, and Second values.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-date-time"
+    },
+    {
+      "name": "TimeValue",
+      "category": "T",
+      "description": "Converts a time-only string to a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datevalue-timevalue"
+    },
+    {
+      "name": "TimeZoneOffset",
+      "category": "T",
+      "description": "Returns the difference between UTC and the user's local time in minutes.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-dateadd-datediff"
+    },
+    {
+      "name": "Today",
+      "category": "T",
+      "description": "Returns the current date-only value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-now-today-istoday"
+    },
+    {
+      "name": "Trace",
+      "category": "T",
+      "description": "Provide additional information in your test results.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trace"
+    },
+    {
+      "name": "Trim",
+      "category": "T",
+      "description": "Removes extra spaces from the ends and interior of a string of text.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trim"
+    },
+    {
+      "name": "TrimEnds",
+      "category": "T",
+      "description": "Removes extra spaces from the ends of a string of text only.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-trim"
+    },
+    {
+      "name": "Trunc",
+      "category": "T",
+      "description": "Truncates the number to only the integer portion by removing any decimal portion.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-round"
+    },
+    {
+      "name": "Type",
+      "category": "T",
+      "description": "Defines a user defined type.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-type"
+    },
+    {
+      "name": "Ungroup",
+      "category": "U",
+      "description": "Removes a grouping.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-groupby"
+    },
+    {
+      "name": "UniChar",
+      "category": "U",
+      "description": "Translates a Unicode code into a string.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-char"
+    },
+    {
+      "name": "Unrelate",
+      "category": "U",
+      "description": "Unrelates records of two tables from a one-to-many or many-to-many relationship.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-relate-unrelate"
+    },
+    {
+      "name": "Update",
+      "category": "U",
+      "description": "Replaces a record in a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-update-updateif"
+    },
+    {
+      "name": "UpdateContext",
+      "category": "U",
+      "description": "Sets the value of one or more context variables of the current screen.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-updatecontext"
+    },
+    {
+      "name": "UpdateIf",
+      "category": "U",
+      "description": "Modifies a set of records in a data source based on a condition.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-update-updateif"
+    },
+    {
+      "name": "Upper",
+      "category": "U",
+      "description": "Converts letters in a string of text to all uppercase.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-lower-upper-proper"
+    },
+    {
+      "name": "User",
+      "category": "U",
+      "description": "Returns information about the current user.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-user"
+    },
+    {
+      "name": "Validate",
+      "category": "V",
+      "description": "Checks whether the value of a single column or a complete record is valid for a data source.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-validate"
+    },
+    {
+      "name": "Value",
+      "category": "V",
+      "description": "Converts a string to a number.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-value"
+    },
+    {
+      "name": "VarP",
+      "category": "V",
+      "description": "Returns the variance of its arguments.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-aggregates"
+    },
+    {
+      "name": "ViewForm",
+      "category": "V",
+      "description": "Resets a form control for viewing of an existing item.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-form"
+    },
+    {
+      "name": "Weekday",
+      "category": "W",
+      "description": "Retrieves the weekday portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    },
+    {
+      "name": "WeekNum",
+      "category": "W",
+      "description": "Returns the week number of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-weeknum"
+    },
+    {
+      "name": "With",
+      "category": "W",
+      "description": "Calculates values and performs actions for a single record, including inline records of named values.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-with"
+    },
+    {
+      "name": "Year",
+      "category": "Y",
+      "description": "Retrieves the year portion of a date/time value.",
+      "docUrl": "https://learn.microsoft.com/en-us/power-platform/power-fx/reference/function-datetime-parts"
+    }
+  ]
+}

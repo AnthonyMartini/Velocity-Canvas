@@ -153,6 +153,10 @@ function ValidatedStringInput({ prop, value, onChange, className = "", localVars
   }
 
   const handleBlur = () => {
+    if (sError) {
+      setTempValue(String(value || ""))
+      return
+    }
     onChange(tempValue.trim())
   }
 

@@ -6,6 +6,21 @@ import NextImage from 'next/image'
 import PropTypes from 'prop-types'
 import logo from '@/assets/logo.png'
 import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
+  ModernButtonRenderer,
+  ModernDropdownRenderer,
+  ModernCheckboxRenderer,
+  ModernComboBoxRenderer,
+  ModernProgressBarRenderer,
+  ModernSliderRenderer,
+  ModernSpinnerRenderer,
+  ModernTextRenderer,
+  ModernTextInputRenderer,
+  ModernToggleRenderer,
+  LinkRenderer,
+  NumberInputRenderer,
+  ModernDatePickerRenderer,
+  RichTextEditorRenderer,
+  RatingRenderer,
   RectangleRenderer,
   IconRenderer,
   HtmlTextRenderer,
@@ -14,6 +29,7 @@ import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, Con
   ToggleRenderer,
   RadioRenderer,
   SliderRenderer,
+  UnknownPowerAppsObjectRenderer,
 } from './components/controls'
 import { SCHEMAS } from './constants'
 import PropField from './components/PropField'
@@ -26,16 +42,41 @@ import { uid, nextName, createComponent, createFromSpec, componentToYaml, screen
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, ensureUniqueNodeNames, ensureUniqueNodeListNames, getNodeAbsolutePosition, getAllAppErrors } from '../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../common/constants'
 import { appTheme, themeVars } from '@/theme/theme'
+import { createDefaultCanvasThemeState, getActiveCanvasThemeDefinition, normalizeCanvasThemeState, resolveCanvasTheme } from '@/theme/canvasTheme'
+import { looksLikePowerAppsYaml, parsePowerAppsYaml } from '@/lib/powerapps-import'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
 const createInitialChatMessages = () => ([
-  { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+  { role: 'assistant', content: 'Hi! Tell me what to add Ã¢â‚¬â€ e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
 ])
 const RENDERER_CHAT_MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
   { value: 'gemini-3.1-pro-preview', label: '3.1-pro-preview - 10 credits' },
 ] as const
 const DEFAULT_RENDERER_CHAT_MODEL = RENDERER_CHAT_MODEL_OPTIONS[0].value
+const INTERNAL_COMPONENT_CLIPBOARD_PREFIX = '__VELOCITY_CANVAS_COMPONENTS__:'
+const COMPONENT_LIBRARY_GROUPS = [
+  {
+    key: 'input',
+    label: 'Input',
+    types: ['Button', 'TextInput', 'Dropdown', 'Checkbox', 'DatePicker', 'ComboBox', 'Toggle', 'Radio', 'Slider', 'RichTextEditor', 'Rating'],
+  },
+  {
+    key: 'output',
+    label: 'Output',
+    types: ['Label', 'HtmlText'],
+  },
+  {
+    key: 'display',
+    label: 'Display',
+    types: ['Container', 'Gallery', 'Rectangle', 'Icon'],
+  },
+  {
+    key: 'modern',
+    label: 'Modern',
+    types: ['ModernButton', 'ModernDropdown', 'ModernCheckbox', 'ModernComboBox', 'ModernProgressBar', 'ModernSlider', 'ModernSpinner', 'ModernText', 'ModernTextInput', 'ModernToggle', 'Link', 'NumberInput', 'ModernDatePicker'],
+  },
+] as const
 const AI_REQUEST_SUMMARY_KEYS = new Set([
   'id',
   'type',
@@ -47,15 +88,22 @@ const AI_REQUEST_SUMMARY_KEYS = new Set([
   'Text',
   'Fill',
   'Color',
+  'Appearance',
+  'BasePaletteColor',
+  'BorderRadius',
   'Size',
   'Font',
+  'FontColor',
+  'FontSize',
   'FontWeight',
   'Align',
   'VerticalAlign',
   'DisplayMode',
   'Visible',
   'Icon',
+  'IconStyle',
   'LayoutMode',
+  'Layout',
 ])
 
 function compactNodeForAIRequest(node, { summaryOnly = false, childLimit = 0 } = {}) {
@@ -88,6 +136,23 @@ function compactNodeForAIRequest(node, { summaryOnly = false, childLimit = 0 } =
   }
 
   return out
+}
+
+function serializeCopiedNodes(nodes) {
+  return `${INTERNAL_COMPONENT_CLIPBOARD_PREFIX}${JSON.stringify(nodes)}`
+}
+
+function deserializeCopiedNodes(text) {
+  if (typeof text !== 'string' || !text.startsWith(INTERNAL_COMPONENT_CLIPBOARD_PREFIX)) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(text.slice(INTERNAL_COMPONENT_CLIPBOARD_PREFIX.length))
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
 }
 
 async function consumeAIResponse(res, options: any = {}) {
@@ -204,7 +269,7 @@ async function consumeAIResponse(res, options: any = {}) {
   return { mode: 'legacy' as const, data: finalResult }
 }
 
-// ── Live-Validating Name Input ──────────────────────────────────────────────
+// â”€â”€ Live-Validating Name Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function NameInput({ initialValue, checkDuplicate, onCommit }) {
   const [val, setVal] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
@@ -253,8 +318,62 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
   )
 }
 
-// ── Errors Pane ───────────────────────────────────────────────────────────────
-function ErrorsPane({ errors, onSelectNode, width, onClose }) {
+// ── Errors Pane ───────────────────────────────────────────────────────────────────────────────────
+function ErrorCard({ err, onSelectNode }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = (e) => {
+    e.stopPropagation()
+    const text = `${err.path}\n${err.error}`
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+
+  return (
+    <div
+      onClick={() => onSelectNode(err.nodeId)}
+      className="group flex flex-col gap-1.5 p-3 rounded-lg border border-red/20 bg-red/5 hover:bg-red/10 hover:border-red/40 transition-colors cursor-pointer"
+    >
+      <div className="flex items-center justify-between overflow-hidden gap-2">
+        <span className="text-[11px] font-mono text-red-300 font-semibold truncate flex-1" title={err.path}>{err.path}</span>
+        <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded bg-black/20 text-subtext/60 group-hover:text-text transition-colors">Select &rarr;</span>
+      </div>
+      <p className="text-[11px] text-red-200 leading-relaxed">{err.error}</p>
+      <div className="flex justify-end mt-0.5">
+        <button
+          onClick={handleCopy}
+          title="Copy error to clipboard"
+          className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border transition-all duration-200 cursor-pointer ${
+            copied
+              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+              : 'bg-black/20 border-transparent text-subtext/50 hover:border-red/30 hover:text-red-300'
+          }`}
+        >
+          {copied ? (
+            <>
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
+                <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
+              </svg>
+              Copy
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ErrorsPane({ errors, onSelectNode, width = 320, onClose }) {
   return (
     <div style={{ width, backgroundColor: themeVars.colors.panel }} className="shrink-0 border-l border-overlay/30 flex flex-col overflow-hidden relative">
       {/* Header */}
@@ -285,17 +404,7 @@ function ErrorsPane({ errors, onSelectNode, width, onClose }) {
           </div>
         ) : (
           errors.map((err, i) => (
-            <div 
-              key={i} 
-              onClick={() => onSelectNode(err.nodeId)}
-              className="group flex flex-col gap-1 p-3 rounded-lg border border-red/20 bg-red/5 hover:bg-red/10 hover:border-red/40 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center justify-between overflow-hidden gap-2">
-                <span className="text-[11px] font-mono text-red-300 font-semibold truncate flex-1" title={err.path}>{err.path}</span>
-                <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded bg-black/20 text-subtext/60 group-hover:text-text transition-colors">Select &rarr;</span>
-              </div>
-              <p className="text-[11px] text-red-200 mt-0.5">{err.error}</p>
-            </div>
+            <ErrorCard key={i} err={err} onSelectNode={onSelectNode} />
           ))
         )}
       </div>
@@ -305,6 +414,21 @@ function ErrorsPane({ errors, onSelectNode, width, onClose }) {
 
 function RendererSwitch({ comp, sharedProps }) {
   if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernButton') return <ModernButtonRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernDropdown') return <ModernDropdownRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernCheckbox') return <ModernCheckboxRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernComboBox') return <ModernComboBoxRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernProgressBar') return <ModernProgressBarRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernSlider') return <ModernSliderRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernSpinner') return <ModernSpinnerRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernText') return <ModernTextRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernTextInput') return <ModernTextInputRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernToggle') return <ModernToggleRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'Link') return <LinkRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'NumberInput') return <NumberInputRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernDatePicker') return <ModernDatePickerRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'RichTextEditor') return <RichTextEditorRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'Rating') return <RatingRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
@@ -356,6 +480,9 @@ function RendererSwitch({ comp, sharedProps }) {
   if (comp.type === 'Slider') return (
     <SliderRenderer key={comp.id} {...sharedProps} />
   )
+  if (comp.type === 'UnknownPowerAppsObject') return (
+    <UnknownPowerAppsObjectRenderer key={comp.id} {...sharedProps} />
+  )
   return null
 }
 
@@ -376,7 +503,7 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
               className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 object-contain"
               priority
             />
-            <span className="text-xl">✨</span>
+            <span className="text-xl">âœ¨</span>
           </div>
         </div>
         <div className="text-center">
@@ -486,17 +613,15 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
   )
 }
 
-// ── Code Pane ─────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width, onClose }) {
+// â”€â”€ Code Pane â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function CodePane({ node, tree, canvasTheme, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width, onClose }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
   const yaml = (() => {
-    if (!node || node.type === 'App') return screenToYaml(tree)
+    if (!node || node.type === 'App') return screenToYaml(tree, canvasTheme)
     if (node.type === 'Screen') {
-      // Wrap the single screen as a full Screens: document
-      const screenBody = componentToYaml(node, 2)
-      return `Screens:\n${screenBody}`
+      return screenToYaml(tree, canvasTheme, [node])
     }
     return componentToYaml(node)
   })()
@@ -785,9 +910,9 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
   )
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Main Page
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function RendererPage({ user, onCreditDeduction, activeProject, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, setActiveProject: (p: any) => void }) {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedState, setLastSavedState] = useState('')
@@ -795,6 +920,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [canvasH, setCanvasH] = useState(768)
   const [canvasWInput, setCanvasWInput] = useState('1366')
   const [canvasHInput, setCanvasHInput] = useState('768')
+  const [canvasTheme, setCanvasTheme] = useState<any>(() => createDefaultCanvasThemeState())
   
   const [tree, setTree] = useState([
     {
@@ -821,11 +947,21 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [showPropertiesPane, setShowPropertiesPane] = useState(false) // Toggle visibility of Properties Pane
   const [showMobilePaneMenu, setShowMobilePaneMenu] = useState(false)
   const showLayerNames = true // Always show layer names/full size
+  const componentLibraryGroups = useMemo(() => {
+    return COMPONENT_LIBRARY_GROUPS
+      .map(group => ({
+        ...group,
+        items: group.types
+          .map(type => [type, SCHEMAS[type]] as const)
+          .filter(([, schema]) => Boolean(schema)),
+      }))
+      .filter(group => group.items.length > 0)
+  }, [])
 
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+    { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
   ])
   const [chatModel, setChatModel] = useState<string>(DEFAULT_RENDERER_CHAT_MODEL)
   const [chatLoading, setChatLoading] = useState(false)
@@ -877,7 +1013,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   }, [])
   
   // Sidebar/Pane Resizing state
-  const [rightWidth, setRightWidth] = useState(256)
+  const [rightWidth, setRightWidth] = useState(320)
   const [chatHeight, setChatHeight] = useState(240)
   const [codeWidth, setCodeWidth] = useState(384)
   const paneResizeRef = useRef(null)
@@ -889,6 +1025,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   })
   const treeRef = useRef(tree)
   const activeScreenIdRef = useRef<string | null>(null)
+  // Tracks which project id we last fully initialized, so metadata-only
+  // updates (theme/name) don't re-trigger a full state reset and clear selection.
+  const loadedProjectIdRef = useRef<string | null | undefined>(undefined)
 
   const [snapLines, setSnapLines] = useState([]) // Active grid lines [{x?, y?, orientation}]
 
@@ -943,7 +1082,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setDragOverId(null)
   }, [])
 
-  // ── Delete selected ─────────────────────────────────────────────────────────
+  // â”€â”€ Delete selected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const deleteSelected = useCallback(() => {
     if (!selectedIds.length) return
     setTree(prev => { 
@@ -962,9 +1101,22 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [isAltPressed, setIsAltPressed] = useState(false)
   const effectiveIsPlaying = isPlaying || isAltPressed
 
-  // ── Global App State ────────────────────────────────────────────────────────
+  // â”€â”€ Global App State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [localVars, setLocalVars] = useState<Record<string, any>>({}) // { varName: value }
   const [notification, setNotification] = useState(null) // { message, id, timer }
+  const normalizedCanvasTheme = useMemo(() => normalizeCanvasThemeState(canvasTheme), [canvasTheme])
+  const activeCanvasTheme = useMemo(() => getActiveCanvasThemeDefinition(normalizedCanvasTheme), [normalizedCanvasTheme])
+  const resolvedCanvasTheme = useMemo(() => resolveCanvasTheme(normalizedCanvasTheme), [normalizedCanvasTheme])
+  const runtimeLocalVars = useMemo(() => ({
+    ...localVars,
+    App: {
+      Theme: resolvedCanvasTheme,
+    },
+  }), [localVars, resolvedCanvasTheme])
+  const serializedProjectState = useMemo(
+    () => JSON.stringify({ tree, canvasW, canvasH, canvasTheme: normalizedCanvasTheme }),
+    [tree, canvasW, canvasH, normalizedCanvasTheme]
+  )
 
   // Auto-extract and sync variables from the tree into localVars
   useEffect(() => {
@@ -1004,11 +1156,172 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [])
 
+  const copySelectedToClipboard = useCallback(async () => {
+    if (selectedIds.length <= 0) return false
+    const nodesToCopy = selectedIds.map(id => findNode(treeRef.current, id)).filter(Boolean)
+    if (nodesToCopy.length <= 0) return false
+    clipboardRef.current = nodesToCopy
+    try {
+      await navigator.clipboard.writeText(serializeCopiedNodes(nodesToCopy))
+    } catch {
+      // Keep the in-memory clipboard as a fallback if browser clipboard access is blocked.
+    }
+    return true
+  }, [selectedIds])
+
+  const pasteCopiedNodes = useCallback((sourceNodes) => {
+    if (!Array.isArray(sourceNodes) || sourceNodes.length <= 0) return false
+    const baseTree = treeRef.current
+    const allNamesInTree = flattenTree(baseTree).map(n => n.name)
+
+    const cloneNode = (node, shouldShift = false) => {
+      const newName = getNextAvailableName(node.name, allNamesInTree)
+      allNamesInTree.push(newName)
+
+      const newNode = { ...node, id: uid(), name: newName }
+
+      if (shouldShift && typeof node.X === 'number' && typeof node.Y === 'number') {
+        newNode.X = node.X + 20
+        newNode.Y = node.Y + 20
+      }
+
+      if (node.children) {
+        newNode.children = node.children.map(c => cloneNode(c, false))
+      }
+      return newNode
+    }
+
+    let nextTree = baseTree
+    const newSelectedIds = []
+
+    for (const copiedNode of sourceNodes) {
+      const pastedNode = cloneNode(copiedNode, true)
+
+      const sNode = selectedIds.length === 1 ? findNode(baseTree, selectedIds[0]) : null
+      const isContainerType = (type) => ['Container', 'Gallery', 'Screen'].includes(type)
+
+      let targetParentId = null
+
+      if (copiedNode.type === 'Screen') {
+        targetParentId = 'app_root'
+      } else if (sNode) {
+        if (isContainerType(sNode.type)) {
+          targetParentId = sNode.id
+        } else {
+          const parent = findParent(baseTree, sNode.id)
+          if (parent && parent.type !== 'App') {
+            targetParentId = parent.id
+          }
+        }
+      }
+
+      if (!targetParentId && copiedNode.type !== 'Screen') {
+        targetParentId = activeScreenIdRef.current
+      }
+
+      nextTree = insertNode(nextTree, pastedNode, targetParentId)
+      newSelectedIds.push(pastedNode.id)
+    }
+
+    treeRef.current = nextTree
+    setTree(nextTree)
+    saveHistory(nextTree)
+    if (newSelectedIds.length > 0) {
+      setTimeout(() => setSelectedIds(newSelectedIds), 10)
+    }
+    return true
+  }, [saveHistory, selectedIds])
+
+  const pasteInternalClipboard = useCallback(() => {
+    return pasteCopiedNodes(clipboardRef.current)
+  }, [pasteCopiedNodes])
+
+  const importPowerAppsYamlText = useCallback((text) => {
+    if (!looksLikePowerAppsYaml(text)) return false
+
+    try {
+      const parsed = parsePowerAppsYaml(text)
+      const importedSpecs = [...parsed.screens, ...parsed.components]
+
+      if (importedSpecs.length === 0) {
+        notify('No Power Apps screens or controls were found in the pasted YAML.', 'Error')
+        return true
+      }
+
+      const baseTree = treeRef.current
+      let nextTree = baseTree
+      const existingIds = new Set(flattenTree(baseTree).map(n => n.id))
+      const existingNames = flattenTree(baseTree).map(n => n.name)
+      const newSelectedIds = []
+      let firstImportedScreenId = null
+      let importedNodeCount = 0
+
+      const selectedSingleNode = selectedIds.length === 1 ? findNode(baseTree, selectedIds[0]) : null
+      const isContainerType = (type) => ['Container', 'Gallery', 'Screen'].includes(type)
+
+      const resolveTargetParentId = (node) => {
+        if (node.type === 'Screen') return baseTree[0]?.id || 'app_root'
+
+        if (selectedSingleNode) {
+          if (isContainerType(selectedSingleNode.type)) return selectedSingleNode.id
+
+          const parent = findParent(baseTree, selectedSingleNode.id)
+          if (parent && parent.type !== 'App') return parent.id
+        }
+
+        return activeScreenIdRef.current
+      }
+
+      for (const spec of importedSpecs) {
+        const importedNode = createFromSpec(spec, existingIds)
+        if (!importedNode) continue
+
+        const uniqueNode = ensureUniqueNodeNames(importedNode, existingNames)
+        existingNames.push(...flattenTree([uniqueNode]).map(n => n.name))
+
+        nextTree = insertNode(nextTree, uniqueNode, resolveTargetParentId(uniqueNode))
+        newSelectedIds.push(uniqueNode.id)
+        importedNodeCount += 1
+
+        if (!firstImportedScreenId && uniqueNode.type === 'Screen') {
+          firstImportedScreenId = uniqueNode.id
+        }
+      }
+
+      if (importedNodeCount === 0) {
+        notify('The pasted YAML was recognized, but none of its nodes could be imported safely.', 'Error')
+        return true
+      }
+
+      treeRef.current = nextTree
+      setTree(nextTree)
+      saveHistory(nextTree)
+
+      if (newSelectedIds.length > 0) {
+        setTimeout(() => {
+          setSelectedIds(newSelectedIds)
+          if (firstImportedScreenId) setActiveScreenId(firstImportedScreenId)
+        }, 0)
+      }
+
+      const importedLabel = importedNodeCount === 1 ? 'object' : 'objects'
+      const placeholderSuffix = parsed.opaqueNodeCount > 0
+        ? ` ${parsed.opaqueNodeCount} unrecognized ${parsed.opaqueNodeCount === 1 ? 'node was' : 'nodes were'} preserved as placeholders.`
+        : ''
+      notify(`Imported ${importedNodeCount} Power Apps ${importedLabel}.${placeholderSuffix}`, 'Success')
+      return true
+    } catch (error) {
+      console.error('Failed to import Power Apps YAML:', error)
+      notify('Failed to import pasted Power Apps YAML.', 'Error')
+      return true
+    }
+  }, [notify, saveHistory, selectedIds])
+
   // Clear chat when project is closed
   useEffect(() => {
     if (!activeProject) {
       setChatMessages([
-        { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+        { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
       ])
       setChatImage(null)
       setChatInput('')
@@ -1100,6 +1413,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const resizeRef = useRef(null)
   const selectionBoxRef = useRef(null)
   const panRef = useRef(null)
+  const spacePanRef = useRef(false)
   const canvasSizeRef = useRef({ w: 1366, h: 768 })
 
   // Synchronize state when activeProject changes
@@ -1122,13 +1436,19 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setActiveScreenId(blankTree[0]?.children?.[0]?.id || null);
       setCollapsedIds(new Set());
       setLocalVars({});
-      setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768 }));
+      const nextCanvasTheme = createDefaultCanvasThemeState()
+      setCanvasTheme(nextCanvasTheme)
+      setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768, canvasTheme: nextCanvasTheme }));
 
       // If it was the temporary `{name, isNew}` object, finalize it into a proper project state
       if (typeof activeProject === 'object' && activeProject?.isNew) {
-        setActiveProject({ name: projectName, tree: blankTree, canvasW: 1366, canvasH: 768 });
+        setActiveProject({ name: projectName, tree: blankTree, canvasW: 1366, canvasH: 768, canvasTheme: nextCanvasTheme });
       }
     } else if (activeProject && typeof activeProject === 'object') {
+      // Skip full re-initialization for metadata-only updates on the current project.
+      const incomingId = activeProject.id ?? null
+      if (loadedProjectIdRef.current !== undefined && loadedProjectIdRef.current === incomingId) return
+      loadedProjectIdRef.current = incomingId
       const savedTree = activeProject.tree?.length ? activeProject.tree : [{
         id: 'app_root',
         type: 'App',
@@ -1144,7 +1464,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setSelectedIds([]);
       setActiveScreenId(savedTree[0]?.children?.[0]?.id || null);
       setCollapsedIds(new Set());
-      setLastSavedState(JSON.stringify({ tree: savedTree, canvasW: loadedW, canvasH: loadedH }));
+      const loadedTheme = normalizeCanvasThemeState(activeProject.canvasTheme)
+      setCanvasTheme(loadedTheme)
+      setLastSavedState(JSON.stringify({ tree: savedTree, canvasW: loadedW, canvasH: loadedH, canvasTheme: loadedTheme }));
     }
   }, [activeProject]);
 
@@ -1156,7 +1478,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         name: typeof activeProject === 'object' ? activeProject.name : 'Untitled Project',
         tree,
         canvasW,
-        canvasH
+        canvasH,
+        canvasTheme: normalizedCanvasTheme,
       };
       
       const idToken = await user.getIdToken();
@@ -1172,10 +1495,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       if (showSuccessToast) {
         notify('Project saved to cloud!', 'Success');
       }
-      setLastSavedState(JSON.stringify({ tree, canvasW, canvasH }));
+      setLastSavedState(serializedProjectState);
       
       // Update activeProject with the new ID so future queries act as 'updates'
       if (activeProject === 'new' || !activeProject?.id) {
+        loadedProjectIdRef.current = data.projectId // keep guard in sync so the sync effect doesn't re-init
         setActiveProject({ ...payload, id: data.projectId });
       }
 
@@ -1186,15 +1510,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     } finally {
       setIsSaving(false);
     }
-  }, [activeProject, tree, canvasW, canvasH, user, notify, setActiveProject]);
+  }, [activeProject, tree, canvasW, canvasH, normalizedCanvasTheme, serializedProjectState, user, notify, setActiveProject]);
 
   const handleSaveProject = useCallback(async () => {
     await saveProjectToCloud({ showSuccessToast: true });
   }, [saveProjectToCloud]);
 
   const hasUnsavedChanges = useMemo(() => {
-    return JSON.stringify({ tree, canvasW, canvasH }) !== lastSavedState;
-  }, [tree, canvasW, canvasH, lastSavedState]);
+    return serializedProjectState !== lastSavedState;
+  }, [serializedProjectState, lastSavedState]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1259,10 +1583,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const totalCount = fullFlatNodes.length // Total count shouldn't hide skipped nodes
 
   const globalErrors = useMemo(() => {
-    return getAllAppErrors(tree, localVars, SCHEMAS)
-  }, [tree, localVars])
+    return getAllAppErrors(tree, runtimeLocalVars, SCHEMAS)
+  }, [tree, runtimeLocalVars])
 
-  // Sticky active screen — only changes when the selection moves to a different screen.
+  // Sticky active screen â€” only changes when the selection moves to a different screen.
   // Deselecting (empty selectedIds) keeps the last active screen.
   const [activeScreenId, setActiveScreenId] = useState(() => {
     const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
@@ -1426,7 +1750,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages])
   useEffect(() => { if (chatOpen) setTimeout(() => chatInputRef.current?.focus(), 150) }, [chatOpen])
 
-  // ── Add component to root or into selected container ──────────────────────
+  // â”€â”€ Add component to root or into selected container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const addComponent = useCallback((sch) => {
     let targetParent = activeScreenNode
     let isGallery = false
@@ -1463,7 +1787,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setSelectedIds([compId])
   }, [selectedNode, activeScreenNode, tree, saveHistory])
 
-  // ── Add a new Screen ────────────────────────────────────────────────────────
+  // â”€â”€ Add a new Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const addScreen = useCallback(() => {
     const compId = uid()
     const comp = {
@@ -1494,7 +1818,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [saveHistory, tree])
 
-  // ── Update a property on selected node ─────────────────────────────────────
+  // â”€â”€ Update a property on selected node â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const updateProp = useCallback((id, key, val) => {
     setTree(prev => {
       const next = updateNode(prev, id, () => ({ [key]: val }))
@@ -1520,7 +1844,60 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setActiveProject(prev => typeof prev === 'object' ? { ...prev, name: nextName } : prev)
   }, [saveHistory, setActiveProject])
 
-  // ── Reorder a node in z-space ─────────────────────────────────────────────
+  const canvasThemeRef = useRef(canvasTheme)
+  useEffect(() => { canvasThemeRef.current = canvasTheme }, [canvasTheme])
+
+  const updateCanvasThemeState = useCallback((updater) => {
+    const normalizedPrev = normalizeCanvasThemeState(canvasThemeRef.current)
+    const nextThemeState = normalizeCanvasThemeState(updater(normalizedPrev))
+    // Update both states as independent top-level calls â€” never nest setState
+    // inside another setState updater (causes "update while rendering" error).
+    setCanvasTheme(nextThemeState)
+    setActiveProject(current => typeof current === 'object' ? { ...current, canvasTheme: nextThemeState } : current)
+  }, [setActiveProject])
+
+  const updateActiveCanvasThemeField = useCallback((field, value) => {
+    updateCanvasThemeState(prev => {
+      const activeName = prev.activeThemeName
+      return {
+        ...prev,
+        themes: {
+          ...prev.themes,
+          [activeName]: {
+            ...prev.themes[activeName],
+            [field]: value,
+          },
+        },
+      }
+    })
+  }, [updateCanvasThemeState])
+
+  const updateActiveCanvasThemeName = useCallback((rawValue) => {
+    updateCanvasThemeState(prev => {
+      const currentName = prev.activeThemeName
+      const requestedName = String(rawValue ?? '').trim() || currentName
+      const existingEntries = Object.entries(prev.themes).filter(([name]) => name !== currentName)
+
+      let uniqueName = requestedName
+      let suffix = 2
+      const existingNames = new Set(existingEntries.map(([name]) => name.toLowerCase()))
+      while (existingNames.has(uniqueName.toLowerCase())) {
+        uniqueName = `${requestedName} ${suffix}`
+        suffix += 1
+      }
+
+      const activeDefinition = prev.themes[currentName]
+      return {
+        activeThemeName: uniqueName,
+        themes: {
+          ...Object.fromEntries(existingEntries),
+          [uniqueName]: activeDefinition,
+        },
+      }
+    })
+  }, [updateCanvasThemeState])
+
+  // â”€â”€ Reorder a node in z-space â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleReorder = useCallback((id, direction) => {
     setTree(prev => {
       const next = reorderNode(prev, id, direction)
@@ -1577,12 +1954,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [])
 
-  // ── Snap Lines state ────────────────────────────────────────────────────────
+  // â”€â”€ Snap Lines state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
-  // ── Drag state ──────────────────────────────────────────────────────────────
+  // â”€â”€ Drag state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleMouseDown = useCallback((e, id) => {
-    if (effectiveIsPlaying) return // In preview mode — no drag/select
+    if (effectiveIsPlaying) return // In preview mode â€” no drag/select
     if (e.button === 2) return // Don't interact with components while right-clicking
 
     e.stopPropagation()
@@ -1619,7 +1996,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const n = findNode(tree, sid)
         if (!n) return null
         const parent = findParent(tree, sid)
-        const rn = resolveProperties(n, localVars, fullFlatNodes, parent)
+        const rn = resolveProperties(n, runtimeLocalVars, fullFlatNodes, parent)
         return { 
           id: sid, 
           startX: rn.X || 0, 
@@ -1640,7 +2017,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   useEffect(() => {
     const onMove = (e) => {
-      // ── Pane Resizing ────────────────────────────────────────────────────────
+      // â”€â”€ Pane Resizing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (paneResizeRef.current) {
         const { side, startMouseX, startMouseY, startWidth, startHeight } = paneResizeRef.current
 
@@ -1657,12 +2034,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Panning ─────────────────────────────────────────────────────────────
+      // â”€â”€ Panning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (panRef.current) {
         const { startMouseX, startMouseY, startScrollX, startScrollY } = panRef.current
         const dx = e.clientX - startMouseX
         const dy = e.clientY - startMouseY
-        
+
         const wrapper = document.getElementById('canvas-scroll-wrapper')
         if (wrapper) {
           wrapper.scrollLeft = startScrollX - dx
@@ -1671,7 +2048,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Resize mode ──────────────────────────────────────────────────────────
+      // â”€â”€ Resize mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (resizeRef.current) {
         const { id, dir, startMouseX, startMouseY, startX, startY, startW, startH } = resizeRef.current
         const PT_RATIO = 0.75
@@ -1684,7 +2061,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const parent = findParent(tree, id)
         const isChildOfContainer = parent && parent.type !== 'App'
         const siblings = isChildOfContainer ? (parent.children || []) : (activeScreenNode?.children || [])
-        const filteredSiblings = siblings.filter(s => s.id !== id).map(s => resolveProperties(s, localVars, fullFlatNodes, parent))
+        const filteredSiblings = siblings.filter(s => s.id !== id).map(s => resolveProperties(s, runtimeLocalVars, fullFlatNodes, parent))
 
         let snapDx = dx
         let snapDy = dy
@@ -1799,7 +2176,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Drag move ────────────────────────────────────────────────────────────
+      // â”€â”€ Drag move â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (dragRef.current && dragRef.current.nodes?.length) {
         const { startMouseX, startMouseY, nodes } = dragRef.current
         
@@ -1811,7 +2188,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
         // dx/dy are now just applied to the nodes below.
 
-        // ── Grid Snapping Logic ──
+        // â”€â”€ Grid Snapping Logic â”€â”€
         const SNAP_THRESHOLD = 8
         
         // Calculate aggregate bounds of all dragged nodes for group snapping
@@ -1830,7 +2207,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         const siblings = isChildOfContainer ? (parent.children || []) : (activeScreenNode?.children || [])
         
         const draggedIds = new Set(nodes.map(n => n.id))
-        const filteredSiblings = siblings.filter(s => !draggedIds.has(s.id)).map(s => resolveProperties(s, localVars, fullFlatNodes, parent))
+        const filteredSiblings = siblings.filter(s => !draggedIds.has(s.id)).map(s => resolveProperties(s, runtimeLocalVars, fullFlatNodes, parent))
 
         let snapDx = dx
         let snapDy = dy
@@ -1972,7 +2349,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             let limitH = canvasH
             if (parent && parent.type !== 'App') {
               const grandParent = findParent(nextTree, parent.id)
-              const resolvedParent = resolveProperties(parent, localVars, fullFlatNodes, grandParent)
+              const resolvedParent = resolveProperties(parent, runtimeLocalVars, fullFlatNodes, grandParent)
               limitW = resolvedParent.Width || limitW
               limitH = resolvedParent.Height || limitH
               
@@ -2004,7 +2381,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Marquee Selection Move ──────────────────────────────────────────────
+      // â”€â”€ Marquee Selection Move â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (selectionBoxRef.current) {
         const rootCanvas = document.getElementById('canvas-root')
         if (rootCanvas) {
@@ -2022,20 +2399,20 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
     
     const onUp = (e) => { 
-      // ── Pane Resizing End ───────────────────────────────────────────────────
+      // â”€â”€ Pane Resizing End â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (paneResizeRef.current) {
         paneResizeRef.current = null
         document.body.style.cursor = ''
       }
 
-      // ── Pan end ─────────────────────────────────────────────────────────────
+      // â”€â”€ Pan end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (panRef.current) {
         panRef.current = null
         document.body.style.cursor = ''
         return
       }
 
-      // ── Resize end ──────────────────────────────────────────────────────────
+      // â”€â”€ Resize end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (resizeRef.current) {
         resizeRef.current = null
         document.body.style.cursor = ''
@@ -2044,7 +2421,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Marquee Selection End ───────────────────────────────────────────────
+      // â”€â”€ Marquee Selection End â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (selectionBoxRef.current) {
         // Calculate bounding box in canvas coordinates
         const { startX, startY, currentX, currentY } = selectionBoxRef.current
@@ -2106,7 +2483,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // ── Drag end ────────────────────────────────────────────────────────────
+      // â”€â”€ Drag end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (!dragRef.current || !dragRef.current.nodes?.length) {
         setSnapLines([]) // Clear lines if mouse up without dragging
         return
@@ -2140,21 +2517,21 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [tree, saveHistory, selectedIds])
 
-  // ── Drop logic ──────────────────────────────────────────────────────────────
+  // â”€â”€ Drop logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDropInto = useCallback((targetContainerId) => {
     if (!dragRef.current) return
     const dragId = dragRef.current.id
     setTree(prev => handleDropLogic(prev, dragId, targetContainerId))
   }, [])
 
-  // ── Resize handle mousedown ─────────────────────────────────────────────────
+  // â”€â”€ Resize handle mousedown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleResizeMouseDown = useCallback((e, id, dir) => {
     e.stopPropagation()
     e.preventDefault()
     const node = findNode(tree, id)
     if (!node) return
     const parent = findParent(tree, id)
-    const rn = resolveProperties(node, localVars, fullFlatNodes, parent)
+    const rn = resolveProperties(node, runtimeLocalVars, fullFlatNodes, parent)
     const limitW = (parent && parent.type !== 'App') ? (parent.Width || 800) : canvasW
     const limitH = (parent && parent.type !== 'App') ? (parent.Height || 600) : canvasH
 
@@ -2171,7 +2548,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     document.body.style.cursor = cursorMap[dir] || 'default'
   }, [tree, localVars, fullFlatNodes])
 
-  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const clipboardRef = useRef(null)
 
   useEffect(() => {
@@ -2184,75 +2561,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       // Copy: Ctrl+C / Cmd+C
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         if (selectedIds.length > 0) {
-          const nodesToCopy = selectedIds.map(id => findNode(tree, id)).filter(Boolean)
-          if (nodesToCopy.length > 0) {
-            clipboardRef.current = nodesToCopy
-          }
-        }
-      }
-
-      // Paste: Ctrl+V / Cmd+V
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
-        if (clipboardRef.current && clipboardRef.current.length > 0) {
-          // Get all current names to avoid collisions during the paste batch
-          const allNamesInTree = flattenTree(tree).map(n => n.name)
-
-          // Deep clone helper to ensure fresh IDs and names
-          const cloneNode = (node, shouldShift = false) => {
-            const newName = getNextAvailableName(node.name, allNamesInTree)
-            allNamesInTree.push(newName) // Keep tracking for the rest of this paste batch
-
-            const newNode = { ...node, id: uid(), name: newName }
-            
-            if (shouldShift && typeof node.X === 'number' && typeof node.Y === 'number') {
-              newNode.X = node.X + 20
-              newNode.Y = node.Y + 20
-            }
-
-            if (node.children) {
-              newNode.children = node.children.map(c => cloneNode(c, false))
-            }
-            return newNode
-          }
-
-          setTree(prev => {
-            let nextTree = prev
-            const newSelectedIds = []
-            
-            for (const copiedNode of clipboardRef.current) {
-              const pastedNode = cloneNode(copiedNode, true)
-              
-              const sNode = selectedIds.length === 1 ? findNode(prev, selectedIds[0]) : null
-              const isContainerType = (type) => ['Container', 'Gallery', 'Screen'].includes(type)
-
-              let targetParentId = null
-
-              if (copiedNode.type === 'Screen') {
-                targetParentId = 'app_root'
-              } else if (sNode) {
-                if (isContainerType(sNode.type)) {
-                  targetParentId = sNode.id
-                } else {
-                  const parent = findParent(prev, sNode.id)
-                  // Don't paste into 'App' root alongside screens
-                  if (parent && parent.type !== 'App') {
-                    targetParentId = parent.id
-                  }
-                }
-              }
-
-              // Fallback for components to the current active screen
-              if (!targetParentId && copiedNode.type !== 'Screen') {
-                targetParentId = activeScreenId
-              }
-
-              nextTree = insertNode(nextTree, pastedNode, targetParentId)
-              newSelectedIds.push(pastedNode.id)
-            }
-            
-            setTimeout(() => setSelectedIds(newSelectedIds), 10)
-            return nextTree
-          })
+          e.preventDefault()
+          void copySelectedToClipboard()
         }
       }
 
@@ -2261,11 +2571,66 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       deleteSelected()
       }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tree, selectedIds, deleteSelected, activeScreenId])
 
-  // ── Canvas size commit ──────────────────────────────────────────────────────
+    const handlePaste = (e) => {
+      const tag = document.activeElement?.tagName
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+      if (inInput) return
+
+      const text = e.clipboardData?.getData('text/plain') || ''
+      const copiedNodes = deserializeCopiedNodes(text)
+      if (copiedNodes?.length) {
+        e.preventDefault()
+        clipboardRef.current = copiedNodes
+        pasteCopiedNodes(copiedNodes)
+        return
+      }
+      if (text && importPowerAppsYamlText(text)) {
+        e.preventDefault()
+        return
+      }
+
+      if (pasteInternalClipboard()) {
+        e.preventDefault()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('paste', handlePaste)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('paste', handlePaste)
+    }
+  }, [selectedIds, deleteSelected, importPowerAppsYamlText, copySelectedToClipboard, pasteCopiedNodes, pasteInternalClipboard])
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName
+      const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+      if (inInput) return
+
+      if (e.code === 'Space') {
+        spacePanRef.current = true
+        e.preventDefault()
+      }
+    }
+
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        spacePanRef.current = false
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
+
+  // â”€â”€ Canvas size commit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const commitCanvasSize = () => {
     const w = parseInt(canvasWInput, 10), h = parseInt(canvasHInput, 10)
     if (!isNaN(w) && w > 0) setCanvasW(w)
@@ -2275,10 +2640,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const handleExportToPowerApps = useCallback(() => {
     const exportNode = selectedNode?.type === 'App' ? null : selectedNode
     const yaml = (() => {
-      if (!exportNode) return screenToYaml(tree)
+      if (!exportNode) return screenToYaml(tree, normalizedCanvasTheme)
       if (exportNode.type === 'Screen') {
-        const screenBody = componentToYaml(exportNode, 2)
-        return `Screens:\n${screenBody}`
+        return screenToYaml(tree, normalizedCanvasTheme, [exportNode])
       }
       return componentToYaml(exportNode)
     })()
@@ -2297,9 +2661,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }).catch(() => {
       notify('Failed to copy YAML to clipboard.', 'Error')
     })
-  }, [selectedNode, tree, globalErrors, notify])
+  }, [selectedNode, tree, normalizedCanvasTheme, globalErrors, notify])
 
-  // ── AI Component Tweaking ───────────────────────────────────────────────────
+  // â”€â”€ AI Component Tweaking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleTweakSubmit = useCallback(async () => {
     const msg = tweakInput.trim()
     if (!msg || selectedIds.length !== 1 || tweakLoading) return
@@ -2400,7 +2764,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [selectedIds, tweakOriginalNode, confirmTweak])
 
-  // ── Image compression helper ─────────────────────────────────────────────
+  // â”€â”€ Image compression helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const MAX_RENDERER_CHAT_REQUEST_BYTES = 900 * 1024
   const MAX_CHAT_IMAGE_BYTES = 450 * 1024
 
@@ -2437,7 +2801,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     img.src = dataUrl
   }
 
-  // ── LLM Chat ────────────────────────────────────────────────────────────────
+  // â”€â”€ LLM Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleChatSubmit = useCallback(async () => {
     const msg = chatInput.trim()
     if ((!msg && !chatImage) || chatLoading) return
@@ -2605,7 +2969,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         setTree(preStreamTree)
       }
       if (err.name === 'AbortError') return
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}`, added: 0 }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `âš ï¸ ${err.message}`, added: 0 }])
     } finally {
       setChatLoading(false)
       setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
@@ -2613,7 +2977,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch, chatModel])
 
-  // ── Shared child event handlers ─────────────────────────────────────────────
+  // â”€â”€ Shared child event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
   
   // Also need to handle click on children for selection when not dragging
@@ -2622,7 +2986,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     // handleMouseDown already handles selection. We don't want to double trigger here.
   }, [])
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!activeProject) {
     return <ProjectsDashboard user={user} onOpenProject={setActiveProject} />;
   }
@@ -2652,7 +3016,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           <input type="number" value={canvasWInput} onChange={e => setCanvasWInput(e.target.value)}
             onBlur={commitCanvasSize} onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
             className="w-20 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right" />
-          <span className="text-subtext/40 text-xs">×</span>
+          <span className="text-subtext/40 text-xs">Ã—</span>
           <label className="text-xs text-subtext">H</label>
           <input type="number" value={canvasHInput} onChange={e => setCanvasHInput(e.target.value)}
             onBlur={commitCanvasSize} onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
@@ -2748,7 +3112,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             className={`hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 [&>span:first-of-type]:hidden ${showCodePane ? 'bg-accent/20 text-accent border border-accent/30 shadow-inner' : 'bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text'
               }`}
           >
-            <span className="text-[13px]">💻</span>
+            <span className="text-[13px]">ðŸ’»</span>
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 6 3 12l5 6" />
               <path d="m16 6 5 6-5 6" />
@@ -2921,28 +3285,43 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
             </div>
             <div className={`overflow-y-auto flex-1 pb-3 ${showLayerNames ? 'px-3 pt-2' : 'px-2 pt-2'}`}>
-              <div className="flex flex-col gap-1.5">
-              {Object.entries(SCHEMAS)
-                .filter(([label]) => label !== 'Screen')
-                .map(([label, sch]) => {
-                  const Icon = TYPE_ICONS[label]
-                  const color = TYPE_COLORS[label]
-                  return (
-                    <button key={label} onClick={() => !isPlaying && addComponent(sch)}
-                      disabled={isPlaying}
-                      title={!showLayerNames ? label : undefined}
-                      className={`flex items-center gap-2 w-full text-left border rounded-lg transition-all duration-150 ${showLayerNames ? 'px-3 py-2.5 text-xs' : 'py-2.5 px-3 justify-start'} ${
-                        isPlaying
-                          ? 'bg-base/30 border-overlay/15 text-subtext/30 cursor-not-allowed'
-                          : 'bg-base/60 border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext cursor-pointer'
-                      }`}>
-                      <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
-                        {Icon && <Icon className="w-4 h-4" />}
-                      </span>
-                      {showLayerNames && <span className="font-medium truncate">{label}</span>}
-                    </button>
-                  )
-                })}
+              <div className="flex flex-col gap-2">
+                {componentLibraryGroups.map(group => (
+                  <details key={group.key} open className="rounded-xl border border-overlay/25 bg-base/30 overflow-hidden">
+                    <summary className="list-none cursor-pointer select-none px-3 py-2.5 bg-surface/40 hover:bg-surface/55 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-subtext/75">{group.label}</p>
+                          <p className="text-[10px] text-subtext/45 mt-0.5">{group.items.length} component{group.items.length !== 1 ? 's' : ''}</p>
+                        </div>
+                        <svg className="w-4 h-4 text-subtext/50 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.512a.75.75 0 0 1-1.08 0L5.21 8.27a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </summary>
+                    <div className="p-2 space-y-1.5">
+                      {group.items.map(([label, sch]) => {
+                        const Icon = TYPE_ICONS[label]
+                        const color = TYPE_COLORS[label]
+                        return (
+                          <button key={label} onClick={() => !isPlaying && addComponent(sch)}
+                            disabled={isPlaying}
+                            title={!showLayerNames ? label : undefined}
+                            className={`flex items-center gap-2 w-full text-left border rounded-lg transition-all duration-150 ${showLayerNames ? 'px-3 py-2.5 text-xs' : 'py-2.5 px-3 justify-start'} ${
+                              isPlaying
+                                ? 'bg-base/30 border-overlay/15 text-subtext/30 cursor-not-allowed'
+                                : 'bg-base/60 border-overlay/30 hover:border-accent/50 hover:bg-accent/5 hover:text-accent text-subtext cursor-pointer'
+                            }`}>
+                            <span className={`w-6 h-6 rounded ${color} flex items-center justify-center shrink-0 shadow-sm text-white ${isPlaying ? 'opacity-40' : ''}`}>
+                              {Icon && <Icon className="w-4 h-4" />}
+                            </span>
+                            {showLayerNames && <span className="font-medium truncate">{label}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </details>
+                ))}
               </div>{/* end button list */}
             </div>{/* end scrollable */}
             {selectedNode?.type === 'Container' && (
@@ -3016,41 +3395,45 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             const type = notification.type || 'Information'
             const styles = {
               Success: {
-                bg: 'bg-emerald-50/95',
-                border: 'border-emerald-500/30',
+                bgColor: 'rgba(236, 253, 245, 0.96)',
+                borderColor: 'rgba(16, 185, 129, 0.3)',
                 iconBg: 'bg-emerald-500',
                 iconText: 'text-white',
                 accent: 'bg-emerald-500',
-                text: 'text-emerald-900',
+                titleColor: '#065f46',
+                bodyColor: 'rgba(6, 95, 70, 0.82)',
                 shadow: 'shadow-emerald-500/10'
               },
               Error: {
-                bg: 'bg-red-50/95',
-                border: 'border-red-500/30',
+                bgColor: 'rgba(254, 242, 242, 0.98)',
+                borderColor: 'rgba(239, 68, 68, 0.35)',
                 iconBg: 'bg-red-500',
                 iconText: 'text-white',
                 accent: 'bg-red-500',
-                text: 'text-red-900',
+                titleColor: '#7f1d1d',
+                bodyColor: 'rgba(127, 29, 29, 0.84)',
                 shadow: 'shadow-red-500/10',
                 icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               },
               Warning: {
-                bg: 'bg-amber-50/95',
-                border: 'border-amber-500/30',
+                bgColor: 'rgba(255, 251, 235, 0.97)',
+                borderColor: 'rgba(245, 158, 11, 0.35)',
                 iconBg: 'bg-amber-500',
                 iconText: 'text-white',
                 accent: 'bg-amber-500',
-                text: 'text-amber-900',
+                titleColor: '#78350f',
+                bodyColor: 'rgba(120, 53, 15, 0.82)',
                 shadow: 'shadow-amber-500/10',
                 icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
               },
               Information: {
-                bg: 'bg-blue-50/95',
-                border: 'border-blue-500/30',
+                bgColor: 'rgba(239, 246, 255, 0.97)',
+                borderColor: 'rgba(59, 130, 246, 0.3)',
                 iconBg: 'bg-blue-500',
                 iconText: 'text-white',
                 accent: 'bg-blue-500',
-                text: 'text-blue-900',
+                titleColor: '#1e3a8a',
+                bodyColor: 'rgba(30, 58, 138, 0.82)',
                 shadow: 'shadow-blue-500/10',
                 icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               }
@@ -3059,7 +3442,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             const s = styles[normalizedType] || styles.Information
             return (
               <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[100000] animate-in fade-in slide-in-from-top-6 duration-300 pointer-events-none">
-                <div className={`${s.bg} backdrop-blur-md border ${s.border} shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}>
+                <div
+                  className={`backdrop-blur-md border shadow-2xl ${s.shadow} rounded-2xl p-1.5 flex items-center gap-3 min-w-[300px] overflow-hidden relative`}
+                  style={{ backgroundColor: s.bgColor, borderColor: s.borderColor }}
+                >
                   <div className={`w-10 h-10 rounded-xl ${s.iconBg} flex items-center justify-center shrink-0 shadow-lg shadow-black/5`}>
                     {normalizedType === 'Success' ? (
                       <svg className={`w-5 h-5 ${s.iconText}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
@@ -3068,8 +3454,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     ) : s.icon}
                   </div>
                   <div className="flex-1 pr-4">
-                    <p className={`text-[13px] font-bold ${s.text} leading-tight`}>{normalizedType}</p>
-                    <p className={`text-xs ${s.text}/70 font-medium leading-tight mt-0.5`}>{notification.message}</p>
+                    <p className="text-[13px] font-bold leading-tight" style={{ color: s.titleColor }}>{normalizedType}</p>
+                    <p className="text-xs font-medium leading-tight mt-0.5" style={{ color: s.bodyColor }}>{notification.message}</p>
                   </div>
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-black/5">
                      <div className={`h-full ${s.accent} animate-toast-progress`} />
@@ -3102,22 +3488,31 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             className="absolute inset-0 overflow-auto"
             style={{ backgroundColor: themeVars.colors.canvasSurface, backgroundImage: themeVars.gradients.canvasGrid, backgroundSize: '20px 20px' }}
             onContextMenu={(e) => {
-              // Prevent browser context menu so we can right-click pan smoothly
               e.preventDefault()
             }}
             onMouseDown={(e) => {
               if (isPlaying) return // In preview mode, don't intercept canvas clicks
-              const wrapper = e.currentTarget
               
-              // Handle Panning (Right Click only)
               if (e.button === 2) {
-                e.preventDefault() // prevent text selection while panning
+                e.preventDefault()
                 document.body.style.cursor = 'grabbing'
                 panRef.current = {
                   startMouseX: e.clientX,
                   startMouseY: e.clientY,
-                  startScrollX: wrapper.scrollLeft,
-                  startScrollY: wrapper.scrollTop
+                  startScrollX: e.currentTarget.scrollLeft,
+                  startScrollY: e.currentTarget.scrollTop,
+                }
+                return
+              }
+
+              if (e.button === 1 || (e.button === 0 && spacePanRef.current)) {
+                e.preventDefault()
+                document.body.style.cursor = 'grabbing'
+                panRef.current = {
+                  startMouseX: e.clientX,
+                  startMouseY: e.clientY,
+                  startScrollX: e.currentTarget.scrollLeft,
+                  startScrollY: e.currentTarget.scrollTop,
                 }
                 return
               }
@@ -3160,7 +3555,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               )}
               <div
                 className="relative shrink-0"
-                style={{ width: `${canvasW}pt`, height: `${canvasH}pt`, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), localVars, fullFlatNodes), boxShadow: themeVars.shadows.canvas }}
+                style={{ width: `${canvasW}pt`, height: `${canvasH}pt`, backgroundColor: evaluateAST(parseFormula(activeScreenNode?.Fill || 'white'), runtimeLocalVars, fullFlatNodes), boxShadow: themeVars.shadows.canvas }}
                 data-container-id={activeScreenNode?.id || 'root'}
                 id="canvas-root"
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
@@ -3174,18 +3569,19 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       </svg>
                     </div>
                     <p className="text-gray-300 text-sm font-medium">Add components from the left panel or chat</p>
-                    <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
+                    <p className="text-gray-200 text-xs mt-1">{canvasW} Ã— {canvasH}</p>
                   </div>
                 )}
                 {(activeScreenNode?.children || []).map((rawComp, siblingIndex) => {
                   const isSelected = selectedIds.includes(rawComp.id)
-                  const comp = resolveProperties(rawComp, localVars, fullFlatNodes, activeScreenNode)
+                  const comp = resolveProperties(rawComp, runtimeLocalVars, fullFlatNodes, activeScreenNode)
                   const sharedProps = {
                     comp, selected: isSelected, isPlaying: effectiveIsPlaying,
-                    localVars, setLocalVars, notify,
+                    localVars: runtimeLocalVars, setLocalVars, notify,
                     flatNodes: fullFlatNodes,
                     updateProp,
                     parentNode: activeScreenNode,
+                    canvasTheme: resolvedCanvasTheme,
                     renderZIndex: siblingIndex + 1,
                     navigate: (targetNameOrId) => {
                       const screens = tree[0]?.type === 'App' ? (tree[0]?.children || []) : []
@@ -3230,7 +3626,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   let absY = line.y || 0
                   // If snapping inside a nested container, adjust coordinates to be relative to the active screen
                   if (line.parentId && line.parentId !== activeScreenId && line.parentId !== 'root' && line.parentId !== 'app_root') {
-                    const parentPos = getNodeAbsolutePosition(tree, line.parentId, fullFlatNodes, localVars)
+                    const parentPos = getNodeAbsolutePosition(tree, line.parentId, fullFlatNodes, runtimeLocalVars)
                     if (line.orientation === 'vertical') absX += parentPos.x
                     else absY += parentPos.y
                   }
@@ -3281,7 +3677,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
                   selectedNodes.forEach(rawNode => {
                     const parent = findParent(tree, rawNode.id)
-                    const node = resolveProperties(rawNode, localVars, fullFlatNodes, parent)
+                    const node = resolveProperties(rawNode, runtimeLocalVars, fullFlatNodes, parent)
                     minX = Math.min(minX, node.X || 0)
                     minY = Math.min(minY, node.Y || 0)
                     maxX = Math.max(maxX, (node.X || 0) + (node.Width || 0))
@@ -3313,9 +3709,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     const comp = findNode(tree, nodeId);
                     if (!comp || comp.type === 'Screen' || comp.type === 'App') return null;
                     
-                    const { x, y } = getNodeAbsolutePosition(tree, comp.id, fullFlatNodes, localVars);
+                    const { x, y } = getNodeAbsolutePosition(tree, comp.id, fullFlatNodes, runtimeLocalVars);
                     const parent = findParent(tree, comp.id);
-                    const resolvedComp = resolveProperties(comp, localVars, fullFlatNodes, parent);
+                    const resolvedComp = resolveProperties(comp, runtimeLocalVars, fullFlatNodes, parent);
                     const { Width: w } = resolvedComp;
                     
                     return (
@@ -3342,15 +3738,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 })()}
 
                 {/* Resize handles for selected root-level component */}
-                {/* Resize handles — hidden in preview mode */}
+                {/* Resize handles â€” hidden in preview mode */}
                 {selectedNode && selectedIds.length === 1 && !effectiveIsPlaying && selectedNode.type !== 'Screen' && selectedNode.type !== 'App' && (() => {
                   const comp = findNode(tree, selectedNode.id)
                   if (!comp) return null
-                  const { x, y } = getNodeAbsolutePosition(tree, comp.id, fullFlatNodes, localVars)
+                    const { x, y } = getNodeAbsolutePosition(tree, comp.id, fullFlatNodes, runtimeLocalVars)
                   
                   // Must use resolved height and width so handles match drawn bounds
                   const parent = findParent(tree, comp.id)
-                  const resolvedComp = resolveProperties(comp, localVars, fullFlatNodes, parent);
+                    const resolvedComp = resolveProperties(comp, runtimeLocalVars, fullFlatNodes, parent);
                   const { Width: w, Height: h } = resolvedComp
 
                   const handles = [
@@ -3509,7 +3905,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white shadow-md transition-all cursor-pointer opacity-0 group-hover:opacity-100 hover:scale-110"
                     style={{ backgroundColor: appTheme.colors.red }}
                   >
-                    ✕
+                    âœ•
                   </button>
                 </div>
               )}
@@ -3549,7 +3945,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         }
                       }
                     }}
-                    placeholder="Describe what to build — or paste a screenshot"
+                    placeholder="Describe what to build â€” or paste a screenshot"
                     className="w-full bg-base border border-overlay/40 rounded-xl px-4 pr-12 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
                   <span className={`absolute right-3 text-[9px] font-bold transition-colors ${chatInput.length >= 900 ? 'text-amber-500' : 'text-subtext/30'}`}>
                     {chatInput.length}/1000
@@ -3581,6 +3977,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             <CodePane 
               node={selectedNode}
               tree={tree}
+              canvasTheme={normalizedCanvasTheme}
               globalErrors={globalErrors}
               notify={notify}
               isTweaking={isTweaking}
@@ -3751,10 +4148,121 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         </label>
                       </div>
                     </div>
+                    <div className="rounded-xl border border-overlay/25 bg-overlay/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-subtext/60">Modern Theme</p>
+                          <p className="mt-1 text-xs text-subtext/60">Modern controls fall back to this app theme when local values are blank.</p>
+                        </div>
+                        <div
+                          className="h-8 w-8 rounded-full border border-white/20 shadow-sm"
+                          style={{ backgroundColor: activeCanvasTheme.BasePaletteColor }}
+                          title={activeCanvasTheme.BasePaletteColor}
+                        />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <label className="col-span-2 flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Theme Name</span>
+                          <input
+                            type="text"
+                            value={activeCanvasTheme.name}
+                            onChange={e => updateActiveCanvasThemeName(e.target.value)}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Base Palette</span>
+                          <input
+                            type="color"
+                            value={activeCanvasTheme.BasePaletteColor}
+                            onChange={e => updateActiveCanvasThemeField('BasePaletteColor', e.target.value)}
+                            className="h-11 w-full rounded-lg border border-overlay/35 bg-base px-2 py-2"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Font</span>
+                          <input
+                            type="text"
+                            value={activeCanvasTheme.Font}
+                            onChange={e => updateActiveCanvasThemeField('Font', e.target.value)}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Hue Torsion</span>
+                          <input
+                            type="number"
+                            value={activeCanvasTheme.HueTorsion}
+                            onChange={e => updateActiveCanvasThemeField('HueTorsion', Number(e.target.value || 0))}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">Vibrancy</span>
+                          <input
+                            type="number"
+                            value={activeCanvasTheme.Vibrancy}
+                            onChange={e => updateActiveCanvasThemeField('Vibrancy', Number(e.target.value || 0))}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-accent/60"
+                          />
+                        </label>
+                      </div>
+                    </div>
                     <div className="rounded-xl border border-overlay/20 bg-overlay/5 px-3 py-2.5 text-xs text-subtext/65">
                       {screenCount} screen{screenCount !== 1 ? 's' : ''} in this app.
                       {activeScreenNode ? ` Currently editing ${activeScreenNode.name || activeScreenNode.id}.` : ''}
                     </div>
+                  </div>
+                </div>
+              </>
+            ) : selectedNode && selectedNode.type === 'UnknownPowerAppsObject' ? (
+              <>
+                <div className="px-4 py-3 border-b border-overlay/20 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/25 px-2 py-0.5 rounded-full font-medium">
+                      Preserved Power Apps Object
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setShowPropertiesPane(false)}
+                        className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    {selectedNode.sourceControl || 'Unknown'}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-4">
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-subtext/80 space-y-4">
+                    <p className="text-text font-medium">This Power Apps object is not recognized by the renderer, so its original YAML is being preserved exactly for export.</p>
+                    <div className="rounded-lg bg-black/20 px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-subtext/55">Source Control</p>
+                      <p className="mt-1 font-mono text-[11px] text-amber-100 break-all">{selectedNode.sourceControl || 'Unknown'}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        ['X', 'X'],
+                        ['Y', 'Y'],
+                        ['Width', 'Width'],
+                        ['Height', 'Height'],
+                      ].map(([key, label]) => (
+                        <label key={key} className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-subtext/70">{label}</span>
+                          <input
+                            type="number"
+                            value={selectedNode[key] ?? ''}
+                            onChange={e => updateProp(selectedNode.id, key, Number(e.target.value || 0))}
+                            className="w-full rounded-lg border border-overlay/35 bg-base px-3 py-2 text-sm text-text focus:outline-none focus:border-amber-400/60"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <p>It is shown on the canvas as a placeholder rectangle so we can keep layout context without losing the original YAML.</p>
                   </div>
                 </div>
               </>
@@ -3827,7 +4335,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                   {selectedNode.type === 'Container' && (
                     <p className="text-[10px] text-subtext/50 mb-2 bg-overlay/20 rounded-lg px-2 py-1.5">
                       {selectedNode.children?.length ?? 0} child component{(selectedNode.children?.length ?? 0) !== 1 ? 's' : ''}
-                      {' · '}Select this container then click &quot;Add Component&quot; to add children.
+                      {' Â· '}Select this container then click &quot;Add Component&quot; to add children.
                     </p>
                   )}
                   <div className="divide-y divide-overlay/20">
@@ -3835,7 +4343,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       .filter(p => {
                         // Screens should not have editable width/height in the props panel as they follow the canvas
                         if (selectedNode.type === 'Screen' && (p.key === 'Width' || p.key === 'Height')) return false;
-                        return p.propertyType === 'Input' || p.propertyType === 'Event';
+                        return p.propertyType === 'Input' || p.propertyType === 'Event' || p.propertyType === 'Output';
                       })
                       .map(prop => (
                         <PropField 
@@ -3843,7 +4351,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                           prop={prop} 
                           value={selectedNode[prop.key]}
                           onChange={val => updateProp(selectedNode.id, prop.key, val)}
-                          localVars={localVars}
+                          localVars={runtimeLocalVars}
                           flatNodes={fullFlatNodes}
                           parentNode={findParent(tree, selectedNode.id)}
                           selfNode={selectedNode}
@@ -3881,6 +4389,21 @@ export {
   screenToYaml,
   componentToYaml,
   ButtonRenderer,
+  ModernButtonRenderer,
+  ModernDropdownRenderer,
+  ModernCheckboxRenderer,
+  ModernComboBoxRenderer,
+  ModernProgressBarRenderer,
+  ModernSliderRenderer,
+  ModernSpinnerRenderer,
+  ModernTextRenderer,
+  ModernTextInputRenderer,
+  ModernToggleRenderer,
+  LinkRenderer,
+  NumberInputRenderer,
+  ModernDatePickerRenderer,
+  RichTextEditorRenderer,
+  RatingRenderer,
   LabelRenderer,
   TextInputRenderer,
   DropdownRenderer,
@@ -3892,5 +4415,6 @@ export {
   ToggleRenderer,
   RadioRenderer,
   SliderRenderer,
+  UnknownPowerAppsObjectRenderer,
   createFromSpec
 }

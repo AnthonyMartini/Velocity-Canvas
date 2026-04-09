@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from 'react';
 import { useState, useEffect } from 'react';
 import LandingPage from '@/LandingPage';
 import RendererPage from '@/RendererPage';
@@ -7,9 +8,65 @@ import ComponentLibraryPage from '@/ComponentLibraryPage';
 import PlansPage from '@/PlansPage';
 import AdminPage from '@/AdminPage';
 import logo from '@/assets/logo.png';
-import { auth } from '@/lib/firebase';
+import { auth, upsertUserProfile } from '@/lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Image from 'next/image';
+import { Moon, Sun } from 'lucide-react';
+
+const THEME_STORAGE_KEY = 'velocity-canvas-theme'
+const LIGHT_THEME_OVERRIDES: CSSProperties & Record<string, string> = {
+  '--vc-color-base': '#e9edf4',
+  '--vc-color-base-rgb': '233 237 244',
+  '--vc-color-surface': '#f6f8fc',
+  '--vc-color-surface-rgb': '246 248 252',
+  '--vc-color-overlay': '#c8d1de',
+  '--vc-color-overlay-rgb': '200 209 222',
+  '--vc-color-accent': '#0e639c',
+  '--vc-color-accent-rgb': '14 99 156',
+  '--vc-color-accent-dark': '#0b5688',
+  '--vc-color-accent-dark-rgb': '11 86 136',
+  '--vc-color-text': '#111827',
+  '--vc-color-text-rgb': '17 24 39',
+  '--vc-color-subtext': '#5b6474',
+  '--vc-color-subtext-rgb': '91 100 116',
+  '--vc-color-green': '#0f9d78',
+  '--vc-color-green-rgb': '15 157 120',
+  '--vc-color-red': '#d14343',
+  '--vc-color-red-rgb': '209 67 67',
+  '--vc-color-yellow': '#b7791f',
+  '--vc-color-yellow-rgb': '183 121 31',
+  '--vc-color-white': '#ffffff',
+  '--vc-color-panel': '#e6ebf3',
+  '--vc-color-panel-scrim': 'rgba(15, 23, 42, 0.12)',
+  '--vc-color-canvas-workspace': '#e4eaf2',
+  '--vc-color-canvas-surface': '#f7f9fc',
+  '--vc-color-canvas-grid-dot': '#d1d9e5',
+  '--vc-color-selection': '#0e639c',
+  '--vc-color-selection-soft': 'rgba(14, 99, 156, 0.14)',
+  '--vc-color-selection-strong': 'rgba(14, 99, 156, 0.26)',
+  '--vc-color-gallery-selection': '#7c3aed',
+  '--vc-color-gallery-selection-soft': 'rgba(124, 58, 237, 0.16)',
+  '--vc-color-gallery-selection-strong': 'rgba(124, 58, 237, 0.28)',
+  '--vc-color-control-text': '#111827',
+  '--vc-color-control-text-muted': '#64748b',
+  '--vc-color-control-border': '#c7d0dd',
+  '--vc-color-control-border-strong': '#aab7ca',
+  '--vc-color-control-surface': '#f8fafd',
+  '--vc-color-control-disabled': '#94a3b8',
+  '--vc-color-control-disabled-fill': '#e7edf4',
+  '--vc-color-placeholder': '#94a3b8',
+  '--vc-gradient-ask-ai': 'linear-gradient(180deg,#38bdf8 0%,#0ea5e9 45%,#0284c7 100%)',
+  '--vc-shadow-selection': '0 0 0 3px rgba(14, 99, 156, 0.16)',
+  '--vc-shadow-selection-inset': '0 0 0 2px rgba(14, 99, 156, 0.9) inset',
+  '--vc-shadow-gallery-selection': '0 0 0 3px rgba(124, 58, 237, 0.18)',
+  '--vc-shadow-gallery-selection-inset': '0 0 0 2px rgba(124, 58, 237, 0.8) inset',
+  '--vc-shadow-canvas': '0 18px 36px rgba(15, 23, 42, 0.07), 0 0 0 1px rgba(15,23,42,0.05)',
+  '--vc-shadow-control-rest': '0 8px 20px rgba(15, 23, 42, 0.07)',
+  '--vc-shadow-drag-guide': '0 0 6px rgba(14, 99, 156, 0.18)',
+  '--vc-shadow-floating-panel': '0 24px 64px rgba(15, 23, 42, 0.18)',
+  '--vc-shadow-spotlight': '0 0 24px rgba(14, 99, 156, 0.12)',
+  '--vc-shadow-chat-dock': '0 -14px 40px rgba(15, 23, 42, 0.1)',
+}
 
 // ── Tab Icons ──────────────────────────────────────────────────────────────────
 const HomeIcon = () => (
@@ -51,6 +108,7 @@ export default function Home() {
   const [credits, setCredits] = useState<number | string | null>(null);
   const [activeProject, setActiveProject] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   const fetchCredits = async (firebaseUser) => {
     try {
@@ -73,9 +131,28 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (savedTheme === 'light') {
+      setIsDarkMode(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(THEME_STORAGE_KEY, isDarkMode ? 'dark' : 'light')
+    document.documentElement.style.colorScheme = isDarkMode ? 'dark' : 'light'
+  }, [isDarkMode])
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser ?? null);
       if (firebaseUser) {
+        try {
+          await upsertUserProfile(firebaseUser)
+        } catch (profileError) {
+          console.warn('Unable to sync user profile after sign-in.', profileError)
+        }
         fetchCredits(firebaseUser);
         try {
           const idToken = await firebaseUser.getIdToken();
@@ -121,7 +198,7 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen bg-base flex flex-col overflow-hidden">
+    <div className="h-screen bg-base flex flex-col overflow-hidden" style={isDarkMode ? undefined : LIGHT_THEME_OVERRIDES}>
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="border-b border-surface/60 backdrop-blur-sm sticky top-0 z-10 bg-base/90 shrink-0">
         <div className="max-w-none px-6 py-3 flex items-center justify-between relative">
@@ -160,6 +237,16 @@ export default function Home() {
 
           {/* Status + User */}
           <div className="flex items-center gap-3">
+
+            <button
+              type="button"
+              onClick={() => setIsDarkMode(prev => !prev)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-overlay/40 bg-surface/55 text-subtext shadow-sm transition-all duration-200 hover:text-text hover:bg-overlay/35"
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
 
             
             {credits !== null && (

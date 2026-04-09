@@ -135,11 +135,61 @@ export const SliderIcon = ({ className = 'w-4 h-4' }) => (
   </svg>
 )
 
+export const LinkIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M13 19l6-6" strokeLinecap="round" />
+    <path d="M11 23H8a4 4 0 0 1 0-8h3" strokeLinecap="round" />
+    <path d="M21 9h3a4 4 0 1 1 0 8h-3" strokeLinecap="round" />
+  </svg>
+)
+
+export const RichTextIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="5" y="6" width="22" height="20" rx="2" />
+    <path d="M10 12h10M10 17h12M10 22h7" stroke={ACCENT_COLOR} strokeLinecap="round" />
+  </svg>
+)
+
+export const RatingIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <path d="m16 5 3.2 6.5 7.2 1-5.2 5 1.2 7-6.4-3.4-6.4 3.4 1.2-7-5.2-5 7.2-1z" fill={ACCENT_COLOR} fillOpacity="0.18" strokeLinejoin="round" />
+  </svg>
+)
+
+export const SpinnerIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <circle cx="16" cy="16" r="10" strokeOpacity="0.25" />
+    <path d="M16 6a10 10 0 0 1 10 10" stroke={ACCENT_COLOR} strokeLinecap="round" />
+  </svg>
+)
+
+export const ProgressBarIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="5" y="12" width="22" height="8" rx="4" />
+    <path d="M7 16h9" stroke={ACCENT_COLOR} strokeLinecap="round" />
+  </svg>
+)
+
 // Lookup map: component type → icon component
 export const TYPE_ICONS = {
   App:       AppIcon,
   Screen:    ScreenIcon,
   Button:    ButtonIcon,
+  ModernButton: ButtonIcon,
+  ModernDropdown: DropdownIcon,
+  ModernCheckbox: CheckboxIcon,
+  ModernComboBox: ComboBoxIcon,
+  ModernProgressBar: ProgressBarIcon,
+  ModernSlider: SliderIcon,
+  ModernSpinner: SpinnerIcon,
+  ModernText: LabelIcon,
+  ModernTextInput: TextInputIcon,
+  ModernToggle: ToggleIcon,
+  Link: LinkIcon,
+  NumberInput: TextInputIcon,
+  ModernDatePicker: DatePickerIcon,
+  RichTextEditor: RichTextIcon,
+  Rating: RatingIcon,
   Label:     LabelIcon,
   Container: ContainerIcon,
   TextInput: TextInputIcon,
@@ -154,6 +204,7 @@ export const TYPE_ICONS = {
   Toggle:    ToggleIcon,
   Radio:     RadioIcon,
   Slider:    SliderIcon,
+  UnknownPowerAppsObject: RectangleIcon,
 }
 
 // Lookup map: component type → Tailwind background colour class
@@ -161,6 +212,21 @@ export const TYPE_COLORS = {
   App:       'bg-violet-600',
   Screen:    'bg-indigo-500',
   Button:    'bg-[#0078d4]',
+  ModernButton: 'bg-[#0f6cbd]',
+  ModernDropdown: 'bg-[#1f883d]',
+  ModernCheckbox: 'bg-[#0ea5e9]',
+  ModernComboBox: 'bg-[#f59e0b]',
+  ModernProgressBar: 'bg-[#059669]',
+  ModernSlider: 'bg-[#84cc16]',
+  ModernSpinner: 'bg-[#64748b]',
+  ModernText: 'bg-[#2563eb]',
+  ModernTextInput: 'bg-[#22c55e]',
+  ModernToggle: 'bg-[#06b6d4]',
+  Link: 'bg-[#0f6cbd]',
+  NumberInput: 'bg-[#16a34a]',
+  ModernDatePicker: 'bg-[#14b8a6]',
+  RichTextEditor: 'bg-[#8b5cf6]',
+  Rating: 'bg-[#f59e0b]',
   Label:     'bg-overlay',
   Container: 'bg-violet-500',
   TextInput: 'bg-emerald-500',
@@ -175,4 +241,5 @@ export const TYPE_COLORS = {
   Toggle:    'bg-sky-500',
   Radio:     'bg-rose-500',
   Slider:    'bg-lime-500',
+  UnknownPowerAppsObject: 'bg-amber-500',
 }

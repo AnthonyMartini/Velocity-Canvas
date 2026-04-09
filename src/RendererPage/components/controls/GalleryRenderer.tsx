@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import ButtonRenderer from './ButtonRenderer'
+import ModernButtonRenderer from './ModernButtonRenderer'
 import LabelRenderer from './LabelRenderer'
 import TextInputRenderer from './TextInputRenderer'
 import DropdownRenderer from './DropdownRenderer'
@@ -33,7 +34,7 @@ function normaliseItems(raw: any): Record<string, any>[] {
 export default function GalleryRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
   updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
-  onDropInto, dragOverId, setDragOverId, renderZIndex = 1
+  onDropInto, dragOverId, setDragOverId, canvasTheme, renderZIndex = 1
 }) {
   const style: any = {
     position: 'absolute',
@@ -74,6 +75,7 @@ export default function GalleryRenderer({
         flatNodes,
         updateProp,
         parentNode: comp,
+        canvasTheme,
         renderZIndex: childIndex + 1,
         onDropInto, dragOverId, setDragOverId,
       }
@@ -86,6 +88,7 @@ export default function GalleryRenderer({
         childProps.onClick     = () => {}
       }
       if (child.type === 'Button')     return <ButtonRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernButton') return <ModernButtonRenderer key={child.id} {...childProps} />
       if (child.type === 'Label')      return <LabelRenderer key={child.id} {...childProps} />
       if (child.type === 'TextInput')  return <TextInputRenderer key={child.id} {...childProps} />
       if (child.type === 'Dropdown')   return <DropdownRenderer key={child.id} {...childProps} />
@@ -224,5 +227,6 @@ GalleryRenderer.propTypes = {
   onDropInto: PropTypes.func,
   dragOverId: PropTypes.string,
   setDragOverId: PropTypes.func,
+  canvasTheme: PropTypes.object,
   renderZIndex: PropTypes.number,
 }

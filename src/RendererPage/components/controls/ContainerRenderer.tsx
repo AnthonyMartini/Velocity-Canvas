@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import ButtonRenderer from './ButtonRenderer'
+import ModernButtonRenderer from './ModernButtonRenderer'
 import LabelRenderer from './LabelRenderer'
 import TextInputRenderer from './TextInputRenderer'
 import DropdownRenderer from './DropdownRenderer'
@@ -20,7 +21,7 @@ import { getDragOutlineStyles, getSelectionStyles } from '@/theme/theme'
 export default function ContainerRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
   updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
-  onDropInto, dragOverId, setDragOverId, renderZIndex = 1
+  onDropInto, dragOverId, setDragOverId, canvasTheme, renderZIndex = 1
 }) {
   const shadowMap = {
     'DropShadow.None': 'none',
@@ -86,12 +87,14 @@ export default function ContainerRenderer({
           localVars, setLocalVars, flatNodes, notify, navigate,
           updateProp,
           parentNode: comp,
+          canvasTheme,
           renderZIndex: childIndex + 1,
           onMouseDown: (e) => { e.stopPropagation(); onChildMouseDown(e, child.id) },
           onClick: (e) => { e.stopPropagation(); onChildClick(e, child.id) },
           onDropInto, dragOverId, setDragOverId,
         }
         if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
+        if (child.type === 'ModernButton') return <ModernButtonRenderer key={child.id} {...childProps} />
         if (child.type === 'Label') return <LabelRenderer key={child.id} {...childProps} />
         if (child.type === 'TextInput') return <TextInputRenderer key={child.id} {...childProps} />
         if (child.type === 'Dropdown') return <DropdownRenderer key={child.id} {...childProps} />
@@ -159,5 +162,6 @@ ContainerRenderer.propTypes = {
   onDropInto: PropTypes.func,
   dragOverId: PropTypes.string,
   setDragOverId: PropTypes.func,
+  canvasTheme: PropTypes.object,
   renderZIndex: PropTypes.number,
 }

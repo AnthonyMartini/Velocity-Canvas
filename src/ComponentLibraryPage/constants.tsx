@@ -1,4 +1,19 @@
 import buttonSchema from '../../schemas/button.json'
+import modernButtonSchema from '../../schemas/modernButton.json'
+import modernDropdownSchema from '../../schemas/modernDropdown.json'
+import modernCheckboxSchema from '../../schemas/modernCheckbox.json'
+import modernComboBoxSchema from '../../schemas/modernComboBox.json'
+import modernProgressBarSchema from '../../schemas/modernProgressBar.json'
+import modernSliderSchema from '../../schemas/modernSlider.json'
+import modernSpinnerSchema from '../../schemas/modernSpinner.json'
+import modernTextSchema from '../../schemas/modernText.json'
+import modernTextInputSchema from '../../schemas/modernTextInput.json'
+import modernToggleSchema from '../../schemas/modernToggle.json'
+import linkSchema from '../../schemas/link.json'
+import numberInputSchema from '../../schemas/numberInput.json'
+import modernDatePickerSchema from '../../schemas/modernDatePicker.json'
+import richTextEditorSchema from '../../schemas/richTextEditor.json'
+import ratingSchema from '../../schemas/rating.json'
 import labelSchema from '../../schemas/label.json'
 import containerSchema from '../../schemas/container.json'
 import textInputSchema from '../../schemas/textInput.json'
@@ -24,6 +39,21 @@ const PROP_TYPE_COLORS = {
 
 const SCHEMAS = [
   buttonSchema,
+  modernButtonSchema,
+  modernDropdownSchema,
+  modernCheckboxSchema,
+  modernComboBoxSchema,
+  modernProgressBarSchema,
+  modernSliderSchema,
+  modernSpinnerSchema,
+  modernTextSchema,
+  modernTextInputSchema,
+  modernToggleSchema,
+  linkSchema,
+  numberInputSchema,
+  modernDatePickerSchema,
+  richTextEditorSchema,
+  ratingSchema,
   labelSchema,
   textInputSchema,
   dropdownSchema,
