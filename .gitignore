@@ -3,6 +3,7 @@
 
 #legacy
 legacy/
+docs/
 
 # Dependency directories
 node_modules/

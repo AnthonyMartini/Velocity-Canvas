@@ -1,7 +1,6 @@
 import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 // Inline calendar icon (no external dependency needed)
 const CalendarIcon = ({ size = 18 }) => (
@@ -122,7 +121,7 @@ export default function DatePickerRenderer({
     onClick(e)
   }
 
-  const handleChange = (e) => {
+  const handleChange = () => {
     if (!isInteractive) return
     if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
   }

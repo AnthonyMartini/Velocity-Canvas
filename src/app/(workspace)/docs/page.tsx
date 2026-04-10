@@ -8,5 +8,5 @@ export default function DocsPage() {
 
   if (!user) return null;
 
-  return <ComponentLibraryPage user={user} />;
+  return <ComponentLibraryPage />;
 }

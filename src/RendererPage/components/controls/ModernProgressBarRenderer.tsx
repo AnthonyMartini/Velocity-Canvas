@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
 import { getSelectionStyles } from '@/theme/theme'
-import { clamp, normalizeLiteralString, resolveModernPalette, toRgba } from './modernControlUtils'
+import { clamp, normalizeLiteralString, resolveModernPalette } from './modernControlUtils'
 
 function resolveProgressColor(progressColor: string, palette: string) {
   const normalized = normalizeLiteralString(progressColor, 'brand').toLowerCase()

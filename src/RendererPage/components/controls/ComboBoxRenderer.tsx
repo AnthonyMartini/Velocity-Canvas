@@ -1,7 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 // Inline icons (no external dependency needed)
 const ChevronDownIcon = ({ size = 16 }) => (

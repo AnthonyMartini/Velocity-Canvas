@@ -34,7 +34,7 @@ interface PlansPageProps {
   user: any;
 }
 
-export default function PlansPage({ user, onRefreshCredits }: PlansPageProps & { onRefreshCredits?: () => void }) {
+export default function PlansPage({ user }: PlansPageProps) {
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);

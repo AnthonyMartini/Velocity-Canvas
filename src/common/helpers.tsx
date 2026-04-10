@@ -635,12 +635,9 @@ export function executeAction(formula, localVars, setLocalVars, notify, navigate
 
   // We can just parse the formula and execute it directly, because the AST evaluator 
   // supports ActionSequence and FunctionCall execution natively now.
-  let varsChanged = false
-
   // Wrap the setLocalVars in the context so we can track if it was called
   context.setVariable = (varName, value) => {
       setLocalVars(prev => ({...prev, [varName]: value}))
-      varsChanged = true
   }
 
   const ast = parseFormula(trimmedFormula)

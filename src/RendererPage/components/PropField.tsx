@@ -1,7 +1,6 @@
 import * as React from 'react'
-import PropTypes from 'prop-types'
 import FormulaInput from './FormulaInput'
-import { flattenTree, findParent, validateProperty } from '../../common/helpers'
+import { validateProperty } from '../../common/helpers'
 import { sanitizeSvgFragment } from '@/lib/content-sanitizer'
 
 // ── Validated Number Input ─────────────────────────────────────────────────
@@ -217,10 +216,6 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             hasError={false}
             onKeyDown={() => {}}
             className="w-full bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60"
-            localVars={localVars}
-            flatNodes={flatNodes}
-            parentNode={parentNode}
-            selfNode={selfNode}
           />
         )}
       </div>

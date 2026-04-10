@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types'
 import { CSS_FW, CSS_ALIGN, CSS_JUSTIFY, CSS_VALIGN } from './cssProps'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { resolveSampleText } from './sampleText'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 

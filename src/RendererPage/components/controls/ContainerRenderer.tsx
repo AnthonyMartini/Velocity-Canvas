@@ -20,7 +20,7 @@ import { getDragOutlineStyles, getSelectionStyles } from '@/theme/theme'
 
 export default function ContainerRenderer({ 
   comp, selected, isPlaying, selectedIds, localVars, setLocalVars, flatNodes, notify, navigate, 
-  updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
+  updateProp, onMouseDown, onClick, onChildMouseDown, onChildClick,
   onDropInto, dragOverId, setDragOverId, canvasTheme, renderZIndex = 1
 }) {
   const shadowMap = {
@@ -72,7 +72,7 @@ export default function ContainerRenderer({
         e.preventDefault()
         if (dragOverId !== comp.id) setDragOverId(comp.id)
       }}
-      onMouseUp={(e) => {
+      onMouseUp={() => {
         if (isPlaying) return
         // If we are dragging something and mouse up over this container, 
         // the index.tsx onUp handles the actual tree move, but we could also 

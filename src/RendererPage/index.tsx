@@ -46,7 +46,7 @@ import { looksLikePowerAppsYaml, parsePowerAppsYaml } from '@/lib/powerapps-impo
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
 const createInitialChatMessages = () => ([
-  { role: 'assistant', content: 'Hi! Tell me what to add Ã¢â‚¬â€ e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+  { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
 ])
 const RENDERER_CHAT_MODEL_OPTIONS = [
   { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
@@ -268,7 +268,7 @@ async function consumeAIResponse(res, options: any = {}) {
   return { mode: 'legacy' as const, data: finalResult }
 }
 
-// â”€â”€ Live-Validating Name Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Live-Validating Name Input ──────────────────────────────────────────────────
 function NameInput({ initialValue, checkDuplicate, onCommit }) {
   const [val, setVal] = useState(initialValue)
   const [error, setError] = useState<string | null>(null)
@@ -502,7 +502,7 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
               className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 object-contain"
               priority
             />
-            <span className="text-xl">âœ¨</span>
+            <span className="text-xl">✨</span>
           </div>
         </div>
         <div className="text-center">
@@ -520,7 +520,7 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
   )
 }
 
-function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, confirmTweak, undoTweak, handleReorder, deleteSelected }) {
+function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, handleReorder, deleteSelected }) {
   if (!node) return null;
 
   return (
@@ -612,8 +612,8 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
   )
 }
 
-// â”€â”€ Code Pane â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function CodePane({ node, tree, canvasTheme, globalErrors, notify, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, tweakOriginalNode, width, onClose }) {
+// ── Code Pane ───────────────────────────────────────────────────────────────────
+function CodePane({ node, tree, canvasTheme, globalErrors, notify, width, onClose }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
@@ -721,15 +721,11 @@ function CodePane({ node, tree, canvasTheme, globalErrors, notify, isTweaking, s
 CodePane.propTypes = {
   node: PropTypes.object, // Can be null for screen mode
   tree: PropTypes.array.isRequired,
+  canvasTheme: PropTypes.object,
   globalErrors: PropTypes.array.isRequired,
   notify: PropTypes.func.isRequired,
-  isTweaking: PropTypes.bool.isRequired,
-  setIsTweaking: PropTypes.func.isRequired,
-  tweakInput: PropTypes.string.isRequired,
-  setTweakInput: PropTypes.func.isRequired,
-  handleTweakSubmit: PropTypes.func.isRequired,
-  tweakLoading: PropTypes.bool.isRequired,
-  tweakOriginalNode: PropTypes.object,
+  width: PropTypes.number.isRequired,
+  onClose: PropTypes.func.isRequired,
 }
 
 const TOUR_STEPS = [
@@ -909,9 +905,9 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
   )
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Main Page
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 export default function RendererPage({ user, onCreditDeduction, activeProject, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, setActiveProject: (p: any) => void }) {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedState, setLastSavedState] = useState('')
@@ -960,7 +956,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+    { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
   ])
   const [chatModel, setChatModel] = useState<string>(DEFAULT_RENDERER_CHAT_MODEL)
   const [chatLoading, setChatLoading] = useState(false)
@@ -1081,7 +1077,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setDragOverId(null)
   }, [])
 
-  // â”€â”€ Delete selected â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Delete selected ───────────────────────────────────────────────────────────
   const deleteSelected = useCallback(() => {
     if (!selectedIds.length) return
     setTree(prev => { 
@@ -1100,7 +1096,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [isAltPressed, setIsAltPressed] = useState(false)
   const effectiveIsPlaying = isPlaying || isAltPressed
 
-  // â”€â”€ Global App State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Global App State ──────────────────────────────────────────────────────────
   const [localVars, setLocalVars] = useState<Record<string, any>>({}) // { varName: value }
   const [notification, setNotification] = useState(null) // { message, id, timer }
   const normalizedCanvasTheme = useMemo(() => normalizeCanvasThemeState(canvasTheme), [canvasTheme])
@@ -1320,7 +1316,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   useEffect(() => {
     if (!activeProject) {
       setChatMessages([
-        { role: 'assistant', content: 'Hi! Tell me what to add â€” e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
+        { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
       ])
       setChatImage(null)
       setChatInput('')
@@ -1579,7 +1575,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const screenCount = tree[0]?.children?.length || 0
   const flatNodes = flattenTree(tree, collapsedIds)
   const fullFlatNodes = flattenTree(tree, new Set())
-  const totalCount = fullFlatNodes.length // Total count shouldn't hide skipped nodes
 
   const globalErrors = useMemo(() => {
     return getAllAppErrors(tree, runtimeLocalVars, SCHEMAS)
@@ -1749,7 +1744,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages])
   useEffect(() => { if (chatOpen) setTimeout(() => chatInputRef.current?.focus(), 150) }, [chatOpen])
 
-  // â”€â”€ Add component to root or into selected container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Add component to root or into selected container ──────────────────────
   const addComponent = useCallback((sch) => {
     let targetParent = activeScreenNode
     let isGallery = false
@@ -1786,7 +1781,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setSelectedIds([compId])
   }, [selectedNode, activeScreenNode, tree, saveHistory])
 
-  // â”€â”€ Add a new Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Add a new Screen ────────────────────────────────────────────────────────
   const addScreen = useCallback(() => {
     const compId = uid()
     const comp = {
@@ -1817,7 +1812,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [saveHistory, tree])
 
-  // â”€â”€ Update a property on selected node â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Update a property on selected node ─────────────────────────────────────
   const updateProp = useCallback((id, key, val) => {
     setTree(prev => {
       const next = updateNode(prev, id, () => ({ [key]: val }))
@@ -1896,7 +1891,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [updateCanvasThemeState])
 
-  // â”€â”€ Reorder a node in z-space â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Reorder a node in z-space ─────────────────────────────────────────────
   const handleReorder = useCallback((id, direction) => {
     setTree(prev => {
       const next = reorderNode(prev, id, direction)
@@ -1953,10 +1948,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [])
 
-  // â”€â”€ Snap Lines state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Snap Lines state ────────────────────────────────────────────────────────
 
 
-  // â”€â”€ Drag state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Drag state ──────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e, id) => {
     if (effectiveIsPlaying) return // In preview mode â€” no drag/select
     if (e.button === 2) return // Don't interact with components while right-clicking
@@ -2016,7 +2011,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   useEffect(() => {
     const onMove = (e) => {
-      // â”€â”€ Pane Resizing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Pane Resizing ────────────────────────────────────────────────────────
       if (paneResizeRef.current) {
         const { side, startMouseX, startMouseY, startWidth, startHeight } = paneResizeRef.current
 
@@ -2033,7 +2028,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Panning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Panning ─────────────────────────────────────────────────────────────
       if (panRef.current) {
         const { startMouseX, startMouseY, startScrollX, startScrollY } = panRef.current
         const dx = e.clientX - startMouseX
@@ -2047,7 +2042,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Resize mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Resize mode ──────────────────────────────────────────────────────────
       if (resizeRef.current) {
         const { id, dir, startMouseX, startMouseY, startX, startY, startW, startH } = resizeRef.current
         const PT_RATIO = 0.75
@@ -2149,7 +2144,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
         setSnapLines(newSnapLines)
 
-        setTree(prev => updateNode(prev, id, (node) => {
+        setTree(prev => updateNode(prev, id, () => {
           let newX = startX, newY = startY, newW = startW, newH = startH
           if (dir.includes('e')) newW = Math.max(20, startW + snapDx)
           if (dir.includes('s')) newH = Math.max(20, startH + snapDy)
@@ -2175,7 +2170,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Drag move â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Drag move ────────────────────────────────────────────────────────────
       if (dragRef.current && dragRef.current.nodes?.length) {
         const { startMouseX, startMouseY, nodes } = dragRef.current
         
@@ -2187,7 +2182,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
         // dx/dy are now just applied to the nodes below.
 
-        // â”€â”€ Grid Snapping Logic â”€â”€
+        // ── Grid Snapping Logic ──
         const SNAP_THRESHOLD = 8
         
         // Calculate aggregate bounds of all dragged nodes for group snapping
@@ -2353,7 +2348,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               limitH = resolvedParent.Height || limitH
               
               if (parent.type === 'Gallery') {
-                const isVertical = resolvedParent.Variant ? resolvedParent.Variant.includes('Vertical') : resolvedParent.Height > resolvedParent.Width
+                const isVertical = resolvedParent.Variant ? resolvedParent.Variant === 'Vertical' : resolvedParent.Height > resolvedParent.Width
                 const tSize = resolvedParent.TemplateSize || 100
                 if (isVertical) limitH = tSize
                 else limitW = tSize
@@ -2367,7 +2362,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             targetX = Math.max(0, Math.min(targetX, limitW - draggedNode.width))
             targetY = Math.max(0, Math.min(targetY, limitH - draggedNode.height))
 
-            nextTree = updateNode(nextTree, draggedNode.id, (node) => {
+            nextTree = updateNode(nextTree, draggedNode.id, () => {
               // Intentionally override formulas with static values if dragged
               return {
                 X: targetX,
@@ -2380,7 +2375,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Marquee Selection Move â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Marquee Selection Move ──────────────────────────────────────────────
       if (selectionBoxRef.current) {
         const rootCanvas = document.getElementById('canvas-root')
         if (rootCanvas) {
@@ -2398,20 +2393,20 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
     
     const onUp = (e) => { 
-      // â”€â”€ Pane Resizing End â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Pane Resizing End ───────────────────────────────────────────────────
       if (paneResizeRef.current) {
         paneResizeRef.current = null
         document.body.style.cursor = ''
       }
 
-      // â”€â”€ Pan end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Pan end ─────────────────────────────────────────────────────────────
       if (panRef.current) {
         panRef.current = null
         document.body.style.cursor = ''
         return
       }
 
-      // â”€â”€ Resize end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Resize end ──────────────────────────────────────────────────────────
       if (resizeRef.current) {
         resizeRef.current = null
         document.body.style.cursor = ''
@@ -2420,7 +2415,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Marquee Selection End â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Marquee Selection End ───────────────────────────────────────────────
       if (selectionBoxRef.current) {
         // Calculate bounding box in canvas coordinates
         const { startX, startY, currentX, currentY } = selectionBoxRef.current
@@ -2482,7 +2477,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         return
       }
 
-      // â”€â”€ Drag end â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Drag end ────────────────────────────────────────────────────────────
       if (!dragRef.current || !dragRef.current.nodes?.length) {
         setSnapLines([]) // Clear lines if mouse up without dragging
         return
@@ -2516,14 +2511,14 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [tree, saveHistory, selectedIds])
 
-  // â”€â”€ Drop logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Drop logic ──────────────────────────────────────────────────────────────
   const handleDropInto = useCallback((targetContainerId) => {
     if (!dragRef.current) return
     const dragId = dragRef.current.id
     setTree(prev => handleDropLogic(prev, dragId, targetContainerId))
   }, [])
 
-  // â”€â”€ Resize handle mousedown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Resize handle mousedown ─────────────────────────────────────────────────
   const handleResizeMouseDown = useCallback((e, id, dir) => {
     e.stopPropagation()
     e.preventDefault()
@@ -2547,7 +2542,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     document.body.style.cursor = cursorMap[dir] || 'default'
   }, [tree, localVars, fullFlatNodes])
 
-  // â”€â”€ Keyboard shortcuts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   const clipboardRef = useRef(null)
 
   useEffect(() => {
@@ -2629,7 +2624,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [])
 
-  // â”€â”€ Canvas size commit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Canvas size commit ──────────────────────────────────────────────────────
   const commitCanvasSize = () => {
     const w = parseInt(canvasWInput, 10), h = parseInt(canvasHInput, 10)
     if (!isNaN(w) && w > 0) setCanvasW(w)
@@ -2662,7 +2657,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     })
   }, [selectedNode, tree, normalizedCanvasTheme, globalErrors, notify])
 
-  // â”€â”€ AI Component Tweaking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── AI Component Tweaking ───────────────────────────────────────────────────
   const handleTweakSubmit = useCallback(async () => {
     const msg = tweakInput.trim()
     if (!msg || selectedIds.length !== 1 || tweakLoading) return
@@ -2741,19 +2736,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     setTweakInput('')
   }, [])
 
-  const undoTweak = useCallback(() => {
-    if (tweakOriginalNode) {
-      setTree(prev => {
-        const nextTree = updateNode(prev, tweakOriginalNode.id, () => tweakOriginalNode)
-        saveHistory(nextTree)
-        return nextTree
-      })
-      setTweakOriginalNode(null)
-      setIsTweaking(false)
-      setTweakInput('')
-    }
-  }, [tweakOriginalNode, saveHistory])
-
   // Clear tweak state if selection changes
   useEffect(() => {
     if (selectedIds.length === 1 && tweakOriginalNode && selectedIds[0] !== tweakOriginalNode.id) {
@@ -2763,7 +2745,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [selectedIds, tweakOriginalNode, confirmTweak])
 
-  // â”€â”€ Image compression helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Image compression helper ─────────────────────────────────────────────
   const MAX_RENDERER_CHAT_REQUEST_BYTES = 900 * 1024
   const MAX_CHAT_IMAGE_BYTES = 450 * 1024
 
@@ -2800,7 +2782,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     img.src = dataUrl
   }
 
-  // â”€â”€ LLM Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── LLM Chat ────────────────────────────────────────────────────────────────
   const handleChatSubmit = useCallback(async () => {
     const msg = chatInput.trim()
     if ((!msg && !chatImage) || chatLoading) return
@@ -2968,7 +2950,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
         setTree(preStreamTree)
       }
       if (err.name === 'AbortError') return
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `âš ï¸ ${err.message}`, added: 0 }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}`, added: 0 }])
     } finally {
       setChatLoading(false)
       setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
@@ -2976,7 +2958,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     }
   }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch, chatModel])
 
-  // â”€â”€ Shared child event handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Shared child event handlers ────────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])
   
   // Also need to handle click on children for selection when not dragging
@@ -2985,7 +2967,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     // handleMouseDown already handles selection. We don't want to double trigger here.
   }, [])
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
       <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />
@@ -3011,7 +2993,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           <input type="number" value={canvasWInput} onChange={e => setCanvasWInput(e.target.value)}
             onBlur={commitCanvasSize} onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
             className="w-20 bg-base border border-overlay/40 rounded-md px-2 py-1 text-xs text-text focus:outline-none focus:border-accent/60 text-right" />
-          <span className="text-subtext/40 text-xs">Ã—</span>
+          <span className="text-subtext/40 text-xs">×</span>
           <label className="text-xs text-subtext">H</label>
           <input type="number" value={canvasHInput} onChange={e => setCanvasHInput(e.target.value)}
             onBlur={commitCanvasSize} onKeyDown={e => e.key === 'Enter' && commitCanvasSize()}
@@ -3470,9 +3452,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               setTweakInput={setTweakInput}
               handleTweakSubmit={handleTweakSubmit}
               tweakLoading={tweakLoading}
-              tweakOriginalNode={tweakOriginalNode}
-              confirmTweak={confirmTweak}
-              undoTweak={undoTweak}
               handleReorder={handleReorder}
               deleteSelected={deleteSelected}
             />
@@ -3564,7 +3543,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       </svg>
                     </div>
                     <p className="text-gray-300 text-sm font-medium">Add components from the left panel or chat</p>
-                    <p className="text-gray-200 text-xs mt-1">{canvasW} Ã— {canvasH}</p>
+                    <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
                 {(activeScreenNode?.children || []).map((rawComp, siblingIndex) => {
@@ -3723,7 +3702,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedIds([nodeId]);
-                          if (!showErrorsPane) setShowErrorsPane(true);
+                          setShowErrorsPane(false);
+                          setShowPropertiesPane(true);
                         }}
                       >
                         !
@@ -3733,7 +3713,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 })()}
 
                 {/* Resize handles for selected root-level component */}
-                {/* Resize handles â€” hidden in preview mode */}
+                {/* Resize handles — hidden in preview mode */}
                 {selectedNode && selectedIds.length === 1 && !effectiveIsPlaying && selectedNode.type !== 'Screen' && selectedNode.type !== 'App' && (() => {
                   const comp = findNode(tree, selectedNode.id)
                   if (!comp) return null
@@ -3900,7 +3880,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                     className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white shadow-md transition-all cursor-pointer opacity-0 group-hover:opacity-100 hover:scale-110"
                     style={{ backgroundColor: appTheme.colors.red }}
                   >
-                    âœ•
+                    ✕
                   </button>
                 </div>
               )}
@@ -3940,7 +3920,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                         }
                       }
                     }}
-                    placeholder="Describe what to build â€” or paste a screenshot"
+                    placeholder="Describe what to build — or paste a screenshot"
                     className="w-full bg-base border border-overlay/40 rounded-xl px-4 pr-12 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
                   <span className={`absolute right-3 text-[9px] font-bold transition-colors ${chatInput.length >= 900 ? 'text-amber-500' : 'text-subtext/30'}`}>
                     {chatInput.length}/1000
@@ -3975,13 +3955,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
               canvasTheme={normalizedCanvasTheme}
               globalErrors={globalErrors}
               notify={notify}
-              isTweaking={isTweaking}
-              setIsTweaking={setIsTweaking}
-              tweakInput={tweakInput}
-              setTweakInput={setTweakInput}
-              handleTweakSubmit={handleTweakSubmit}
-              tweakLoading={tweakLoading}
-              tweakOriginalNode={tweakOriginalNode}
               width={codeWidth}
               onClose={() => setShowCodePane(false)}
             />

@@ -54,7 +54,7 @@ export default function GalleryRenderer({
     Object.assign(style, getDragOutlineStyles('gallery'))
   }
 
-  const isVertical = comp.Variant ? comp.Variant.includes('Vertical') : comp.Height > comp.Width
+  const isVertical = comp.Variant ? comp.Variant === 'Vertical' : comp.Height > comp.Width
   const padding = comp.TemplatePadding || 0
   const tSize = comp.TemplateSize || 100
 

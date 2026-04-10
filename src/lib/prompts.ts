@@ -137,7 +137,7 @@ Use TitleCase for all property keys. Default values follow the PropertyName.
    - RichTextEditor: Default ("'<p>Type here</p>'"), HTMLText read-only output, EnableSpellCheck (true), AccessibleLabel, TabIndex
    - Rating: Default (3), Value output, Max (5), RatingFill (RGBA), ReadOnly (false), ShowValue (true), Reset (false), Tooltip
    - Dropdown / ComboBox: Items ("['A', 'B']"), Default ("'A'")
-   - Gallery: Items ("[{Title: 'Item 1', Subtitle: 'Details', Qty: 12}]"), Variant ("BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0" or "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"), TemplateSize (100), TemplatePadding (0), WrapCount (1)
+   - Gallery: Items ("[{Title: 'Item 1', Subtitle: 'Details', Qty: 12}]"), Variant ("Vertical" or "Horizontal"), TemplateSize (100), TemplatePadding (0), WrapCount (1)
    - DatePicker: DefaultDate, SelectedDate, StartYear, EndYear
    - Checkbox: CheckmarkFill, CheckboxBackgroundFill, CheckboxBorderColor, CheckboxSize (40)
    - Toggle: Default (false), TrueText ("'On'"), FalseText ("'Off'"), TrueFill (RGBA), FalseFill (RGBA), HandleFill (RGBA)

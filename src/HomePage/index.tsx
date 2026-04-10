@@ -101,7 +101,7 @@ export default function ProjectsDashboard({
             Welcome back, <span className="text-accent">{user?.displayName?.split(' ')[0] || 'Builder'}</span>!
           </h1>
           <p className="text-subtext text-lg max-w-xl">
-            You're doing great work. Pick up where you left off or start something new.
+            Pick up where you left off or start something new.
           </p>
         </div>
 
@@ -145,11 +145,39 @@ export default function ProjectsDashboard({
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 rounded-full border-4 border-accent border-t-transparent animate-spin" />
           </div>
+        ) : projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 px-4 text-center animate-slide-up">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full" />
+              <div className="relative w-24 h-24 bg-surface border border-overlay/20 rounded-3xl flex items-center justify-center text-accent shadow-2xl ring-1 ring-white/10">
+                <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-3xl font-black text-text mb-4 tracking-tight">no projects yet.</h3>
+            <p className="text-subtext text-lg mb-10 max-w-md mx-auto leading-relaxed">
+              Let's start building! Create your first project to experience the power of Velocity Canvas.
+            </p>
+            <button
+              onClick={() => {
+                setNewProjectName('Untitled Project');
+                setShowNewProjectModal(true);
+              }}
+              className="group relative inline-flex items-center gap-3 bg-accent hover:bg-accent-hover text-white px-10 py-4 rounded-2xl font-black transition-all shadow-2xl shadow-accent/30 transform active:scale-95 hover:-translate-y-1"
+            >
+              <svg className="w-5 h-5 transition-transform group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Start Building
+              <div className="absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+            </button>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
               {/* Existing Projects */}
-              {(showAll ? projects : projects.slice(0, 3)).map((proj) => (
+              {(showAll ? projects : projects.slice(0, 6)).map((proj) => (
                 <div
                   key={proj.id ?? proj.name}
                   onClick={() => renamingId !== proj.id && onOpenProject(proj)}
@@ -226,7 +254,7 @@ export default function ProjectsDashboard({
               ))}
             </div>
 
-            {!showAll && projects.length > 3 && (
+            {!showAll && projects.length > 6 && (
               <div className="mt-8 flex justify-center">
                 <button
                   onClick={() => setShowAll(true)}

@@ -1073,7 +1073,7 @@ export function componentToYaml(node, col = 0) {
 }
 
 // ── Screen-level YAML renderer ───────────────────────────────────────────────
-export function screenToYaml(tree, canvasTheme = null, screensOverride = null) {
+export function screenToYaml(tree, _canvasTheme = null, screensOverride = null) {
   if (!tree?.length) return '# Empty canvas — add components to get started'
   const screens = Array.isArray(screensOverride)
     ? screensOverride

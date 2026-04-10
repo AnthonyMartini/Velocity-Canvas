@@ -1,7 +1,6 @@
 import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { getSelectionStyles } from '@/theme/theme'
 
 export default function DropdownRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {

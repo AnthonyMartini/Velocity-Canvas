@@ -68,16 +68,6 @@ function splitKeyValue(trimmedLine: string) {
   };
 }
 
-function unwrapQuoted(value: string) {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
-}
-
 function coercePowerAppsValue(rawValue: string) {
   const trimmed = String(rawValue || "").trim();
   if (!trimmed) return "";

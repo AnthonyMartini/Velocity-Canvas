@@ -711,7 +711,7 @@ export const FUNCTIONS = [
             { name: "number", type: Type.NUMBER },
             { name: "base", type: Type.NUMBER, optional: true }
         ],
-        function: (value, base, context) => {
+        function: (value, base, _context) => {
             const num = toFiniteNumber(value)
             const actualBase = isRuntimeContext(base) || base === undefined ? 10 : toFiniteNumber(base)
             if (num === null || actualBase === null) return { status: "error", message: "Log requires numeric arguments" }
@@ -760,7 +760,7 @@ export const FUNCTIONS = [
         description: "Returns the number pi.",
         example: 'Pi()',
         args: [],
-        function: (...args) => ({ status: "success", message: Math.PI })
+        function: (..._args) => ({ status: "success", message: Math.PI })
     },
     {
         name: "Power",
@@ -798,7 +798,7 @@ export const FUNCTIONS = [
         description: "Returns a pseudo-random number between 0 and 1.",
         example: 'Rand()',
         args: [],
-        function: (...args) => ({ status: "success", message: Math.random() })
+        function: (..._args) => ({ status: "success", message: Math.random() })
     },
     {
         name: "RandBetween",
@@ -827,7 +827,7 @@ export const FUNCTIONS = [
             { name: "number", type: Type.NUMBER },
             { name: "digits", type: Type.NUMBER, optional: true }
         ],
-        function: (value, digits, context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'nearest')
+        function: (value, digits, _context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'nearest')
     },
     {
         name: "RoundDown",
@@ -838,7 +838,7 @@ export const FUNCTIONS = [
             { name: "number", type: Type.NUMBER },
             { name: "digits", type: Type.NUMBER, optional: true }
         ],
-        function: (value, digits, context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'down')
+        function: (value, digits, _context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'down')
     },
     {
         name: "RoundUp",
@@ -849,7 +849,7 @@ export const FUNCTIONS = [
             { name: "number", type: Type.NUMBER },
             { name: "digits", type: Type.NUMBER, optional: true }
         ],
-        function: (value, digits, context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'up')
+        function: (value, digits, _context) => roundWithMode(value, isRuntimeContext(digits) || digits === undefined ? 0 : digits, 'up')
     },
     {
         name: "Sequence",
@@ -861,7 +861,7 @@ export const FUNCTIONS = [
             { name: "start", type: Type.NUMBER, optional: true },
             { name: "step", type: Type.NUMBER, optional: true }
         ],
-        function: (records, start, step, context) => {
+        function: (records, start, step, _context) => {
             const count = toFiniteNumber(records)
             const actualStart = isRuntimeContext(start) || start === undefined ? 1 : toFiniteNumber(start)
             const actualStep = isRuntimeContext(step) || step === undefined ? 1 : toFiniteNumber(step)

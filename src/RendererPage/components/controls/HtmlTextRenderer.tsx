@@ -1,7 +1,6 @@
 import React, { useRef } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { getSelectionStyles } from '@/theme/theme'
 import { sanitizeHtmlFragment } from '@/lib/content-sanitizer'
 

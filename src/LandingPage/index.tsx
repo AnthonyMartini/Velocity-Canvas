@@ -1,14 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
-  Bot,
-  Boxes,
   LoaderCircle,
-  PanelTop,
   Sparkles,
-  WandSparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import logo from "@/assets/logo.png";
@@ -23,48 +18,6 @@ import {
 
 const REDIRECT_PENDING_KEY = "velocity-canvas-auth-redirect-pending";
 const REDIRECT_ORIGIN_KEY = "velocity-canvas-auth-redirect-origin";
-const PROMPT_TEXT = "Generate a responsive inventory dashboard...";
-const YAML_LINES = [
-  "Screens:",
-  "  InventoryDashboard As screen:",
-  "    Fill: =RGBA(5, 5, 5, 1)",
-  '    HeaderTitle: ="Inventory Overview"',
-  "    Components:",
-  "      - Type: Container",
-  "        Layout: Horizontal",
-  "        Gap: 24",
-  "      - Type: Gallery",
-  '        Items: =Filter(Inventory, Status = "In Stock")',
-  "      - Type: ModernButton",
-  '        Text: ="Create Report"',
-];
-
-const FEATURE_CARDS = [
-  {
-    title: "AI-Powered YAML",
-    icon: WandSparkles,
-    eyebrow: "Prompt to structure",
-    description:
-      "Describe a screen in plain English and watch Velocity Canvas draft production-ready Power Apps YAML with layout, controls, and formulas already aligned.",
-    stats: ['Prompt latency < 1 min', 'YAML-first editing'],
-  },
-  {
-    title: "Live Canvas Preview",
-    icon: PanelTop,
-    eyebrow: "Design with feedback",
-    description:
-      "See every screen rendered in a live canvas as the AI edits it, so layout, spacing, and interaction choices stay visible while you iterate.",
-    stats: ['Visual parity loop', 'Immediate validation'],
-  },
-  {
-    title: "Component Library",
-    icon: Boxes,
-    eyebrow: "Reusable building blocks",
-    description:
-      "Save polished controls, remix them with AI, and keep a reusable inventory of components your team can ship across projects without drift.",
-    stats: ['Team-ready assets', 'Library reuse flow'],
-  },
-];
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -217,177 +170,9 @@ function AmbientDataCanvas() {
   );
 }
 
-function FeatureCard({
-  title,
-  eyebrow,
-  description,
-  icon: Icon,
-  delay,
-}: {
-  title: string;
-  eyebrow: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  delay: number;
-}) {
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay }}
-      className="group relative min-h-[260px] overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,19,28,0.92),rgba(8,10,15,0.92))] p-7 backdrop-blur-xl transition-colors hover:border-[#00D1FF]/25 hover:bg-[linear-gradient(180deg,rgba(18,22,30,0.95),rgba(9,11,16,0.94))]"
-    >
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-[#7f8aa1]">{eyebrow}</p>
-          <div className="rounded-2xl bg-[#00D1FF]/10 p-3 text-[#8ef0ff]">
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <h3 className="text-2xl font-black tracking-[-0.03em] text-white">{title}</h3>
-          <p className="mt-4 max-w-[28ch] text-sm leading-7 text-[#96a0b5]">{description}</p>
-        </div>
-      </div>
-    </motion.article>
-  );
-}
-
-function FloatingIdeWindow({
-  promptText,
-  shownLines,
-}: {
-  promptText: string;
-  shownLines: string[];
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 28, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-      className="relative w-full overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.055] shadow-[0_32px_120px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,209,255,0.14),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(79,70,229,0.18),transparent_34%)]" />
-
-      <div className="relative z-10 border-b border-white/8 px-5 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2f]" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-            </div>
-            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#95a0b5]">
-              Velocity Canvas IDE
-            </div>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00D1FF]/20 bg-[#00D1FF]/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#8ef0ff]">
-            <Bot className="h-3.5 w-3.5" />
-            AI Session Live
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="border-b border-white/8 p-5 lg:border-b-0 lg:border-r">
-          <div className="rounded-[26px] border border-white/8 bg-[#05070b]/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <div className="flex items-center gap-3 border-b border-white/6 pb-4">
-              <div className="rounded-2xl bg-[#00D1FF]/10 p-3 text-[#8ef0ff]">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-[#7b859a]">Ghost Prompt</p>
-                <p className="mt-1 text-sm text-[#d8e7f6]">Prompting the AI editor with layout intent</p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-[22px] border border-white/8 bg-white/[0.02] p-5">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#7f8aa1]">
-                <span className="h-2 w-2 rounded-full bg-[#00D1FF]" />
-                ide.input.prompt
-              </div>
-              <div className="font-mono text-[15px] leading-8 text-[#dff8ff]">
-                <span className="text-[#6a7487]">&gt;</span>{" "}
-                {promptText}
-                <motion.span
-                  animate={{ opacity: [0.15, 1, 0.15] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="ml-1 inline-block h-[1.1em] w-[10px] translate-y-[3px] rounded-sm bg-[#00D1FF]"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-[#7f8aa1]">Context</p>
-                <p className="mt-3 text-sm leading-7 text-[#c9d7e8]">
-                  AI-integrated IDE for Power Apps with layout-aware generation, formula-safe updates, and exportable YAML.
-                </p>
-              </div>
-              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-[#7f8aa1]">Response Mode</p>
-                <div className="mt-3 space-y-3 text-sm text-[#d7e4f2]">
-                  <div className="flex items-center justify-between">
-                    <span>Schema-safe output</span>
-                    <span className="text-[#8ef0ff]">Enabled</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Preview sync</span>
-                    <span className="text-[#8ef0ff]">Realtime</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="rounded-[26px] border border-white/8 bg-[#040608]/85 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <div className="flex items-center justify-between border-b border-white/6 pb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-[#7b859a]">Generated YAML</p>
-                <p className="mt-1 text-sm text-[#d8e7f6]">Rendered incrementally inside the editor</p>
-              </div>
-              <div className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 font-mono text-xs text-[#7f8aa1]">
-                powerapps.yaml
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-[22px] border border-white/8 bg-[#020304] px-0 py-2">
-              {shownLines.map((line, index) => (
-                <motion.div
-                  key={`${line}-${index}`}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.28, ease: "easeOut" }}
-                  className="grid grid-cols-[46px_1fr] gap-0 px-4 py-1.5 font-mono text-sm"
-                >
-                  <span className="select-none pr-4 text-right text-[#4b5568]">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[#d8ecff]">{line}</span>
-                </motion.div>
-              ))}
-              <div className="grid grid-cols-[46px_1fr] gap-0 px-4 py-1.5 font-mono text-sm">
-                <span className="pr-4 text-right text-[#374151]">{String(shownLines.length + 1).padStart(2, "0")}</span>
-                <motion.span
-                  animate={{ opacity: [0.18, 1, 0.18] }}
-                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-                  className="h-5 w-3 rounded-sm bg-[#00D1FF]"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 export default function LandingPage({ onAuthenticated }: { onAuthenticated: (signedInUser?: any) => void }) {
   const [signingIn, setSigningIn] = useState(false);
-  const [typedCount, setTypedCount] = useState(0);
-  const [visibleLineCount, setVisibleLineCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -430,42 +215,6 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
     };
   }, [onAuthenticated]);
 
-  useEffect(() => {
-    setTypedCount(0);
-    setVisibleLineCount(0);
-
-    let typingTimer: number | undefined;
-    let lineTimer: number | undefined;
-
-    const typeNext = () => {
-      setTypedCount((current) => {
-        const next = current + 1;
-        if (next < PROMPT_TEXT.length) {
-          typingTimer = window.setTimeout(typeNext, 36);
-        } else {
-          lineTimer = window.setTimeout(() => {
-            setVisibleLineCount(1);
-          }, 240);
-        }
-        return next;
-      });
-    };
-
-    typingTimer = window.setTimeout(typeNext, 420);
-
-    const interval = window.setInterval(() => {
-      setVisibleLineCount((current) => {
-        if (current === 0 || current >= YAML_LINES.length) return current;
-        return current + 1;
-      });
-    }, 160);
-
-    return () => {
-      window.clearTimeout(typingTimer);
-      window.clearTimeout(lineTimer);
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const handleGoogleSignIn = async () => {
     if (signingIn) return;
@@ -507,9 +256,7 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
     }
   };
 
-  const promptText = PROMPT_TEXT.slice(0, typedCount);
-  const shownLines = useMemo(() => YAML_LINES.slice(0, clamp(visibleLineCount, 0, YAML_LINES.length)), [visibleLineCount]);
-
+  
   return (
     <div
       className="relative min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#00D1FF]/30 selection:text-white"
@@ -585,21 +332,13 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
                 className={`group relative inline-flex min-w-[230px] items-center justify-center gap-3 overflow-hidden rounded-full px-7 py-4 text-base font-bold transition-all ${
                   signingIn
                     ? "cursor-wait bg-[#00D1FF] text-[#031017] opacity-80"
-                    : "bg-[#00D1FF] text-[#031017] shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_0_40px_rgba(0,209,255,0.28)] hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_55px_rgba(0,209,255,0.38)]"
+                    : "bg-[#FFFFFF] text-[#031017] shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_0_40px_rgba(0,209,255,0.28)] hover:-translate-y-0.5 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_55px_rgba(0,209,255,0.38)]"
                 }`}
               >
                 <span className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.5),transparent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 {signingIn ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
                 <span className="relative">{signingIn ? "Signing in..." : "Continue with Google"}</span>
               </button>
-
-              <a
-                href="#features"
-                className="inline-flex min-w-[190px] items-center justify-center gap-3 rounded-full border border-white/12 bg-white/[0.04] px-7 py-4 text-base font-semibold text-[#d8e7f6] transition-all hover:-translate-y-0.5 hover:border-[#00D1FF]/25 hover:bg-[#00D1FF]/8"
-              >
-                <BookOpen className="h-5 w-5 text-[#8ef0ff]" />
-                Explore Docs
-              </a>
             </motion.div>
           </div>
         </section>

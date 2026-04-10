@@ -28,7 +28,7 @@
     "WrapCount": 1,
     "X": 20,
     "Y": 20,
-    "Variant": "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0"
+    "Variant": "Vertical"
   },
   "properties": [
     { "key": "Items",             "label": "Items",             "type": "table",   "propertyType": "Input" },
@@ -46,6 +46,6 @@
     { "key": "BorderStyle",       "label": "Border Style",      "type": "select", "options": ["BorderStyle.None", "BorderStyle.Solid", "BorderStyle.Dashed", "BorderStyle.Dotted"], "propertyType": "Input" },
     { "key": "BorderThickness",   "label": "Border Width",      "type": "number",  "propertyType": "Input" },
     { "key": "Visible",           "label": "Visible",           "type": "boolean", "propertyType": "Input" },
-    { "key": "Variant",           "label": "Variant",           "type": "select", "options": ["BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0", "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0"], "optionLabels": ["Vertical", "Horizontal"], "propertyType": "Input" }
+    { "key": "Variant",           "label": "Variant",           "type": "select", "options": ["Vertical", "Horizontal"], "propertyType": "Input" }
   ]
 }

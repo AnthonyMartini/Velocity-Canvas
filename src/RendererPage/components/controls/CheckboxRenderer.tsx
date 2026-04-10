@@ -1,12 +1,10 @@
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../common/FormulaParser'
 import { getInsetSelectionStyles } from '@/theme/theme'
 
-export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
+export default function CheckboxRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
   const defaultEval = comp.Default
   const displayValue = defaultEval === true || defaultEval === 'true'
-  const displayText = comp.Text
 
   const handleChange = (e) => {
     if (isPlaying) {

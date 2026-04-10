@@ -10,10 +10,6 @@ export default function FormulaInput({
   placeholder = "", 
   onKeyDown, 
   hasError,
-  localVars = {},
-  flatNodes = [],
-  parentNode = null,
-  selfNode = null
 }) {
   const [isFocused, setIsFocused] = useState(false)
   const editorRef = useRef(null)

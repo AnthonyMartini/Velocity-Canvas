@@ -1,4 +1,4 @@
-# Antigravity — Power Apps YAML Generator
+# Velocity Canvas — Power Apps YAML Generator
 
 > **Generate production-ready Power Apps Canvas Studio components from plain English — powered by Gemini 3.1 Flash.**
 
@@ -6,7 +6,7 @@
 
 ## What Is This?
 
-Antigravity bypasses Microsoft's rigid (and expensive) native AI builder. You describe a UI component in natural language, and the app returns strict `pa.yaml v3.0` code you can paste directly into any Canvas App.
+Velocity Canvas bypasses Microsoft's rigid (and expensive) native AI builder. You describe a UI component in natural language, and the app returns strict `pa.yaml v3.0` code you can paste directly into any Canvas App.
 
 ---
 
