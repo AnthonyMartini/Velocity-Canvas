@@ -245,7 +245,7 @@ export async function POST(req) {
     let canvas_ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
     canvas_ctx += `Active screen id: "${screenParentId}". Put new top-level components on this screen unless the user explicitly asks for a different screen.\n`;
     if (canvas_components && canvas_components.length > 0) {
-      const comp_lines = [];
+      const comp_lines: string[] = [];
       const processComponent = (c, indent = "", siblingIndex = 0, parentId = screenParentId) => {
         comp_lines.push(buildComponentPromptLine(c, { indent, siblingIndex, parentId }));
         if (c.children) {
@@ -292,8 +292,8 @@ export async function POST(req) {
 
           let rawText = "";
           let lineBuffer = "";
-          let usage = null;
-          let firstChunkAt = null;
+          let usage: any = null;
+          let firstChunkAt: number | null = null;
           let sawStructuredOps = false;
           let sawDone = false;
           const modelStartedAt = Date.now();

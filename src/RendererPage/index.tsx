@@ -35,7 +35,6 @@ import { SCHEMAS } from './constants'
 import PropField from './components/PropField'
 import ChatMessage from './components/ChatMessage'
 import LayerRow from './components/LayerRow'
-import ProjectsDashboard from './ProjectsDashboard'
 import { resolveSampleTextDeep } from './components/controls/sampleText'
 import { parseFormula, evaluateAST } from '../common/FormulaParser'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
@@ -2987,10 +2986,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   }, [])
 
   // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (!activeProject) {
-    return <ProjectsDashboard user={user} onOpenProject={setActiveProject} />;
-  }
-
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
       <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />

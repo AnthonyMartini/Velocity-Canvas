@@ -18,7 +18,7 @@ export function parseFormula(formula, strict = false) {
   }
 
   // Tokenizer
-  const tokens = []
+  const tokens: Array<{ type: string; value: any }> = []
   // Updated regex to include # for hex colors and maybe some basic logical operators
   const regex = /("[^"]*"|'[^']*')|([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)|([A-Za-z_][A-Za-z0-9_]*)|(#(?:[0-9a-fA-F]{3}){1,2}|#(?:[0-9a-fA-F]{4}){1,2}|#(?:[0-9a-fA-F]{8}))|([0-9]+(?:\.[0-9]+)?)|(<=|>=|<>|[()=+\-*/&,;<>!|{}\[\]:.]|(?:\r?\n)+)/g
   let match
@@ -177,7 +177,7 @@ export function parseFormula(formula, strict = false) {
       // Check if it's a function call
       if (peek() && peek().value === '(') {
         consume() // consume '('
-        const args = []
+        const args: any[] = []
         if (peek() && peek().value !== ')') {
           args.push(parseExpression())
           while (peek() && peek().value === ',') {
@@ -243,7 +243,16 @@ export function parseFormula(formula, strict = false) {
  * @param {boolean} strict If true, throws errors instead of swallowing them.
  * @returns {any} Result of evaluation
  */
-export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new Set(), parentNode = null, selfNode = null, context: any = {}, strict = false) {
+export function evaluateAST(
+  node,
+  localVars = {},
+  flatNodes: any[] = [],
+  visited = new Set<string>(),
+  parentNode: any = null,
+  selfNode: any = null,
+  context: any = {},
+  strict = false,
+) {
   if (!node) return strict ? null : ""
 
   const handleError = (msg) => {
@@ -302,7 +311,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     if (visited.has(absolutePath)) return handleError('#CYCLE!')
     const nextVisited = new Set(visited).add(absolutePath)
 
-    let targetNode = null
+    let targetNode: any = null
     if (compName.toLowerCase() === 'parent') targetNode = parentNode
     else if (compName.toLowerCase() === 'self') targetNode = selfNode
     else if (compName === 'NotificationType') targetNode = NotificationType
@@ -340,7 +349,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
         try {
           // Evaluate Items non-strictly so partial formulas fail gracefully
           const itemsAst = parseFormula(String(galleryNode.Items))
-          const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set(), null, galleryNode, {}, false)
+        const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set<string>(), null, galleryNode, {}, false)
           const firstRecord: any =
             Array.isArray(itemsResult) && itemsResult.length > 0 ? itemsResult[0]
             : (itemsResult && typeof itemsResult === 'object' && !Array.isArray(itemsResult)) ? itemsResult
@@ -489,7 +498,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
     }
 
     case 'ArrayLiteral': {
-      const elements = []
+      const elements: any[] = []
       for (const el of node.elements) {
         const val = evaluateAST(el, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
         if (val instanceof Error) return val
@@ -511,7 +520,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
       if (right instanceof Error) return right
 
 
-      let res = null
+      let res: any = null
       switch (node.operator) {
         case '+': res = Number(left) + Number(right); break
         case '-': res = Number(left) - Number(right); break
@@ -562,7 +571,7 @@ export function evaluateAST(node, localVars = {}, flatNodes = [], visited = new 
 
       // Special case for Set() - the first argument is an identifier referring to the variable name,
       // not a variable to evaluate. So we pass the name as a string directly.
-      const evaluatedArgs = []
+      const evaluatedArgs: any[] = []
       for (let i = 0; i < node.arguments.length; i++) {
         const argData = node.arguments[i]
         let val: any

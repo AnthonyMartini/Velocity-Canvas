@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import "./globals.css";
 import { themeCssVariables } from "@/theme/theme";
+import { AppShellProvider } from "@/features/app/AppShellProvider";
 
 export const metadata: Metadata = {
   title: "Velocity Canvas",
@@ -16,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en" style={themeCssVariables as CSSProperties} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        {children}
+        <AppShellProvider>{children}</AppShellProvider>
       </body>
     </html>
   );

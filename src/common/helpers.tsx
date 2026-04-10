@@ -105,8 +105,8 @@ export function updateNode(nodes, id, updater) {
 
 /** Remove a node from the tree, return [newTree, removedNode] */
 export function removeNode(nodes, id) {
-  let removed = null
-  const next = []
+  let removed: any = null
+  const next: any[] = []
   for (const n of nodes) {
     if (n.id === id) {
       if (n.type === 'App') {
@@ -144,8 +144,8 @@ export function insertNode(nodes, node, parentId) {
 }
 
 /** Flatten tree to a list (for layers panel) with depth info */
-export function flattenTree(nodes, collapsedIds = new Set(), depth = 0) {
-  const result = []
+export function flattenTree(nodes, collapsedIds: Set<any> = new Set(), depth = 0) {
+  const result: any[] = []
   // Iterate backwards so the front-most (last in array) appears at the top of the list
   for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i]
@@ -176,7 +176,7 @@ export function buildTreeMetadata(tree) {
   const screenById = new Map()
   const componentCountByScreenId = new Map()
 
-  const walk = (nodes, parent = null, screen = null) => {
+  const walk = (nodes, parent: any = null, screen: any = null) => {
     for (const node of nodes || []) {
       nodeById.set(node.id, node)
       parentById.set(node.id, parent)
@@ -212,7 +212,7 @@ export function buildTreeMetadata(tree) {
 }
 
 /** Find the direct parent container of a node, or null if at root */
-export function findParent(nodes, id, parent = null) {
+export function findParent(nodes, id, parent: any = null) {
   for (const n of nodes) {
     if (n.id === id) return parent
     if (n.children?.length) {
@@ -330,7 +330,7 @@ export function getNextAvailableName(baseName, existingNames) {
   return newName
 }
 
-export function ensureUniqueNodeNames(node, existingNames = []) {
+export function ensureUniqueNodeNames(node, existingNames: any[] = []) {
   if (!node || typeof node !== 'object') return node
 
   const reservedNames = [...(existingNames || [])]
@@ -362,7 +362,7 @@ export function ensureUniqueNodeNames(node, existingNames = []) {
   return walk(node)
 }
 
-export function ensureUniqueNodeListNames(nodes, existingNames = []) {
+export function ensureUniqueNodeListNames(nodes, existingNames: any[] = []) {
   if (!Array.isArray(nodes)) return nodes
 
   const reservedNames = [...(existingNames || [])]
@@ -382,7 +382,7 @@ export function ensureUniqueNodeListNames(nodes, existingNames = []) {
  * @param {Object} localVars - Vars for resolving formulas
  * @returns {{x: number, y: number}}
  */
-export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars = {}, treeMeta = null) {
+export function getNodeAbsolutePosition(tree, nodeId, flatNodes: any[] = [], localVars = {}, treeMeta: any = null) {
   let x = 0, y = 0
   let currentId = nodeId
   
@@ -417,7 +417,7 @@ export function getNodeAbsolutePosition(tree, nodeId, flatNodes = [], localVars 
  * Ignores structural properties and events.
  * Coerces into numbers if the target schema property is a number.
  */
-export function resolveProperties(comp, localVars, flatNodes, parentNode = null) {
+export function resolveProperties(comp, localVars, flatNodes, parentNode: any = null) {
   const resolved = { ...comp }
   const propertyDefs = getPropertyDefsForType(comp?.type)
   const propertyDefByKey = new Map<string, any>(propertyDefs.map((property: any) => [property.key || property.name, property]))
@@ -435,7 +435,7 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
     const val = comp[key]
     if (typeof val === 'string' && val.trim() !== '') {
       const ast = parseFormula(val)
-      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, comp)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, comp)
       
       // Basic heuristic: if it looks like a number and isn't "#CYCLE!", parse it
       // to support numeric properties like Width, Height, X, Y
@@ -455,7 +455,7 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode = null)
  * Validates a single property on a component, mimicking the logic in PropField.
  * Returns an error string or null if valid.
  */
-export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode = null, options: any = null) {
+export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode: any = null, options: any = null) {
   if (value === undefined || value === null) return null
   const valStr = String(value)
 
@@ -484,7 +484,7 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
     }
     
     // Evaluate the AST strictly to catch type/syntax errors
-    const evaluated = evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, node, context, true)
+      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, node, context, true)
     
     if (evaluated instanceof Error) return evaluated.message
 
@@ -555,8 +555,8 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
  */
 export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
   const { flatNodes: providedFlatNodes = null, treeMeta = null } = options
-  const errors = []
-  const flatNodes = providedFlatNodes || flattenTree(tree, new Set())
+  const errors: any[] = []
+  const flatNodes = providedFlatNodes || flattenTree(tree, new Set<string>())
   const parentById = treeMeta?.parentById || null
   const screenById = treeMeta?.screenById || null
   const validationContext = {
@@ -622,7 +622,7 @@ export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
  * @param {array} flatNodes - The full flat array of nodes for property lookup
  * @param {object} parentNode - The direct parent of the triggering component
  */
-export function executeAction(formula, localVars, setLocalVars, notify, navigate, flatNodes = [], parentNode = null, selfNode = null) {
+export function executeAction(formula, localVars, setLocalVars, notify, navigate, flatNodes: any[] = [], parentNode: any = null, selfNode: any = null) {
   if (!formula || typeof formula !== 'string') return
 
   let trimmedFormula = formula.trim()
@@ -644,5 +644,5 @@ export function executeAction(formula, localVars, setLocalVars, notify, navigate
   }
 
   const ast = parseFormula(trimmedFormula)
-  evaluateAST(ast, localVars, flatNodes, new Set(), parentNode, selfNode, context)
+    evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, selfNode, context)
 }

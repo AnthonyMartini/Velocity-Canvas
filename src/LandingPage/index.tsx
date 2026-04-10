@@ -384,7 +384,7 @@ function FloatingIdeWindow({
   );
 }
 
-export default function LandingPage({ onStart }: { onStart: (tabId?: string, signedInUser?: any) => void }) {
+export default function LandingPage({ onAuthenticated }: { onAuthenticated: (signedInUser?: any) => void }) {
   const [signingIn, setSigningIn] = useState(false);
   const [typedCount, setTypedCount] = useState(0);
   const [visibleLineCount, setVisibleLineCount] = useState(0);
@@ -405,7 +405,7 @@ export default function LandingPage({ onStart }: { onStart: (tabId?: string, sig
         if (cancelled) return;
 
         await upsertUserProfile(user);
-        if (!cancelled) onStart("renderer", user);
+        if (!cancelled) onAuthenticated(user);
       } catch (error: any) {
         if (cancelled) return;
         if (error?.code) {
@@ -428,7 +428,7 @@ export default function LandingPage({ onStart }: { onStart: (tabId?: string, sig
     return () => {
       cancelled = true;
     };
-  }, [onStart]);
+  }, [onAuthenticated]);
 
   useEffect(() => {
     setTypedCount(0);
@@ -476,7 +476,7 @@ export default function LandingPage({ onStart }: { onStart: (tabId?: string, sig
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       await upsertUserProfile(user);
-      onStart("renderer", user);
+      onAuthenticated(user);
     } catch (error: any) {
       if (error?.code === "auth/internal-error") {
         try {
@@ -500,7 +500,7 @@ export default function LandingPage({ onStart }: { onStart: (tabId?: string, sig
       }
 
       if (auth.currentUser) {
-        onStart("renderer", auth.currentUser);
+        onAuthenticated(auth.currentUser);
       }
     } finally {
       setSigningIn(false);

@@ -1,0 +1,12 @@
+"use client";
+
+import PlansPage from "@/PlansPage";
+import { useAppShell } from "@/features/app/AppShellProvider";
+
+export default function BillingPlansPage() {
+  const { user, refreshCredits } = useAppShell();
+
+  if (!user) return null;
+
+  return <PlansPage user={user} onRefreshCredits={() => void refreshCredits(user)} />;
+}

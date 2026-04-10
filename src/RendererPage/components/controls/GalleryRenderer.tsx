@@ -58,6 +58,18 @@ export default function GalleryRenderer({
   const padding = comp.TemplatePadding || 0
   const tSize = comp.TemplateSize || 100
 
+  const handleGalleryMouseDown = (e) => {
+    e.stopPropagation()
+    if (e.target !== e.currentTarget) return
+    onMouseDown(e)
+  }
+
+  const handleGalleryClick = (e) => {
+    e.stopPropagation()
+    if (e.target !== e.currentTarget) return
+    onClick(e)
+  }
+
   // ── Helper: render children for one template row with given localVars ──────
   function renderChildren(rowLocalVars, isEditableRow) {
     return (comp.children || []).map((rawChild, childIndex) => {
@@ -174,8 +186,8 @@ export default function GalleryRenderer({
     <div
       style={style}
       data-container-id={comp.id}
-      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
-      onClick={onClick}
+      onMouseDown={handleGalleryMouseDown}
+      onClick={handleGalleryClick}
       onDragOver={(e) => {
         e.preventDefault()
         if (dragOverId !== comp.id) setDragOverId(comp.id)

@@ -165,8 +165,8 @@ export async function POST(req) {
           };
 
           let rawText = "";
-          let usage = null;
-          let firstChunkAt = null;
+          let usage: any = null;
+          let firstChunkAt: number | null = null;
           const modelStartedAt = Date.now();
 
           try {

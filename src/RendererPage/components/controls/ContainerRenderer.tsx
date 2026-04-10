@@ -49,12 +49,24 @@ export default function ContainerRenderer({
     Object.assign(style, getDragOutlineStyles('default'))
   }
 
+  const handleContainerMouseDown = (e) => {
+    e.stopPropagation()
+    if (e.target !== e.currentTarget) return
+    onMouseDown(e)
+  }
+
+  const handleContainerClick = (e) => {
+    e.stopPropagation()
+    if (e.target !== e.currentTarget) return
+    onClick(e)
+  }
+
   return (
     <div
       style={style}
       data-container-id={comp.id}
-      onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e); }}
-      onClick={onClick}
+      onMouseDown={handleContainerMouseDown}
+      onClick={handleContainerClick}
       onDragOver={(e) => {
         if (isPlaying) return
         e.preventDefault()
