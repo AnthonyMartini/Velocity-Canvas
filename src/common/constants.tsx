@@ -42,6 +42,14 @@ export const DropdownIcon = ({ className = 'w-4 h-4' }) => (
   </svg>
 )
 
+export const ListBoxIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="5" y="5" width="22" height="22" rx="1" />
+    <path d="M10 11h12M10 16h12M10 21h12" strokeOpacity="0.7" />
+    <rect x="8" y="9" width="16" height="4" fill={ACCENT_COLOR} fillOpacity="0.18" stroke="none" />
+  </svg>
+)
+
 export const GalleryIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
     <rect x="6" y="6" width="20" height="20" rx="1" />
@@ -69,6 +77,14 @@ export const IconIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
     <circle cx="16" cy="16" r="10" />
     <circle cx="16" cy="16" r="4" stroke={ACCENT_COLOR} />
+  </svg>
+)
+
+export const ImageIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <rect x="4" y="6" width="24" height="20" rx="2" />
+    <path d="M9 20l5-5 4 4 3-3 4 4" stroke={ACCENT_COLOR} strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 13a2 2 0 1 0 0-.01" stroke={ACCENT_COLOR} />
   </svg>
 )
 
@@ -143,6 +159,14 @@ export const LinkIcon = ({ className = 'w-4 h-4' }) => (
   </svg>
 )
 
+export const TabListIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
+    <path d="M6 10h20" />
+    <path d="M8 10v12h6V10M18 10v12h6V10" strokeOpacity="0.75" />
+    <path d="M8 24h6M18 24h6" stroke={ACCENT_COLOR} strokeLinecap="round" />
+  </svg>
+)
+
 export const RichTextIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={className} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.5">
     <rect x="5" y="6" width="22" height="20" rx="2" />
@@ -177,6 +201,7 @@ export const TYPE_ICONS = {
   Button:    ButtonIcon,
   ModernButton: ButtonIcon,
   ModernDropdown: DropdownIcon,
+  ModernTabList: TabListIcon,
   ModernCheckbox: CheckboxIcon,
   ModernComboBox: ComboBoxIcon,
   ModernProgressBar: ProgressBarIcon,
@@ -194,9 +219,11 @@ export const TYPE_ICONS = {
   Container: ContainerIcon,
   TextInput: TextInputIcon,
   Dropdown:  DropdownIcon,
+  ListBox:   ListBoxIcon,
   Checkbox:  CheckboxIcon,
   Rectangle: RectangleIcon,
   Icon:      IconIcon,
+  Image:     ImageIcon,
   Gallery:   GalleryIcon,
   HtmlText:  HtmlTextIcon,
   DatePicker: DatePickerIcon,
@@ -214,6 +241,7 @@ export const TYPE_COLORS = {
   Button:    'bg-[#0078d4]',
   ModernButton: 'bg-[#0f6cbd]',
   ModernDropdown: 'bg-[#1f883d]',
+  ModernTabList: 'bg-[#2563eb]',
   ModernCheckbox: 'bg-[#0ea5e9]',
   ModernComboBox: 'bg-[#f59e0b]',
   ModernProgressBar: 'bg-[#059669]',
@@ -231,9 +259,11 @@ export const TYPE_COLORS = {
   Container: 'bg-violet-500',
   TextInput: 'bg-emerald-500',
   Dropdown:  'bg-amber-500',
+  ListBox:   'bg-amber-600',
   Checkbox:  'bg-cyan-500',
   Rectangle: 'bg-zinc-500',
   Icon:      'bg-blue-400',
+  Image:     'bg-sky-400',
   Gallery:   'bg-pink-500',
   HtmlText:  'bg-fuchsia-400',
   DatePicker: 'bg-teal-400',

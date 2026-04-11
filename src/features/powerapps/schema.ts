@@ -1,6 +1,7 @@
 import buttonSchema from "../../../schemas/button.json";
 import modernButtonSchema from "../../../schemas/modernButton.json";
 import modernDropdownSchema from "../../../schemas/modernDropdown.json";
+import modernTabListSchema from "../../../schemas/modernTabList.json";
 import modernCheckboxSchema from "../../../schemas/modernCheckbox.json";
 import modernComboBoxSchema from "../../../schemas/modernComboBox.json";
 import modernProgressBarSchema from "../../../schemas/modernProgressBar.json";
@@ -18,10 +19,12 @@ import labelSchema from "../../../schemas/label.json";
 import containerSchema from "../../../schemas/container.json";
 import textInputSchema from "../../../schemas/textInput.json";
 import dropdownSchema from "../../../schemas/dropdown.json";
+import listBoxSchema from "../../../schemas/listBox.json";
 import gallerySchema from "../../../schemas/gallery.json";
 import CheckboxSchema from "../../../schemas/checkbox.json";
 import RectangleSchema from "../../../schemas/rectangle.json";
 import IconSchema from "../../../schemas/icon.json";
+import ImageSchema from "../../../schemas/image.json";
 import HtmlTextSchema from "../../../schemas/htmltext.json";
 import DatePickerSchema from "../../../schemas/datepicker.json";
 import ComboBoxSchema from "../../../schemas/combobox.json";
@@ -35,6 +38,7 @@ export const SCHEMAS = {
   Button: applyThemeToSchema(buttonSchema, appTheme.controlDefaults.Button),
   ModernButton: applyThemeToSchema(modernButtonSchema, appTheme.controlDefaults.ModernButton),
   ModernDropdown: applyThemeToSchema(modernDropdownSchema, appTheme.controlDefaults.ModernDropdown),
+  ModernTabList: applyThemeToSchema(modernTabListSchema, appTheme.controlDefaults.ModernTabList),
   ModernCheckbox: applyThemeToSchema(modernCheckboxSchema, appTheme.controlDefaults.ModernCheckbox),
   ModernComboBox: applyThemeToSchema(modernComboBoxSchema, appTheme.controlDefaults.ModernComboBox),
   ModernProgressBar: applyThemeToSchema(modernProgressBarSchema, appTheme.controlDefaults.ModernProgressBar),
@@ -52,10 +56,12 @@ export const SCHEMAS = {
   Container: applyThemeToSchema(containerSchema, appTheme.controlDefaults.Container),
   TextInput: applyThemeToSchema(textInputSchema, appTheme.controlDefaults.TextInput),
   Dropdown: applyThemeToSchema(dropdownSchema, appTheme.controlDefaults.Dropdown),
+  ListBox: applyThemeToSchema(listBoxSchema, appTheme.controlDefaults.ListBox),
   Gallery: applyThemeToSchema(gallerySchema, appTheme.controlDefaults.Gallery),
   Checkbox: applyThemeToSchema(CheckboxSchema, appTheme.controlDefaults.Checkbox),
   Rectangle: applyThemeToSchema(RectangleSchema, appTheme.controlDefaults.Rectangle),
   Icon: applyThemeToSchema(IconSchema, appTheme.controlDefaults.Icon),
+  Image: applyThemeToSchema(ImageSchema, appTheme.controlDefaults.Image),
   HtmlText: applyThemeToSchema(HtmlTextSchema, appTheme.controlDefaults.HtmlText),
   DatePicker: applyThemeToSchema(DatePickerSchema, appTheme.controlDefaults.DatePicker),
   ComboBox: applyThemeToSchema(ComboBoxSchema, appTheme.controlDefaults.ComboBox),

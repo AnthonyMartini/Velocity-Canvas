@@ -7,6 +7,7 @@ import logo from '@/assets/logo.png'
 import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
   ModernButtonRenderer,
   ModernDropdownRenderer,
+  ModernTabListRenderer,
   ModernCheckboxRenderer,
   ModernComboBoxRenderer,
   ModernProgressBarRenderer,
@@ -22,9 +23,11 @@ import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, Con
   RatingRenderer,
   RectangleRenderer,
   IconRenderer,
+  ImageRenderer,
   HtmlTextRenderer,
   DatePickerRenderer,
   ComboBoxRenderer,
+  ListBoxRenderer,
   ToggleRenderer,
   RadioRenderer,
   SliderRenderer,
@@ -62,7 +65,7 @@ const COMPONENT_LIBRARY_GROUPS = [
   {
     key: 'input',
     label: 'Input',
-    types: ['Button', 'TextInput', 'Dropdown', 'Checkbox', 'DatePicker', 'ComboBox', 'Toggle', 'Radio', 'Slider', 'RichTextEditor', 'Rating'],
+    types: ['Button', 'TextInput', 'Dropdown', 'ListBox', 'Checkbox', 'DatePicker', 'ComboBox', 'Toggle', 'Radio', 'Slider', 'RichTextEditor', 'Rating'],
   },
   {
     key: 'output',
@@ -72,12 +75,12 @@ const COMPONENT_LIBRARY_GROUPS = [
   {
     key: 'display',
     label: 'Display',
-    types: ['Container', 'Gallery', 'Rectangle', 'Icon'],
+    types: ['Container', 'Gallery', 'Rectangle', 'Icon', 'Image'],
   },
   {
     key: 'modern',
     label: 'Modern',
-    types: ['ModernButton', 'ModernDropdown', 'ModernCheckbox', 'ModernComboBox', 'ModernProgressBar', 'ModernSlider', 'ModernSpinner', 'ModernText', 'ModernTextInput', 'ModernToggle', 'Link', 'NumberInput', 'ModernDatePicker'],
+    types: ['ModernButton', 'ModernDropdown', 'ModernTabList', 'ModernCheckbox', 'ModernComboBox', 'ModernProgressBar', 'ModernSlider', 'ModernSpinner', 'ModernText', 'ModernTextInput', 'ModernToggle', 'Link', 'NumberInput', 'ModernDatePicker'],
   },
 ] as const
 const AI_REQUEST_SUMMARY_KEYS = new Set([
@@ -518,6 +521,7 @@ function RendererSwitch({ comp, sharedProps }) {
   if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernButton') return <ModernButtonRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernDropdown') return <ModernDropdownRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ModernTabList') return <ModernTabListRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernCheckbox') return <ModernCheckboxRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernComboBox') return <ModernComboBoxRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernProgressBar') return <ModernProgressBarRenderer key={comp.id} {...sharedProps} />
@@ -534,6 +538,7 @@ function RendererSwitch({ comp, sharedProps }) {
   if (comp.type === 'Label') return <LabelRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'TextInput') return <TextInputRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'Dropdown') return <DropdownRenderer key={comp.id} {...sharedProps} />
+  if (comp.type === 'ListBox') return <ListBoxRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'Container') return (
     <ContainerRenderer key={comp.id} {...sharedProps}
       selectedIds={sharedProps.selectedIds || []}
@@ -564,6 +569,9 @@ function RendererSwitch({ comp, sharedProps }) {
     // Inject the raw SVG string if available
     return <IconRenderer key={comp.id} {...sharedProps} />
   }
+  if (comp.type === 'Image') return (
+    <ImageRenderer key={comp.id} {...sharedProps} />
+  )
   if (comp.type === 'HtmlText') return (
     <HtmlTextRenderer key={comp.id} {...sharedProps} />
   )

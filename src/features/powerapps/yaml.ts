@@ -1,6 +1,8 @@
 import { SCHEMAS, BORDER_MAP } from '@/features/powerapps/schema'
 import { resolveSampleTextDeep } from '@/features/powerapps/sample-text'
 
+const CLOUD_IMAGE_DATA_URI = `"data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 120' fill='none'%3E%3Crect x='8' y='8' width='144' height='104' rx='22' fill='%23bfdbfe' fill-opacity='.25'/%3E%3Cpath d='M49 79h50c12.15 0 22-9.85 22-22 0-10.666-8.053-19.52-18.731-20.13C100.23 23.34 88.59 13 74.5 13 62.873 13 53.06 20.21 49.818 31.245 40.283 32.773 33 41.036 33 51c0 11.046 8.954 20 20 20' stroke='%2360a5fa' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M71 56l9 9 18-18' stroke='%2360a5fa' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"`
+
 // ── Unique ID ─────────────────────────────────────────────────────────────────
 export const uid = () => `comp_${Math.random().toString(36).substring(2, 11)}`
 
@@ -124,9 +126,12 @@ export function extractVariables(tree: any[]): string[] {
 
 /** Convert a hex color string to PA RGBA notation */
 export function toRgba(hex) {
-  if (!hex || hex === 'transparent') return 'RGBA(0, 0, 0, 0)'
-  if (hex.startsWith('rgba') || hex.startsWith('RGBA')) return hex.replace('rgba', 'RGBA')
-  const clean = hex.replace('#', '')
+  const value = String(hex || '').trim()
+  if (!value || value === 'transparent') return 'RGBA(0, 0, 0, 0)'
+  if (value.startsWith('rgba') || value.startsWith('RGBA')) return value.replace('rgba', 'RGBA')
+  if (!/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) return value
+
+  const clean = value.replace('#', '')
   if (clean.length === 3) {
     const [r, g, b] = clean.split('').map(c => parseInt(c + c, 16))
     return `RGBA(${r}, ${g}, ${b}, 1)`
@@ -137,11 +142,88 @@ export function toRgba(hex) {
   return `RGBA(${r}, ${g}, ${b}, 1)`
 }
 
+const YAML_PROPERTY_DEF_CACHE = new Map()
+
+function getPropertyDef(type, key) {
+  if (!type || !key) return null
+
+  if (!YAML_PROPERTY_DEF_CACHE.has(type)) {
+    const schema = SCHEMAS?.[type]
+    const propertyDefs = schema?.groups
+      ? schema.groups.reduce((acc, group) => acc.concat(group.properties || []), [])
+      : (schema?.properties || [])
+
+    YAML_PROPERTY_DEF_CACHE.set(type, propertyDefs)
+  }
+
+  const propertyDefs = YAML_PROPERTY_DEF_CACHE.get(type) || []
+  return propertyDefs.find(property => {
+    const propertyKey = property?.key || property?.name
+    return String(propertyKey || '').toLowerCase() === String(key || '').toLowerCase()
+  }) || null
+}
+
+function normalizeFormulaString(value) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed.startsWith('=') ? trimmed.slice(1).trim() : trimmed
+}
+
+function getFormulaFlag(node, key) {
+  if (!node?._formulaProps || typeof node._formulaProps !== 'object') return false
+  return node._formulaProps[key] === true
+}
+
+function looksLikeFormulaExpression(value, propDef = null) {
+  const normalized = normalizeFormulaString(value)
+  if (typeof normalized !== 'string' || !normalized) return false
+
+  if (
+    propDef?.type === 'color' &&
+    /^(RGBA|ColorValue)\([^()]*\)$/i.test(normalized)
+  ) {
+    return false
+  }
+
+  if (
+    (/^".*"$/.test(normalized) || /^'.*'$/.test(normalized)) ||
+    /^-?\d+(?:\.\d+)?$/.test(normalized) ||
+    /^(true|false)$/i.test(normalized) ||
+    /^#(?:[0-9a-fA-F]{3,8})$/.test(normalized) ||
+    /^[A-Z][A-Za-z0-9_]*\.[A-Z][A-Za-z0-9_]*$/.test(normalized)
+  ) {
+    return false
+  }
+
+  return (
+    /[()&+\-*/<>=;,[\]{}:]/.test(normalized) ||
+    /^(Parent|Self|ThisItem|ThisRecord)\./.test(normalized) ||
+    /^[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(normalized) ||
+    /^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z0-9_]+/.test(normalized)
+  )
+}
+
+function isFormulaPropertyValue(node, key, value, propDef = null) {
+  if (typeof value !== 'string') return false
+  if (value.trim().startsWith('=')) return true
+  if (getFormulaFlag(node, key)) return true
+  return looksLikeFormulaExpression(value, propDef)
+}
+
+function formatColorValue(node, key, value) {
+  const propDef = getPropertyDef(node?.type, key)
+  if (isFormulaPropertyValue(node, key, value, propDef)) {
+    return normalizeFormulaString(String(value))
+  }
+  return toRgba(value)
+}
+
 /** Recursively convert a component tree node to PA YAML string.
  *  col = the column where the leading `- Name:` dash sits (0 for root). */
 export function componentToYaml(node, col = 0) {
   const sp = (n) => ' '.repeat(n)   // exact column indent
   const safeName = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').replace(/^\d+/, '') || 'Ctrl'
+  const color = (key, value) => formatColorValue(node, key, value)
 
   if (node.type === 'UnknownPowerAppsObject' && node._rawPowerAppsYaml) {
     return String(node._rawPowerAppsYaml)
@@ -161,6 +243,8 @@ export function componentToYaml(node, col = 0) {
       name = (safeName(node.Label) || 'Checkbox') + 'Checkbox'
     } else if (node.type === 'ModernDropdown') {
       name = 'Dropdown'
+    } else if (node.type === 'ModernTabList') {
+      name = 'TabList'
     } else if (node.type === 'ModernComboBox') {
       name = 'ComboBox'
     } else if (node.type === 'ModernProgressBar') {
@@ -189,6 +273,10 @@ export function componentToYaml(node, col = 0) {
       name = (safeName(node.HintText) || 'TextInput') + 'Input'
     } else if (node.type === 'Dropdown') {
       name = (safeName(node.Default) || 'Dropdown') + 'Dropdown'
+    } else if (node.type === 'Image') {
+      name = 'Image'
+    } else if (node.type === 'ListBox') {
+      name = (safeName(node.Default) || 'ListBox') + 'ListBox'
     } else {
       name = (safeName(node.Text) || 'Label') + 'Label'
     }
@@ -198,6 +286,7 @@ export function componentToYaml(node, col = 0) {
     Button:    'Classic/Button@2.2.0',
     ModernButton: 'Button@0.0.45',
     ModernDropdown: 'Dropdown',
+    ModernTabList: 'ModernTabList@1.0.0',
     ModernCheckbox: 'Checkbox',
     ModernComboBox: 'Combobox',
     ModernProgressBar: 'ProgressBar',
@@ -215,6 +304,8 @@ export function componentToYaml(node, col = 0) {
     Container: 'GroupContainer@1.4.0',
     TextInput: 'Classic/TextInput@2.3.2',
     Dropdown: 'Classic/DropDown@2.3.1',
+    Image: 'Image@2.2.3',
+    ListBox: 'Classic/ListBox@2.2.0',
     Checkbox: 'Classic/Checkbox@2.1.2',
     Rectangle: 'Rectangle@2.3.0',
     Icon: 'Classic/Icon@2.5.0',
@@ -246,7 +337,7 @@ export function componentToYaml(node, col = 0) {
   if (node.type === 'Screen') {
     lines.push(`${sp(col)}${name}:`)
     lines.push(`${sp(col + 2)}Properties:`)
-    lines.push(`${sp(col + 4)}Fill: =${toRgba(node.Fill)}`)
+    lines.push(`${sp(col + 4)}Fill: =${color('Fill', node.Fill)}`)
     lines.push(`${sp(col + 2)}Children:`)
     if (node.children?.length) {
       for (const child of node.children) {
@@ -271,8 +362,8 @@ export function componentToYaml(node, col = 0) {
     let valStr = String(v).trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
     
     // Legacy formula prefix support
-    if (valStr.startsWith('=')) {
-      let formula = valStr.slice(1).trim()
+    if (isFormulaPropertyValue(node, k, valStr, getPropertyDef(node?.type, k)) || valStr.startsWith('=')) {
+      let formula = normalizeFormulaString(valStr)
       // Strip outer quotes if redundant (e.g. ="Notify(...)")
       if ((formula.startsWith('"') && formula.endsWith('"')) || (formula.startsWith("'") && formula.endsWith("'"))) {
         const inner = formula.slice(1, -1)
@@ -333,8 +424,8 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
@@ -344,13 +435,13 @@ export function componentToYaml(node, col = 0) {
     p('RadiusTopRight', radiusTopRight)
     p('RadiusBottomLeft', radiusBottomLeft)
     p('RadiusBottomRight', radiusBottomRight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     p('BorderThickness', node.BorderThickness)
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
-    if (node.HoverFill) p('HoverFill', toRgba(node.HoverFill))
-    if (node.HoverColor) p('HoverColor', toRgba(node.HoverColor))
-    if (node.PressedFill) p('PressedFill', toRgba(node.PressedFill))
-    if (node.PressedColor) p('PressedColor', toRgba(node.PressedColor))
+    if (node.HoverFill) p('HoverFill', color('HoverFill', node.HoverFill))
+    if (node.HoverColor) p('HoverColor', color('HoverColor', node.HoverColor))
+    if (node.PressedFill) p('PressedFill', color('PressedFill', node.PressedFill))
+    if (node.PressedColor) p('PressedColor', color('PressedColor', node.PressedColor))
     if (node.PaddingTop) p('PaddingTop', node.PaddingTop)
     if (node.PaddingBottom) p('PaddingBottom', node.PaddingBottom)
     if (node.PaddingLeft) p('PaddingLeft', node.PaddingLeft)
@@ -388,7 +479,7 @@ export function componentToYaml(node, col = 0) {
     p('BorderRadius', node.BorderRadius)
     p('BasePaletteColor', node.BasePaletteColor)
     if (node.Font) p('Font', node.Font)
-    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    if (node.FontColor) p('FontColor', color('FontColor', node.FontColor))
     p('FontSize', node.FontSize)
     p('FontWeight', node.FontWeight)
     if (node.FontItalic) p('FontItalic', 'true')
@@ -425,6 +516,39 @@ export function componentToYaml(node, col = 0) {
     if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
     if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
     if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'ModernTabList') {
+    if (node.Items) p('Items', node.Items)
+    if (node.Default !== undefined) p('Default', node.Default)
+    if (node.Align) p('Align', node.Align)
+    if (node.Alignment) p('Alignment', node.Alignment)
+    if (node.Appearance) p('Appearance', node.Appearance)
+    if (node.Color) p('Color', color('Color', node.Color))
+    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
+    if (node.Font) p('Font', node.Font)
+    if (node.FontWeight) p('FontWeight', node.FontWeight)
+    if (node.Size !== undefined) p('Size', node.Size)
+    if (node.Italic) p('Italic', 'true')
+    if (node.Strikethrough) p('Strikethrough', 'true')
+    if (node.Underline) p('Underline', 'true')
+    if (node.PaddingTop !== undefined) p('PaddingTop', node.PaddingTop)
+    if (node.PaddingRight !== undefined) p('PaddingRight', node.PaddingRight)
+    if (node.PaddingBottom !== undefined) p('PaddingBottom', node.PaddingBottom)
+    if (node.PaddingLeft !== undefined) p('PaddingLeft', node.PaddingLeft)
+    if (node.RadiusTopLeft !== undefined) p('RadiusTopLeft', node.RadiusTopLeft)
+    if (node.RadiusTopRight !== undefined) p('RadiusTopRight', node.RadiusTopRight)
+    if (node.RadiusBottomLeft !== undefined) p('RadiusBottomLeft', node.RadiusBottomLeft)
+    if (node.RadiusBottomRight !== undefined) p('RadiusBottomRight', node.RadiusBottomRight)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.OnChange) p('OnChange', node.OnChange)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
   } else if (node.type === 'ModernCheckbox') {
     p('Label', node.Label || '"Checkbox"')
     p('Checked', node.Checked ? 'true' : 'false')
@@ -434,7 +558,7 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
     if (node.Font) p('Font', node.Font)
-    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    if (node.FontColor) p('FontColor', color('FontColor', node.FontColor))
     p('FontSize', node.FontSize)
     p('FontWeight', node.FontWeight)
     if (node.FontItalic) p('FontItalic', 'true')
@@ -461,12 +585,12 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.Appearance) p('Appearance', node.Appearance)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
-    if (node.Color) p('Color', toRgba(node.Color))
-    if (node.Fill) p('Fill', toRgba(node.Fill))
+    if (node.Color) p('Color', color('Color', node.Color))
+    if (node.Fill) p('Fill', color('Fill', node.Fill))
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     p('InputTextPlaceholder', node.InputTextPlaceholder || '""')
@@ -523,7 +647,7 @@ export function componentToYaml(node, col = 0) {
     if (node.Appearance) p('Appearance', node.Appearance)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
     if (node.Font) p('Font', node.Font)
-    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    if (node.FontColor) p('FontColor', color('FontColor', node.FontColor))
     p('FontSize', node.FontSize)
     p('FontWeight', node.FontWeight)
     if (node.FontItalic) p('FontItalic', 'true')
@@ -545,15 +669,15 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Color', toRgba(node.Color))
-    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', color('Fill', node.Fill))
     if (node.Font) p('Font', node.Font)
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
     if (node.Italic) p('Italic', 'true')
     if (node.Underline) p('Underline', 'true')
     if (node.Strikethrough) p('Strikethrough', 'true')
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     p('PaddingTop', node.PaddingTop)
@@ -581,15 +705,15 @@ export function componentToYaml(node, col = 0) {
     p('Width', node.Width)
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     if (node.Font) p('Font', node.Font)
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
     if (node.Italic) p('Italic', 'true')
     if (node.Underline) p('Underline', 'true')
     if (node.Strikethrough) p('Strikethrough', 'true')
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.MaxLength) p('MaxLength', node.MaxLength)
@@ -615,7 +739,7 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
     if (node.Font) p('Font', node.Font)
-    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    if (node.FontColor) p('FontColor', color('FontColor', node.FontColor))
     p('FontSize', node.FontSize)
     p('FontWeight', node.FontWeight)
     if (node.FontItalic) p('FontItalic', 'true')
@@ -640,15 +764,15 @@ export function componentToYaml(node, col = 0) {
     p('Width', node.Width)
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
-    p('Color', toRgba(node.Color))
-    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', color('Fill', node.Fill))
     if (node.Font) p('Font', node.Font)
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
     if (node.Italic) p('Italic', 'true')
     if (node.Underline) p('Underline', 'true')
     if (node.Strikethrough) p('Strikethrough', 'true')
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     p('PaddingTop', node.PaddingTop)
@@ -677,11 +801,11 @@ export function componentToYaml(node, col = 0) {
     p('Width', node.Width)
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     if (node.Font) p('Font', node.Font)
     p('Size', node.Size)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     p('PaddingTop', node.PaddingTop)
@@ -711,7 +835,7 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.BasePaletteColor) p('BasePaletteColor', node.BasePaletteColor)
     if (node.Font) p('Font', node.Font)
-    if (node.FontColor) p('FontColor', toRgba(node.FontColor))
+    if (node.FontColor) p('FontColor', color('FontColor', node.FontColor))
     p('FontSize', node.FontSize)
     p('FontWeight', node.FontWeight)
     if (node.FontItalic) p('FontItalic', 'true')
@@ -744,12 +868,12 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
-    if (node.RatingFill) p('RatingFill', toRgba(node.RatingFill))
-    p('BorderColor', toRgba(node.BorderColor))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', color('Fill', node.Fill))
+    if (node.RatingFill) p('RatingFill', color('RatingFill', node.RatingFill))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
-    if (node.FocusedBorderColor) p('FocusedBorderColor', toRgba(node.FocusedBorderColor))
+    if (node.FocusedBorderColor) p('FocusedBorderColor', color('FocusedBorderColor', node.FocusedBorderColor))
     p('FocusedBorderThickness', node.FocusedBorderThickness)
     p('TabIndex', node.TabIndex)
     if (node.Visible === false) p('Visible', 'false')
@@ -763,14 +887,14 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Color', toRgba(node.Color))
-    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', color('Fill', node.Fill))
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
     p('Align', node.Align)
     p('VerticalAlign', node.VerticalAlign)
-    if (node.BorderColor) p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
     if (node.LineHeight) p('LineHeight', node.LineHeight)
@@ -789,10 +913,10 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    if (node.Fill && node.Fill !== 'rgba(0,0,0,0)') p('Fill', toRgba(node.Fill))
+    if (node.Fill && node.Fill !== 'rgba(0,0,0,0)') p('Fill', color('Fill', node.Fill))
     if (node.BorderStyle && node.BorderStyle !== 'BorderStyle.None') {
       p('BorderStyle', BORDER_MAP[node.BorderStyle] || node.BorderStyle)
-      p('BorderColor', toRgba(node.BorderColor))
+      p('BorderColor', color('BorderColor', node.BorderColor))
       p('BorderThickness', node.BorderThickness)
     }
     if (node.RadiusTopLeft) p('RadiusTopLeft', node.RadiusTopLeft)
@@ -808,12 +932,12 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.Default !== undefined) p('Default', node.Default)
     if (node.HintText)  p('HintText', node.HintText)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.Mode) p('Mode', node.Mode)
@@ -840,15 +964,15 @@ export function componentToYaml(node, col = 0) {
     p('Height', node.Height)
     if (node.Default !== undefined) p('Default', node.Default)
     if (node.Items) p('Items', node.Items)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
-    if (node.SelectionFill) p('SelectionFill', toRgba(node.SelectionFill))
-    if (node.SelectionColor) p('SelectionColor', toRgba(node.SelectionColor))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
+    if (node.SelectionFill) p('SelectionFill', color('SelectionFill', node.SelectionFill))
+    if (node.SelectionColor) p('SelectionColor', color('SelectionColor', node.SelectionColor))
     if (node.AllowEmptySelection !== undefined) p('AllowEmptySelection', node.AllowEmptySelection ? 'true' : 'false')
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.RadiusTopLeft) p('RadiusTopLeft', node.RadiusTopLeft)
@@ -860,6 +984,55 @@ export function componentToYaml(node, col = 0) {
     if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
     if (node.OnSelect) p('OnSelect', node.OnSelect)
     if (node.OnChange) p('OnChange', node.OnChange)
+  } else if (node.type === 'Image') {
+    p('Image', CLOUD_IMAGE_DATA_URI)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    if (node.Fill) p('Fill', color('Fill', node.Fill))
+    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
+    if (node.PaddingTop !== undefined) p('PaddingTop', node.PaddingTop)
+    if (node.PaddingRight !== undefined) p('PaddingRight', node.PaddingRight)
+    if (node.PaddingBottom !== undefined) p('PaddingBottom', node.PaddingBottom)
+    if (node.PaddingLeft !== undefined) p('PaddingLeft', node.PaddingLeft)
+    if (node.RadiusTopLeft !== undefined) p('RadiusTopLeft', node.RadiusTopLeft)
+    if (node.RadiusTopRight !== undefined) p('RadiusTopRight', node.RadiusTopRight)
+    if (node.RadiusBottomLeft !== undefined) p('RadiusBottomLeft', node.RadiusBottomLeft)
+    if (node.RadiusBottomRight !== undefined) p('RadiusBottomRight', node.RadiusBottomRight)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.Tooltip) p('Tooltip', node.Tooltip)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+  } else if (node.type === 'ListBox') {
+    if (node.Items) p('Items', node.Items)
+    if (node.Default !== undefined) p('Default', node.Default)
+    p('X', node.X)
+    p('Y', node.Y)
+    p('Width', node.Width)
+    p('Height', node.Height)
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
+    if (node.SelectionFill) p('SelectionFill', color('SelectionFill', node.SelectionFill))
+    if (node.SelectionColor) p('SelectionColor', color('SelectionColor', node.SelectionColor))
+    if (node.SelectMultiple !== undefined) p('SelectMultiple', node.SelectMultiple ? 'true' : 'false')
+    if (node.ItemPaddingLeft !== undefined) p('ItemPaddingLeft', node.ItemPaddingLeft)
+    if (node.LineHeight !== undefined) p('LineHeight', node.LineHeight)
+    p('Size', node.Size)
+    if (node.Font) p('Font', node.Font)
+    p('FontWeight', node.FontWeight)
+    p('BorderColor', color('BorderColor', node.BorderColor))
+    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
+    p('BorderThickness', node.BorderThickness)
+    if (node.Visible === false) p('Visible', 'false')
+    if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
+    if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
+    if (node.Tooltip) p('Tooltip', node.Tooltip)
+    if (node.OnSelect) p('OnSelect', node.OnSelect)
+    if (node.OnChange) p('OnChange', node.OnChange)
   } else if (node.type === 'Checkbox') {
     p('Text', node.Text || '"Checkbox"')
     p('X', node.X)
@@ -867,16 +1040,16 @@ export function componentToYaml(node, col = 0) {
     p('Width', node.Width)
     p('Height', node.Height)
     if (node.Default !== undefined) p('Default', node.Default)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
-    p('CheckmarkFill', toRgba(node.CheckmarkFill))
-    p('CheckboxBackgroundFill', toRgba(node.CheckboxBackgroundFill))
-    p('CheckboxBorderColor', toRgba(node.CheckboxBorderColor))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
+    p('CheckmarkFill', color('CheckmarkFill', node.CheckmarkFill))
+    p('CheckboxBackgroundFill', color('CheckboxBackgroundFill', node.CheckboxBackgroundFill))
+    p('CheckboxBorderColor', color('CheckboxBorderColor', node.CheckboxBorderColor))
     p('CheckboxSize', node.CheckboxSize)
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
-    if (node.BorderColor) p('BorderColor', toRgba(node.BorderColor))
+    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
     if (node.RadiusTopLeft) p('RadiusTopLeft', node.RadiusTopLeft)
@@ -900,14 +1073,14 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     p('BorderThickness', node.BorderThickness)
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
-    p('FocusedBorderColor', toRgba(node.FocusedBorderColor))
+    p('FocusedBorderColor', color('FocusedBorderColor', node.FocusedBorderColor))
     p('FocusedBorderThickness', node.FocusedBorderThickness)
     p('InputTextPlaceholder', node.InputTextPlaceholder || '""')
     if (node.Visible === false) p('Visible', 'false')
@@ -921,13 +1094,13 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Fill', toRgba(node.Fill))
-    if (node.HoverFill) p('HoverFill', toRgba(node.HoverFill))
-    if (node.PressedFill) p('PressedFill', toRgba(node.PressedFill))
+    p('Fill', color('Fill', node.Fill))
+    if (node.HoverFill) p('HoverFill', color('HoverFill', node.HoverFill))
+    if (node.PressedFill) p('PressedFill', color('PressedFill', node.PressedFill))
     p('BorderThickness', node.BorderThickness || 0)
     p('BorderStyle', node.BorderStyle || 'BorderStyle.None')
-    p('BorderColor', toRgba(node.BorderColor))
-    if (node.FocusedBorderColor) p('FocusedBorderColor', toRgba(node.FocusedBorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
+    if (node.FocusedBorderColor) p('FocusedBorderColor', color('FocusedBorderColor', node.FocusedBorderColor))
     if (node.FocusedBorderThickness !== undefined) p('FocusedBorderThickness', node.FocusedBorderThickness)
     if (node.Visible === false) p('Visible', 'false')
     if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
@@ -939,12 +1112,12 @@ export function componentToYaml(node, col = 0) {
     p('Width', node.Width)
     p('Height', node.Height)
     p('Icon', node.Icon || 'Icon.Printing3D')
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     if (node.Rotation !== undefined) p('Rotation', node.Rotation)
-    p('HoverBorderColor', toRgba(node.HoverBorderColor))
-    p('DisabledBorderColor', toRgba(node.DisabledBorderColor))
-    p('DisabledFill', toRgba(node.DisabledFill))
+    p('HoverBorderColor', color('HoverBorderColor', node.HoverBorderColor))
+    p('DisabledBorderColor', color('DisabledBorderColor', node.DisabledBorderColor))
+    p('DisabledFill', color('DisabledFill', node.DisabledFill))
     if (node.Visible === false) p('Visible', 'false')
     if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
     if (node.AccessibleLabel) p('AccessibleLabel', node.AccessibleLabel)
@@ -955,19 +1128,19 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     p('Size', node.Size)
     p('PaddingTop', node.PaddingTop)
     p('PaddingBottom', node.PaddingBottom)
     p('PaddingLeft', node.PaddingLeft)
     p('PaddingRight', node.PaddingRight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     p('BorderThickness', node.BorderThickness)
     p('BorderStyle', node.BorderStyle)
-    p('HoverBorderColor', toRgba(node.HoverBorderColor))
-    p('DisabledBorderColor', toRgba(node.DisabledBorderColor))
-    p('DisabledFill', toRgba(node.DisabledFill))
+    p('HoverBorderColor', color('HoverBorderColor', node.HoverBorderColor))
+    p('DisabledBorderColor', color('DisabledBorderColor', node.DisabledBorderColor))
+    p('DisabledFill', color('DisabledFill', node.DisabledFill))
     if (node.Visible === false) p('Visible', 'false')
     if (node.DisplayMode) p('DisplayMode', node.DisplayMode)
     if (node.OnSelect) p('OnSelect', node.OnSelect)
@@ -982,8 +1155,8 @@ export function componentToYaml(node, col = 0) {
     if (node.WrapCount !== undefined) p('WrapCount', node.WrapCount)
     if (node.ShowNavigation !== undefined) p('ShowNavigation', node.ShowNavigation ? 'true' : 'false')
     if (node.ShowScrollbar !== undefined) p('ShowScrollbar', node.ShowScrollbar ? 'true' : 'false')
-    if (node.Fill && node.Fill !== 'transparent') p('Fill', toRgba(node.Fill))
-    if (node.BorderColor) p('BorderColor', toRgba(node.BorderColor))
+    if (node.Fill && node.Fill !== 'transparent') p('Fill', color('Fill', node.Fill))
+    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
     if (node.Visible === false) p('Visible', 'false')
@@ -996,16 +1169,16 @@ export function componentToYaml(node, col = 0) {
     if (node.SelectedDate) p('SelectedDate', node.SelectedDate)
     if (node.Format) p('Format', node.Format)
     if (node.Language) p('Language', node.Language)
-    p('Color', toRgba(node.Color))
-    p('Fill', toRgba(node.Fill))
+    p('Color', color('Color', node.Color))
+    p('Fill', color('Fill', node.Fill))
     p('Size', node.Size)
     if (node.Font) p('Font', node.Font)
     p('FontWeight', node.FontWeight)
-    p('BorderColor', toRgba(node.BorderColor))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
-    p('IconFill', toRgba(node.IconFill))
-    p('IconBackground', toRgba(node.IconBackground))
+    p('IconFill', color('IconFill', node.IconFill))
+    p('IconBackground', color('IconBackground', node.IconBackground))
     if (node.InputTextPlaceholder) p('InputTextPlaceholder', node.InputTextPlaceholder)
     if (node.IsEditable !== undefined) p('IsEditable', node.IsEditable ? 'true' : 'false')
     if (node.Visible === false) p('Visible', 'false')
@@ -1022,16 +1195,16 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
     p('TrueText', node.TrueText || '"On"')
     p('FalseText', node.FalseText || '"Off"')
-    p('TrueFill', toRgba(node.TrueFill))
-    p('FalseFill', toRgba(node.FalseFill))
-    p('HandleFill', toRgba(node.HandleFill))
-    p('BorderColor', toRgba(node.BorderColor))
+    p('TrueFill', color('TrueFill', node.TrueFill))
+    p('FalseFill', color('FalseFill', node.FalseFill))
+    p('HandleFill', color('HandleFill', node.HandleFill))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.Visible === false) p('Visible', 'false')
@@ -1048,14 +1221,14 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Fill', toRgba(node.Fill))
-    p('Color', toRgba(node.Color))
+    p('Fill', color('Fill', node.Fill))
+    p('Color', color('Color', node.Color))
     p('Size', node.Size)
     p('FontWeight', node.FontWeight)
     p('RadioSize', node.RadioSize)
-    p('RadioBorderColor', toRgba(node.RadioBorderColor))
-    p('RadioSelectionFill', toRgba(node.RadioSelectionFill))
-    p('BorderColor', toRgba(node.BorderColor))
+    p('RadioBorderColor', color('RadioBorderColor', node.RadioBorderColor))
+    p('RadioSelectionFill', color('RadioSelectionFill', node.RadioSelectionFill))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.Layout) p('Layout', node.Layout)
@@ -1074,11 +1247,11 @@ export function componentToYaml(node, col = 0) {
     p('Y', node.Y)
     p('Width', node.Width)
     p('Height', node.Height)
-    p('Fill', toRgba(node.Fill))
-    p('RailFill', toRgba(node.RailFill))
-    p('ValueFill', toRgba(node.ValueFill))
-    p('HandleFill', toRgba(node.HandleFill))
-    p('BorderColor', toRgba(node.BorderColor))
+    p('Fill', color('Fill', node.Fill))
+    p('RailFill', color('RailFill', node.RailFill))
+    p('ValueFill', color('ValueFill', node.ValueFill))
+    p('HandleFill', color('HandleFill', node.HandleFill))
+    p('BorderColor', color('BorderColor', node.BorderColor))
     if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
     p('BorderThickness', node.BorderThickness)
     if (node.Visible === false) p('Visible', 'false')

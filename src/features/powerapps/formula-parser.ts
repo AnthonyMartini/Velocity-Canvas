@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle } from '@/features/powerapps/functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 
 /**
@@ -255,6 +255,8 @@ export function evaluateAST(
 ) {
   if (!node) return strict ? null : ""
   const hasLocalVar = (name) => Object.prototype.hasOwnProperty.call(localVars, name)
+  const looksLikePropertyPath = (value: any) =>
+    typeof value === 'string' && /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+$/.test(value.trim())
 
   const handleError = (msg) => {
     if (strict) return new Error(msg) // Return Error object instead of throwing, so we can catch it or return it
@@ -465,7 +467,7 @@ export function evaluateAST(
 
       if (rawVal !== undefined) {
         // If resolving from an enum, return literal value and don't re-evaluate
-        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle].includes(targetNode)
+        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance].includes(targetNode)
         if (isEnum) return rawVal
 
         // If the property itself is a formula, parse and evaluate it
@@ -496,7 +498,7 @@ export function evaluateAST(
       // But if it wasn't explicit, or we're in non-strict mode, we just return the raw string.
       if (typeof node.value === 'string' && !strict) {
          // Attempt one last time to resolve as property/variable just in case it was a single token
-         if (node.value.includes('.')) {
+         if (looksLikePropertyPath(node.value)) {
             const pathRes = resolvePropertyPath(node.value)
             if (!(pathRes instanceof Error)) return pathRes
          }
@@ -524,7 +526,7 @@ export function evaluateAST(
       if (compNode && !strict) return node.name
 
       // Implicitly resolve known enum keys (e.g. typing "Add" instead of "Icon.Add")
-      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle]
+      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance]
       for (const enumObj of implicitEnums) {
           if (enumObj[node.name] !== undefined) return enumObj[node.name]
       }

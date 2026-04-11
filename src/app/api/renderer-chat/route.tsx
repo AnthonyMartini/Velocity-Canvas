@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rendererChatModel, RENDERER_CHAT_MODEL_NAME } from "@/lib/gemini";
+import { AI_ADDABLE_COMPONENT_TYPES, SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
 import { TEXT_SIZING_RUNTIME_GUIDE } from "@/features/powerapps/text-sizing";
 import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
@@ -76,12 +77,18 @@ function summarizeItemsForPrompt(items) {
 
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
+  `- Only add supported controls from this list: ${AI_ADDABLE_COMPONENT_TYPES.join(", ")}.`,
+  '- ModernTabList is the only allowed modern control exception. Do not add other modern controls or modern-only properties.',
   '- Only use supported component property keys and formulas that this renderer understands.',
   '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
   '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
   '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
   '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", or "Self.*". The only supported App path is "App.Theme.*".',
   '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
+  '- For ModernTabList, Alignment must be one of "TabListAlignment.Start", "TabListAlignment.Center", or "TabListAlignment.End".',
+  '- For ModernTabList, Appearance must be one of "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.Underline", or "TabListAppearance.Filled".',
+  `- For Icon controls, Icon must be one of these exact enum strings: ${SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ")}.`,
+  '- For Image controls, do not use URLs, media names, uploaded assets, custom SVG, or source properties. Images are fixed cloud placeholders in this renderer.',
   '- Use double quotes for string literals in component properties and formulas. Never emit single-quoted strings.',
 ].join("\n");
 

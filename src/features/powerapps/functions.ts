@@ -68,6 +68,19 @@ export const ModernButtonIconStyle = {
     Filled: "ModernButtonIconStyle.Filled"
 }
 
+export const TabListAlignment = {
+    Start: "TabListAlignment.Start",
+    Center: "TabListAlignment.Center",
+    End: "TabListAlignment.End"
+}
+
+export const TabListAppearance = {
+    Transparent: "TabListAppearance.Transparent",
+    Subtle: "TabListAppearance.Subtle",
+    Underline: "TabListAppearance.Underline",
+    Filled: "TabListAppearance.Filled"
+}
+
 export const Overflow = {
     Hidden: "Overflow.Hidden",
     Scroll: "Overflow.Scroll",
@@ -174,6 +187,8 @@ export const ALL_ENUM_VALUES = new Set([
     ...Object.values(ModernButtonAppearance),
     ...Object.values(ModernButtonLayout),
     ...Object.values(ModernButtonIconStyle),
+    ...Object.values(TabListAlignment),
+    ...Object.values(TabListAppearance),
     ...Object.values(Overflow),
     ...Object.values(DropShadow),
     ...Object.values(TextMode),
