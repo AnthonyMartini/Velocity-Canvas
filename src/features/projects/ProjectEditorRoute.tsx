@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import RendererPage from "@/RendererPage";
+import RendererPage from "@/components/RendererPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 import { loadProjectById, type ProjectDocument } from "./api";
 

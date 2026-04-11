@@ -1,4 +1,4 @@
-import { SCHEMAS } from "@/RendererPage/constants";
+import { SCHEMAS } from "@/components/RendererPage/constants";
 import { sanitizeHtmlFragment, sanitizeSvgFragment } from "@/lib/content-sanitizer";
 import { normalizeCanvasThemeState } from "@/theme/canvasTheme";
 
@@ -31,6 +31,19 @@ function sanitizeString(value: unknown, maxLength = MAX_STRING_LENGTH) {
 function sanitizeDocumentId(value: unknown) {
   const trimmed = sanitizeString(value, 200).trim();
   return trimmed && !trimmed.includes("/") ? trimmed : null;
+}
+
+function sanitizeFormulaProps(value: unknown, propertyMap: Map<any, any>) {
+  if (!isPlainObject(value)) return undefined;
+
+  const safeFlags = Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, enabled]) => propertyMap.has(key) && enabled === true)
+      .slice(0, 200)
+      .map(([key]) => [key, true]),
+  );
+
+  return Object.keys(safeFlags).length ? safeFlags : undefined;
 }
 
 function sanitizeNodeId(value: unknown, fallback: string) {
@@ -170,6 +183,12 @@ function sanitizeComponentNode(node: unknown, options: { depth?: number; countRe
     if (["id", "type", "name", "children"].includes(key)) continue;
     if (key === "_svg" && rawType !== "Icon") continue;
 
+    if (key === "_formulaProps") {
+      const safeFormulaProps = sanitizeFormulaProps(value, propertyMap);
+      if (safeFormulaProps) sanitized._formulaProps = safeFormulaProps;
+      continue;
+    }
+
     if (key === "_svg") {
       const safeSvg = sanitizePropertyValue(rawType, key, value);
       if (safeSvg) sanitized._svg = safeSvg;
@@ -210,6 +229,12 @@ function sanitizeComponentChanges(type: string, changes: unknown) {
 
     if (key === "name") {
       sanitizedChanges.name = sanitizeNodeName(value, type);
+      continue;
+    }
+
+    if (key === "_formulaProps") {
+      const safeFormulaProps = sanitizeFormulaProps(value, propertyMap);
+      if (safeFormulaProps) sanitizedChanges._formulaProps = safeFormulaProps;
       continue;
     }
 

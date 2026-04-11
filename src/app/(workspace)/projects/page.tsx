@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import HomePage from "@/HomePage";
+import HomePage from "@/components/HomePage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 import type { ProjectDocument } from "@/features/projects/api";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import PlansPage from "@/PlansPage";
+import PlansPage from "@/components/PlansPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 
 export default function BillingPlansPage() {

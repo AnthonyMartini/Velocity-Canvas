@@ -72,8 +72,7 @@ function coercePowerAppsValue(rawValue: string) {
   const trimmed = String(rawValue || "").trim();
   if (!trimmed) return "";
 
-  const isFormula = trimmed.startsWith("=");
-  const value = isFormula ? trimmed.slice(1).trim() : trimmed;
+  const value = trimmed.startsWith("=") ? trimmed.slice(1).trim() : trimmed;
   if (!value) return "";
 
   if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
@@ -86,7 +85,7 @@ function coercePowerAppsValue(rawValue: string) {
     return value;
   }
 
-  return isFormula ? `=${value}` : value;
+  return value;
 }
 
 function isControlHeader(trimmedLine: string) {

@@ -1,6 +1,6 @@
 "use client";
 
-import ComponentLibraryPage from "@/ComponentLibraryPage";
+import ComponentLibraryPage from "@/components/ComponentLibraryPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 
 export default function DocsPage() {

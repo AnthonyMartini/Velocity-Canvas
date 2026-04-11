@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import LandingPage from "@/LandingPage";
+import LandingPage from "@/components/LandingPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 
 export default function Home() {

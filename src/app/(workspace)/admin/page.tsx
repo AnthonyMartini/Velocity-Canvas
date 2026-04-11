@@ -1,6 +1,6 @@
 "use client";
 
-import AdminPage from "@/AdminPage";
+import AdminPage from "@/components/AdminPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 
 export default function WorkspaceAdminPage() {

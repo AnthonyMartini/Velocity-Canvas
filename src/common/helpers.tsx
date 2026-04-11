@@ -1,7 +1,7 @@
 import React from 'react'
 import { parseFormula, evaluateAST } from './FormulaParser'
-import { ALL_ENUM_VALUES } from '../RendererPage/Functions'
-import { SCHEMAS } from '../RendererPage/constants'
+import { ALL_ENUM_VALUES } from '../components/RendererPage/Functions'
+import { SCHEMAS } from '../components/RendererPage/constants'
 import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
 
 const PROPERTY_DEF_CACHE = new Map()
@@ -17,6 +17,88 @@ function getPropertyDefsForType(type) {
 
   PROPERTY_DEF_CACHE.set(type, propertyDefs)
   return propertyDefs
+}
+
+export function normalizeFormulaString(value) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed.startsWith('=') ? trimmed.slice(1).trim() : trimmed
+}
+
+function getFormulaFlag(node, propDef) {
+  const propKey = propDef?.key || propDef?.name
+  if (!propKey || !node?._formulaProps || typeof node._formulaProps !== 'object') return false
+  return node._formulaProps[propKey] === true
+}
+
+function looksLikeFormulaExpression(value, propDef: any = null) {
+  const normalized = normalizeFormulaString(value)
+  if (typeof normalized !== 'string' || !normalized) return false
+
+  if (
+    propDef?.type === 'color' &&
+    /^(RGBA|ColorValue)\([^()]*\)$/i.test(normalized)
+  ) {
+    return false
+  }
+
+  if (
+    (/^".*"$/.test(normalized) || /^'.*'$/.test(normalized)) ||
+    /^-?\d+(?:\.\d+)?$/.test(normalized) ||
+    /^(true|false)$/i.test(normalized) ||
+    /^#(?:[0-9a-fA-F]{3,8})$/.test(normalized) ||
+    /^[A-Z][A-Za-z0-9_]*\.[A-Z][A-Za-z0-9_]*$/.test(normalized)
+  ) {
+    return false
+  }
+
+  return (
+    /[()&+\-*/<>=;,[\]{}:]/.test(normalized) ||
+    /^(Parent|Self|ThisItem|ThisRecord)\./.test(normalized) ||
+    /^[A-Za-z_][A-Za-z0-9_]*\s*\(/.test(normalized) ||
+    /^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z0-9_]+/.test(normalized)
+  )
+}
+
+export function isFormulaValue(value, propDef: any = null, node: any = null) {
+  if (typeof value !== 'string') return false
+  if (value.trim().startsWith('=')) return true
+  if (getFormulaFlag(node, propDef)) return true
+  return looksLikeFormulaExpression(value, propDef)
+}
+
+export function isEventProperty(propDef) {
+  return (
+    propDef?.propertyType === 'Event' ||
+    propDef?.type === 'event' ||
+    ((propDef?.type === 'string' || propDef?.type === 'text') && propDef?.name?.startsWith('On')) ||
+    propDef?.key?.startsWith('On')
+  )
+}
+
+export function getPropertyOptionValues(propDef) {
+  if (!Array.isArray(propDef?.options)) return []
+  return propDef.options
+    .map((opt: any) => (typeof opt === 'object' && opt !== null && 'value' in opt ? opt.value : opt))
+    .filter((value: any) => value !== undefined && value !== null)
+}
+
+export function getPropertyValueType(propDef) {
+  if (isEventProperty(propDef)) return 'event'
+  if (getPropertyOptionValues(propDef).length > 0) return 'enum'
+
+  switch (propDef?.type) {
+    case 'number':
+      return 'number'
+    case 'boolean':
+      return 'boolean'
+    case 'color':
+      return 'color'
+    case 'table':
+      return 'table'
+    default:
+      return 'text'
+  }
 }
 
 /**
@@ -458,69 +540,64 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode: any = 
 export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode: any = null, options: any = null) {
   if (value === undefined || value === null) return null
   const valStr = String(value)
+  const expectedType = getPropertyValueType(propDef)
+  const isEvent = expectedType === 'event'
 
-  // Empty string checks based on prop type
   if (valStr.trim() === '') {
-    if (propDef.type === 'number') return "Required"
-    return null // Events and strings can be empty
+    if (expectedType === 'number') return "Required"
+    return null
   }
-
-  const isEvent = propDef.propertyType === 'Event' || (propDef.type === 'string' && propDef.name?.startsWith('On')) || propDef.type === 'event'
 
   if (!isEvent && (propDef.type === 'string' || propDef.type === 'text') && valStr.includes("'")) {
     return 'Single quotes are not allowed in text properties. Use double quotes instead.'
   }
   
   try {
-    const isAction = isEvent
     const controlNames = options?.controlNames || null
     const screens = options?.screens || null
-    // Events don't expect a return value
     const ast = parseFormula(valStr, true)
-    const context: any = { 
+    const context: any = {
       isControl: (name: any) => controlNames ? controlNames.has(name) : flatNodes.some((n: any) => n.name === name),
       screens: screens || flatNodes.filter((n: any) => n.type === 'Screen'),
-      isActionContext: isAction
+      isActionContext: isEvent
     }
-    
-    // Evaluate the AST strictly to catch type/syntax errors
-      const evaluated = evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, node, context, true)
-    
+
+    const evaluated = evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, node, context, true)
+
     if (evaluated instanceof Error) return evaluated.message
 
-    // If it's a string property but the evaluated result is a native JS function (like from an action),
-    // or if the parsed formula was an ActionSequence but this isn't an event, return an error.
     if (!isEvent && ast.type === 'ActionSequence') {
       return "Actions cannot be used in property formulas"
     }
 
-    if (propDef.type === 'number') {
+    if (expectedType === 'number') {
       const n = Number(evaluated)
       if (isNaN(n)) return "Must evaluate to a number"
     }
 
+    if (expectedType === 'boolean') {
+      if (typeof evaluated !== 'boolean') return "Must evaluate to a boolean"
+    }
+
     // 'table' type accepts arrays, objects, or strings — no further type check needed
-    if (propDef.type === 'table') {
+    if (expectedType === 'table') {
       return null
     }
 
-    // Enum validation: if the property has predefined options, the evaluated value must be one of them
-    if (propDef.options && Array.isArray(propDef.options)) {
-      let valToCheck = evaluated
-      
-      // ModernButton 'Icon' secretly expects primitive strings, but AI often provides 'Icon.Add' or unquoted 'Add' 
-      // (which evaluates to 'Icon.Add'). Strip the prefix for validation to correctly match the schema.
-      if (node.type === 'ModernButton' && propDef.key === 'Icon' && typeof valToCheck === 'string' && valToCheck.startsWith('Icon.')) {
-         valToCheck = valToCheck.replace('Icon.', '')
-      }
-
-      const validValues = propDef.options.map((opt: any) => (typeof opt === 'object' && opt !== null && 'value' in opt) ? opt.value : opt)
-      if (!validValues.includes(valToCheck)) {
+    if (expectedType === 'enum') {
+      const validValues = getPropertyOptionValues(propDef)
+      if (!validValues.includes(evaluated)) {
         return `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`
       }
     }
 
-    if (!isEvent && (propDef.type === 'string' || propDef.type === 'text')) {
+    if (expectedType === 'color') {
+      if (typeof evaluated !== 'string' || ALL_ENUM_VALUES.has(evaluated)) {
+        return "Must evaluate to a color value"
+      }
+    }
+
+    if (expectedType === 'text') {
 
       if (typeof evaluated === 'string' && ALL_ENUM_VALUES.has(evaluated)) {
         return "Enum values cannot be used in text properties"
@@ -625,10 +702,7 @@ export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
 export function executeAction(formula, localVars, setLocalVars, notify, navigate, flatNodes: any[] = [], parentNode: any = null, selfNode: any = null) {
   if (!formula || typeof formula !== 'string') return
 
-  let trimmedFormula = formula.trim()
-  if (trimmedFormula.startsWith('=')) {
-    trimmedFormula = trimmedFormula.slice(1).trim()
-  }
+  const trimmedFormula = normalizeFormulaString(formula)
 
   // Set up the context for the evaluator
   const context: any = { notify, navigate, setVariable: setLocalVars, screens: flatNodes.filter((n: any) => n.type === 'Screen'), isActionContext: true }

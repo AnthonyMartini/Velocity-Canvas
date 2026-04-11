@@ -1,6 +1,6 @@
 {
   "type": "ModernText",
-  "control": "Text (Modern)",
+  "control": "ModernText",
   "defaults": {
     "Align": "Align.Left",
     "AutoHeight": false,

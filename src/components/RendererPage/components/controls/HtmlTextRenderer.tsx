@@ -1,0 +1,142 @@
+import React, { useRef } from 'react'
+import PropTypes from 'prop-types'
+import { executeAction } from '../../../../common/helpers'
+import { getSelectionStyles } from '@/theme/theme'
+import { sanitizeHtmlFragment } from '@/lib/content-sanitizer'
+
+export default function HtmlTextRenderer({ 
+  comp, 
+  selected, 
+  isPlaying, 
+  localVars, 
+  setLocalVars, 
+  notify, 
+  navigate,
+  flatNodes,
+  parentNode,
+  onMouseDown, 
+  onClick,
+  renderZIndex = 1
+}) {
+  const contentRef = useRef(null)
+
+  const rawHtml = sanitizeHtmlFragment(comp.HtmlText || '')
+
+  const isInteractive = isPlaying && comp.DisplayMode !== 'DisplayMode.Disabled' && comp.OnSelect
+
+  // Calculate borders based on state
+  let currentBorderColor = comp.BorderColor
+  if (comp.DisplayMode === 'DisplayMode.Disabled' && comp.DisabledBorderColor) {
+    currentBorderColor = comp.DisabledBorderColor
+  } else if (comp.HoverBorderColor && comp.HoverBorderColor !== 'transparent') {
+    // Basic fallback without full hover state tracking implemented per component
+  }
+
+  // Calculate fill based on state
+  let currentFill = comp.Fill
+  if (comp.DisplayMode === 'DisplayMode.Disabled' && comp.DisabledFill) {
+    currentFill = comp.DisabledFill
+  }
+
+  const borderMap = { None: 'none', Solid: 'solid', Dashed: 'dashed', Dotted: 'dotted' }
+  const fontWeightMap = {
+    'FontWeight.Lighter': '300',
+    'FontWeight.Normal': '400',
+    'FontWeight.Semibold': '600',
+    'FontWeight.Bold': '700'
+  }
+
+  // Build the styles map for the actual container
+  const baseStyle: any = {
+    position: 'absolute',
+    left: `${comp.X}pt`,
+    top: `${comp.Y}pt`,
+    width: `${comp.Width}pt`,
+    height: `${comp.Height}pt`,
+    backgroundColor: currentFill,
+    borderStyle: borderMap[comp.BorderStyle] || 'none',
+    borderWidth: comp.BorderThickness ? `${comp.BorderThickness}pt` : 0,
+    borderColor: currentBorderColor,
+    color: comp.Color,
+    fontSize: comp.Size ? `${comp.Size}pt` : 'inherit',
+    fontWeight: fontWeightMap[comp.FontWeight] || 'normal',
+    paddingLeft: `${comp.PaddingLeft || 0}pt`,
+    paddingRight: `${comp.PaddingRight || 0}pt`,
+    paddingTop: `${comp.PaddingTop || 0}pt`,
+    paddingBottom: `${comp.PaddingBottom || 0}pt`,
+    opacity: comp.Visible !== false ? 1 : 0,
+    pointerEvents: comp.Visible !== false ? 'auto' : 'none',
+    cursor: isInteractive ? 'pointer' : (isPlaying ? 'default' : 'move'), userSelect: 'none',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    fontFamily: comp.Font || 'inherit',
+    ...getSelectionStyles(selected),
+    zIndex: renderZIndex,
+  }
+
+
+  // Action hook
+  const handleClick = (e) => {
+    onClick(e)
+    
+    // PowerApps note: "OnSelect is ignored for hyperlinks within the content"
+    const targetTag = e.target.tagName?.toLowerCase()
+    if (targetTag === 'a') return
+
+    if (isPlaying && comp.OnSelect && comp.DisplayMode !== 'DisplayMode.Disabled') {
+      executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
+    }
+  }
+
+  return (
+    <div
+      id={comp.id}
+      style={baseStyle}
+      onMouseDown={onMouseDown}
+      onClick={handleClick}
+    >
+      <div
+        ref={contentRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          wordWrap: 'break-word',
+        }}
+        dangerouslySetInnerHTML={{ __html: rawHtml }}
+      />
+    </div>
+  )
+}
+
+HtmlTextRenderer.propTypes = {
+  comp: PropTypes.shape({
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    Color: PropTypes.string,
+    DisplayMode: PropTypes.string,
+    BorderStyle: PropTypes.string,
+    BorderThickness: PropTypes.number,
+    BorderColor: PropTypes.string,
+    HtmlText: PropTypes.string,
+    Visible: PropTypes.bool,
+    PaddingLeft: PropTypes.number,
+    PaddingRight: PropTypes.number,
+    PaddingTop: PropTypes.number,
+    PaddingBottom: PropTypes.number,
+    Font: PropTypes.string,
+    FontWeight: PropTypes.string,
+    Size: PropTypes.number,
+    OnSelect: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  isPlaying: PropTypes.bool,
+  localVars: PropTypes.object,
+  setLocalVars: PropTypes.func,
+  notify: PropTypes.func,
+  renderZIndex: PropTypes.number,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+}

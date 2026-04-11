@@ -1,0 +1,58 @@
+import PropTypes from 'prop-types'
+import { CSS_BORDER_STYLE } from './cssProps'
+import { executeAction } from '../../../../common/helpers'
+import { getInsetSelectionStyles } from '@/theme/theme'
+
+export default function RectangleRenderer({ 
+  comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1
+}) {
+  const handleContainerClick = (e) => {
+    if (onClick) onClick(e)
+    if (isPlaying && comp.OnSelect) {
+      executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
+    }
+  }
+
+  const containerStyle: any = {
+    position: 'absolute',
+    left: `${comp.X}pt`,
+    top: `${comp.Y}pt`,
+    width: `${comp.Width}pt`,
+    height: `${comp.Height}pt`,
+    backgroundColor: comp.Fill,
+    border: (comp.BorderStyle && comp.BorderStyle !== 'BorderStyle.None' && (comp.BorderThickness || 0) > 0)
+      ? `${comp.BorderThickness || 0}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor || 'transparent'}`
+      : 'none',
+    opacity: comp.Visible === false ? 0 : (comp.DisplayMode === 'DisplayMode.Disabled' ? 0.5 : 1),
+    cursor: isPlaying ? (comp.DisplayMode === 'DisplayMode.Disabled' ? 'default' : 'pointer') : 'move',
+    userSelect: 'none',
+    ...getInsetSelectionStyles(selected),
+    boxSizing: 'border-box',
+    zIndex: renderZIndex
+  }
+
+  return (
+    <div style={containerStyle} onMouseDown={onMouseDown} onClick={handleContainerClick} />
+  )
+}
+
+RectangleRenderer.propTypes = {
+  comp: PropTypes.shape({
+    X: PropTypes.number.isRequired,
+    Y: PropTypes.number.isRequired,
+    Width: PropTypes.number.isRequired,
+    Height: PropTypes.number.isRequired,
+    Fill: PropTypes.string,
+    BorderStyle: PropTypes.string,
+    BorderThickness: PropTypes.number,
+    BorderColor: PropTypes.string,
+    Visible: PropTypes.bool,
+    DisplayMode: PropTypes.string,
+  }).isRequired,
+  selected: PropTypes.bool,
+  isPlaying: PropTypes.bool,
+  localVars: PropTypes.object,
+  renderZIndex: PropTypes.number,
+  onMouseDown: PropTypes.func.isRequired,
+  onClick: PropTypes.func.isRequired,
+}
