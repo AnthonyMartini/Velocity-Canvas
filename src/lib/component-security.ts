@@ -1,4 +1,5 @@
-import { SCHEMAS } from "@/components/RendererPage/constants";
+import { SCHEMAS } from "@/features/powerapps/schema";
+import { autoSizeTextComponents, getAutoSizedComponentChanges } from "@/features/powerapps/text-sizing";
 import { sanitizeHtmlFragment, sanitizeSvgFragment } from "@/lib/content-sanitizer";
 import { normalizeCanvasThemeState } from "@/theme/canvasTheme";
 
@@ -217,7 +218,7 @@ function sanitizeComponentNode(node: unknown, options: { depth?: number; countRe
   return sanitized;
 }
 
-function sanitizeComponentChanges(type: string, changes: unknown) {
+function sanitizeComponentChanges(type: string, changes: unknown, existingNode?: Record<string, any>) {
   if (!isPlainObject(changes)) return null;
 
   const propertyMap = getPropertyMapForType(type);
@@ -261,7 +262,13 @@ function sanitizeComponentChanges(type: string, changes: unknown) {
     }
   }
 
-  return Object.keys(sanitizedChanges).length ? sanitizedChanges : null;
+  if (!Object.keys(sanitizedChanges).length) return null;
+
+  if (isPlainObject(existingNode)) {
+    return getAutoSizedComponentChanges(existingNode, sanitizedChanges);
+  }
+
+  return sanitizedChanges;
 }
 
 function indexTree(nodes: any[], map: Map<string, any>) {
@@ -334,6 +341,7 @@ export function sanitizeRendererPatch(operation: unknown, lookup: Map<string, an
 
     const component = sanitizeComponentNode(operation.component);
     if (!component) return null;
+    autoSizeTextComponents(component);
 
     return {
       op: "add",
@@ -347,7 +355,7 @@ export function sanitizeRendererPatch(operation: unknown, lookup: Map<string, an
     const existing = lookup.get(id);
     if (!id || !existing) return null;
 
-    const changes = sanitizeComponentChanges(existing.type, operation.changes);
+    const changes = sanitizeComponentChanges(existing.type, operation.changes, existing);
     if (!changes) return null;
 
     return {
@@ -398,6 +406,7 @@ export function sanitizeTweakResult(result: unknown, sourceComponent: any) {
   sanitized.id = sanitizeNodeId(sourceComponent.id, sanitized.id);
   sanitized.type = sanitizeString(sourceComponent.type, 40).trim() || sanitized.type;
   sanitized.name = sanitizeNodeName(sourceComponent.name, sanitized.name || sanitized.type);
+  autoSizeTextComponents(sanitized);
   return sanitized;
 }
 

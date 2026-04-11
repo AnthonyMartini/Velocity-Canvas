@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import RendererPage from "@/components/RendererPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 import { loadProjectById, type ProjectDocument } from "./api";
+import { readProjectSession } from "./session";
 
 interface ProjectEditorRouteProps {
   mode: "new" | "existing";
@@ -27,20 +28,26 @@ function LoadingState({ label }: { label: string }) {
 export default function ProjectEditorRoute({ mode, projectId, initialName }: ProjectEditorRouteProps) {
   const router = useRouter();
   const { user, refreshCredits } = useAppShell();
-  const [loading, setLoading] = useState(mode === "existing");
+  const editorKey = useMemo(() => {
+    if (mode === "new") return "new-project";
+    return `project:${projectId ?? "unknown"}`;
+  }, [mode, projectId]);
+  const initialSessionProject = useMemo(() => readProjectSession(editorKey), [editorKey]);
+  const [loading, setLoading] = useState(mode === "existing" && !initialSessionProject);
   const [error, setError] = useState<string | null>(null);
-  const [hasInitializedProject, setHasInitializedProject] = useState(mode === "new");
+  const [hasInitializedProject, setHasInitializedProject] = useState(mode === "new" || Boolean(initialSessionProject));
   const [activeProject, setActiveProjectState] = useState<ProjectDocument | null>(
-    mode === "new"
-      ? {
-          name: initialName?.trim() || "Untitled Project",
-          isNew: true,
-        }
-      : null,
+    initialSessionProject ??
+      (mode === "new"
+        ? {
+            name: initialName?.trim() || "Untitled Project",
+            isNew: true,
+          }
+        : null),
   );
 
   useEffect(() => {
-    if (mode !== "existing" || !user || !projectId) return;
+    if (mode !== "existing" || !user || !projectId || initialSessionProject) return;
 
     let cancelled = false;
 
@@ -78,7 +85,7 @@ export default function ProjectEditorRoute({ mode, projectId, initialName }: Pro
     return () => {
       cancelled = true;
     };
-  }, [mode, user, projectId]);
+  }, [mode, user, projectId, initialSessionProject]);
 
   useEffect(() => {
     if (mode === "new" && activeProject?.id) {
@@ -91,11 +98,6 @@ export default function ProjectEditorRoute({ mode, projectId, initialName }: Pro
       router.push("/projects");
     }
   }, [hasInitializedProject, loading, error, activeProject, router]);
-
-  const editorKey = useMemo(() => {
-    if (mode === "new") return `new:${initialName ?? "untitled"}`;
-    return `project:${projectId ?? "unknown"}`;
-  }, [mode, projectId, initialName]);
 
   if (loading || !user) {
     return <LoadingState label={mode === "new" ? "Starting a new project..." : "Loading project..."} />;
@@ -128,6 +130,7 @@ export default function ProjectEditorRoute({ mode, projectId, initialName }: Pro
       user={user}
       onCreditDeduction={() => void refreshCredits(user)}
       activeProject={activeProject}
+      projectSessionKey={editorKey}
       setActiveProject={setActiveProjectState}
     />
   );

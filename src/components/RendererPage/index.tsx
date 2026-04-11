@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import NextImage from 'next/image'
-import PropTypes from 'prop-types'
 import logo from '@/assets/logo.png'
 import { ButtonRenderer, LabelRenderer, TextInputRenderer, DropdownRenderer, ContainerRenderer, GalleryRenderer,  CheckboxRenderer,
   ModernButtonRenderer,
@@ -35,16 +34,21 @@ import { SCHEMAS } from './constants'
 import PropField from './components/PropField'
 import ChatMessage from './components/ChatMessage'
 import LayerRow from './components/LayerRow'
-import { resolveSampleTextDeep } from './components/controls/sampleText'
-import { parseFormula, evaluateAST } from '../../common/FormulaParser'
-import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from './helpers'
+import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
+import { resolveSampleTextDeep } from '@/features/powerapps/sample-text'
+import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from '@/features/powerapps/yaml'
 import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, ensureUniqueNodeNames, ensureUniqueNodeListNames, getNodeAbsolutePosition, getAllAppErrors } from '../../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 import { appTheme, themeVars } from '@/theme/theme'
 import { createDefaultCanvasThemeState, getActiveCanvasThemeDefinition, normalizeCanvasThemeState, resolveCanvasTheme } from '@/theme/canvasTheme'
 import { looksLikePowerAppsYaml, parsePowerAppsYaml } from '@/lib/powerapps-import'
+import { clearProjectSession, writeProjectSession } from '@/features/projects/session'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
+const MIN_CANVAS_ZOOM = 0.25
+const MAX_CANVAS_ZOOM = 3
+const CANVAS_ZOOM_STEP = 0.1
+const MAX_PERSISTED_HISTORY_ITEMS = 25
 const createInitialChatMessages = () => ([
   { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
 ])
@@ -104,6 +108,40 @@ const AI_REQUEST_SUMMARY_KEYS = new Set([
   'LayoutMode',
   'Layout',
 ])
+
+function clampZoomLevel(value: number) {
+  return Math.max(MIN_CANVAS_ZOOM, Math.min(MAX_CANVAS_ZOOM, Number(value) || 1))
+}
+
+function getPersistedHistoryStateSnapshot(historyState: any) {
+  if (!historyState || !Array.isArray(historyState.items) || historyState.items.length === 0) {
+    return null
+  }
+
+  const trimmedItems = historyState.items.slice(-MAX_PERSISTED_HISTORY_ITEMS)
+  const trimmedIndex = Math.min(historyState.index, trimmedItems.length - 1)
+
+  return {
+    items: trimmedItems,
+    index: Math.max(0, trimmedIndex),
+  }
+}
+
+function getRestoredHistoryState(historyState: any, fallbackTree: any[]) {
+  if (!historyState || !Array.isArray(historyState.items) || historyState.items.length === 0) {
+    return { items: [fallbackTree], index: 0 }
+  }
+
+  const normalizedItems = historyState.items.filter(Array.isArray)
+  if (normalizedItems.length === 0) {
+    return { items: [fallbackTree], index: 0 }
+  }
+
+  return {
+    items: normalizedItems,
+    index: Math.min(Math.max(Number(historyState.index) || 0, 0), normalizedItems.length - 1),
+  }
+}
 
 function compactNodeForAIRequest(node, { summaryOnly = false, childLimit = 0 } = {}) {
   if (!node || typeof node !== 'object') return null
@@ -318,6 +356,71 @@ function NameInput({ initialValue, checkDuplicate, onCommit }) {
 }
 
 // ── Errors Pane ───────────────────────────────────────────────────────────────────────────────────
+function ExitProjectModal({ isOpen, isSaving, onClose, onSaveAndExit, onDiscard }: any) {
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSaving) {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isSaving, onClose])
+
+  if (!isOpen || typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100002] flex items-center justify-center px-4">
+      <button
+        type="button"
+        aria-label="Close save prompt"
+        disabled={isSaving}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/55 backdrop-blur-[1px] disabled:cursor-default"
+      />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-overlay/35 bg-surface p-5 shadow-2xl shadow-black/40">
+        <h3 className="text-base font-semibold text-text">Unsaved changes</h3>
+        <p className="mt-2 text-sm leading-relaxed text-subtext">
+          Save this project before exiting?
+        </p>
+        <div className="mt-5 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-lg border border-overlay/30 bg-base px-3 py-1.5 text-xs font-medium text-subtext transition-colors hover:bg-overlay/10 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDiscard}
+            disabled={isSaving}
+            className="rounded-lg border border-red/30 bg-red/10 px-3 py-1.5 text-xs font-medium text-red transition-colors hover:bg-red/20 hover:text-red disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            onClick={onSaveAndExit}
+            disabled={isSaving}
+            className="flex min-w-[108px] items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isSaving ? (
+              <div className="h-3.5 w-3.5 rounded-full border-2 border-white/50 border-t-white animate-spin" />
+            ) : null}
+            {isSaving ? 'Saving...' : 'Save and exit'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function ErrorCard({ err, onSelectNode }) {
   const [copied, setCopied] = useState(false)
 
@@ -613,14 +716,14 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
 }
 
 // ── Code Pane ───────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, canvasTheme, globalErrors, notify, width, onClose }) {
+function CodePane({ node, tree, globalErrors, notify, width, onClose }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
   const yaml = (() => {
-    if (!node || node.type === 'App') return screenToYaml(tree, canvasTheme)
+    if (!node || node.type === 'App') return screenToYaml(tree)
     if (node.type === 'Screen') {
-      return screenToYaml(tree, canvasTheme, [node])
+      return screenToYaml(tree, [node])
     }
     return componentToYaml(node)
   })()
@@ -716,16 +819,6 @@ function CodePane({ node, tree, canvasTheme, globalErrors, notify, width, onClos
       </div>
     </div>
   )
-}
-
-CodePane.propTypes = {
-  node: PropTypes.object, // Can be null for screen mode
-  tree: PropTypes.array.isRequired,
-  canvasTheme: PropTypes.object,
-  globalErrors: PropTypes.array.isRequired,
-  notify: PropTypes.func.isRequired,
-  width: PropTypes.number.isRequired,
-  onClose: PropTypes.func.isRequired,
 }
 
 const TOUR_STEPS = [
@@ -908,8 +1001,9 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
 // ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
-export default function RendererPage({ user, onCreditDeduction, activeProject, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, setActiveProject: (p: any) => void }) {
+export default function RendererPage({ user, onCreditDeduction, activeProject, projectSessionKey, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, projectSessionKey: string, setActiveProject: (p: any) => void }) {
   const [isSaving, setIsSaving] = useState(false)
+  const [showExitPrompt, setShowExitPrompt] = useState(false)
   const [lastSavedState, setLastSavedState] = useState('')
   const [canvasW, setCanvasW] = useState(1366)
   const [canvasH, setCanvasH] = useState(768)
@@ -941,6 +1035,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
   const [showPropertiesPane, setShowPropertiesPane] = useState(false) // Toggle visibility of Properties Pane
   const [showMobilePaneMenu, setShowMobilePaneMenu] = useState(false)
+  const zoomBy = useCallback((delta: number) => {
+    setZoom(z => clampZoomLevel(z + delta))
+  }, [])
+  const zoomIn = useCallback(() => zoomBy(CANVAS_ZOOM_STEP), [zoomBy])
+  const zoomOut = useCallback(() => zoomBy(-CANVAS_ZOOM_STEP), [zoomBy])
   const showLayerNames = true // Always show layer names/full size
   const componentLibraryGroups = useMemo(() => {
     return COMPONENT_LIBRARY_GROUPS
@@ -1102,20 +1201,37 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const normalizedCanvasTheme = useMemo(() => normalizeCanvasThemeState(canvasTheme), [canvasTheme])
   const activeCanvasTheme = useMemo(() => getActiveCanvasThemeDefinition(normalizedCanvasTheme), [normalizedCanvasTheme])
   const resolvedCanvasTheme = useMemo(() => resolveCanvasTheme(normalizedCanvasTheme), [normalizedCanvasTheme])
+  const declaredLocalVarNames = useMemo(() => extractVariables(tree) as string[], [tree])
+  const visibleLocalVars = useMemo(() => {
+    const vars: Record<string, any> = {}
+
+    for (const name of declaredLocalVarNames) {
+      vars[name] = Object.prototype.hasOwnProperty.call(localVars, name) ? localVars[name] : ""
+    }
+
+    for (const [name, value] of Object.entries(localVars)) {
+      vars[name] = value
+    }
+
+    return vars
+  }, [declaredLocalVarNames, localVars])
   const runtimeLocalVars = useMemo(() => ({
-    ...localVars,
+    ...visibleLocalVars,
     App: {
       Theme: resolvedCanvasTheme,
     },
-  }), [localVars, resolvedCanvasTheme])
+  }), [visibleLocalVars, resolvedCanvasTheme])
+  const projectName = typeof activeProject === 'object' && activeProject?.name
+    ? activeProject.name
+    : 'Untitled Project'
   const serializedProjectState = useMemo(
-    () => JSON.stringify({ tree, canvasW, canvasH, canvasTheme: normalizedCanvasTheme }),
-    [tree, canvasW, canvasH, normalizedCanvasTheme]
+    () => JSON.stringify({ name: projectName, tree, canvasW, canvasH, canvasTheme: normalizedCanvasTheme }),
+    [projectName, tree, canvasW, canvasH, normalizedCanvasTheme]
   )
 
   // Auto-extract and sync variables from the tree into localVars
   useEffect(() => {
-    const extractedNames = extractVariables(tree) as string[]
+    const extractedNames = declaredLocalVarNames
     
     setLocalVars(prev => {
       let changed = false
@@ -1139,7 +1255,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
       return changed ? nextVars : prev
     })
-  }, [tree])
+  }, [declaredLocalVarNames])
 
   // Custom notify function exposes an API similar to Notify() function
   const notify = useCallback((message, type = 'Information') => {
@@ -1328,14 +1444,25 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     const handleKeyDown = (e) => {
       // Zoom hotkeys
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
+        const isZoomInShortcut =
+          e.key === '=' ||
+          e.key === '+' ||
+          e.code === 'Equal' ||
+          e.code === 'NumpadAdd'
+        const isZoomOutShortcut =
+          e.key === '-' ||
+          e.key === '_' ||
+          e.code === 'Minus' ||
+          e.code === 'NumpadSubtract'
+
+        if (isZoomInShortcut) {
           e.preventDefault()
-          setZoom(z => Math.min(3, z + 0.1))
+          zoomIn()
           return
         }
-        if (e.key === '-') {
+        if (isZoomOutShortcut) {
           e.preventDefault()
-          setZoom(z => Math.max(0.25, z - 0.1))
+          zoomOut()
           return
         }
       }
@@ -1393,7 +1520,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [undo, redo, selectedIds, saveHistory, isTweaking, deleteSelected, effectiveIsPlaying])
+  }, [undo, redo, selectedIds, saveHistory, isTweaking, deleteSelected, effectiveIsPlaying, zoomIn, zoomOut])
 
   // Grid State
 
@@ -1426,14 +1553,20 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       setCanvasH(768);
       setCanvasWInput('1366');
       setCanvasHInput('768');
-      setHistoryState({ items: [blankTree], index: 0 });
+      setHistoryState(getRestoredHistoryState(activeProject?.historyState, blankTree));
       setSelectedIds([]);
-      setActiveScreenId(blankTree[0]?.children?.[0]?.id || null);
+      const initialScreenId = activeProject?.activeScreenId
+      const blankScreens = blankTree[0]?.children || []
+      setActiveScreenId(
+        initialScreenId && blankScreens.some(screen => screen.id === initialScreenId)
+          ? initialScreenId
+          : (blankScreens[0]?.id || null)
+      );
       setCollapsedIds(new Set());
       setLocalVars({});
       const nextCanvasTheme = createDefaultCanvasThemeState()
       setCanvasTheme(nextCanvasTheme)
-      setLastSavedState(JSON.stringify({ tree: blankTree, canvasW: 1366, canvasH: 768, canvasTheme: nextCanvasTheme }));
+      setLastSavedState(JSON.stringify({ name: projectName, tree: blankTree, canvasW: 1366, canvasH: 768, canvasTheme: nextCanvasTheme }));
 
       // If it was the temporary `{name, isNew}` object, finalize it into a proper project state
       if (typeof activeProject === 'object' && activeProject?.isNew) {
@@ -1455,15 +1588,24 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       const loadedH = activeProject.canvasH || 768;
       if (activeProject.canvasW) { setCanvasW(loadedW); setCanvasWInput(String(loadedW)); }
       if (activeProject.canvasH) { setCanvasH(loadedH); setCanvasHInput(String(loadedH)); }
-      setHistoryState({ items: [savedTree], index: 0 });
+      setHistoryState(getRestoredHistoryState(activeProject.historyState, savedTree));
       setSelectedIds([]);
-      setActiveScreenId(savedTree[0]?.children?.[0]?.id || null);
+      const savedScreens = savedTree[0]?.children || []
+      setActiveScreenId(
+        activeProject.activeScreenId && savedScreens.some(screen => screen.id === activeProject.activeScreenId)
+          ? activeProject.activeScreenId
+          : (savedScreens[0]?.id || null)
+      );
       setCollapsedIds(new Set());
       const loadedTheme = normalizeCanvasThemeState(activeProject.canvasTheme)
       setCanvasTheme(loadedTheme)
-      setLastSavedState(JSON.stringify({ tree: savedTree, canvasW: loadedW, canvasH: loadedH, canvasTheme: loadedTheme }));
+      setLastSavedState(JSON.stringify({ name: activeProject.name || 'Untitled Project', tree: savedTree, canvasW: loadedW, canvasH: loadedH, canvasTheme: loadedTheme }));
     }
-  }, [activeProject]);
+  }, [activeProject, projectName]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    return serializedProjectState !== lastSavedState;
+  }, [serializedProjectState, lastSavedState]);
 
   const saveProjectToCloud = useCallback(async ({ showSuccessToast = true } = {}) => {
     try {
@@ -1505,15 +1647,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
     } finally {
       setIsSaving(false);
     }
-  }, [activeProject, tree, canvasW, canvasH, normalizedCanvasTheme, serializedProjectState, user, notify, setActiveProject]);
+  }, [activeProject, tree, canvasW, canvasH, normalizedCanvasTheme, serializedProjectState, user, notify, projectSessionKey, setActiveProject]);
 
   const handleSaveProject = useCallback(async () => {
     await saveProjectToCloud({ showSuccessToast: true });
   }, [saveProjectToCloud]);
-
-  const hasUnsavedChanges = useMemo(() => {
-    return serializedProjectState !== lastSavedState;
-  }, [serializedProjectState, lastSavedState]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1528,24 +1666,34 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
 
   const handleExitProject = useCallback(async () => {
     if (!hasUnsavedChanges) {
+      clearProjectSession(projectSessionKey)
       setActiveProject(null)
       return
     }
 
-    const shouldSave = window.confirm('You have unsaved changes. Click OK to save before leaving, or Cancel to choose whether to discard them.')
-    if (shouldSave) {
-      const didSave = await saveProjectToCloud({ showSuccessToast: true })
-      if (didSave) {
-        setActiveProject(null)
-      }
-      return
-    }
+    setShowExitPrompt(true)
+  }, [hasUnsavedChanges, projectSessionKey, setActiveProject]);
 
-    const shouldDiscard = window.confirm('Discard unsaved changes and leave this project?')
-    if (shouldDiscard) {
+  const handleCancelExitProject = useCallback(() => {
+    if (!isSaving) {
+      setShowExitPrompt(false)
+    }
+  }, [isSaving])
+
+  const handleDiscardAndExitProject = useCallback(() => {
+    setShowExitPrompt(false)
+    clearProjectSession(projectSessionKey)
+    setActiveProject(null)
+  }, [projectSessionKey, setActiveProject])
+
+  const handleSaveAndExitProject = useCallback(async () => {
+    const didSave = await saveProjectToCloud({ showSuccessToast: true })
+    if (didSave) {
+      setShowExitPrompt(false)
+      clearProjectSession(projectSessionKey)
       setActiveProject(null)
     }
-  }, [hasUnsavedChanges, saveProjectToCloud, setActiveProject]);
+  }, [saveProjectToCloud, projectSessionKey, setActiveProject]);
 
   // Auto-scroll to center of padded canvas on initial load
   const [initialScrollDone, setInitialScrollDone] = useState(false)
@@ -1702,6 +1850,25 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   }, [activeScreenNode]);
   useEffect(() => { treeRef.current = tree }, [tree])
   useEffect(() => { activeScreenIdRef.current = activeScreenId }, [activeScreenId])
+
+  useEffect(() => {
+    if (!activeProject || typeof activeProject !== 'object' || !projectSessionKey) return
+
+    const timeoutId = window.setTimeout(() => {
+      writeProjectSession(projectSessionKey, {
+        ...activeProject,
+        name: projectName,
+        tree,
+        canvasW,
+        canvasH,
+        canvasTheme: normalizedCanvasTheme,
+        historyState: getPersistedHistoryStateSnapshot(historyState),
+        activeScreenId,
+      })
+    }, 150)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [activeProject, projectSessionKey, projectName, tree, canvasW, canvasH, normalizedCanvasTheme, historyState, activeScreenId])
 
   // Sync canvas dimensions to all Screen nodes
   useEffect(() => {
@@ -2667,9 +2834,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   const handleExportToPowerApps = useCallback(() => {
     const exportNode = selectedNode?.type === 'App' ? null : selectedNode
     const yaml = (() => {
-      if (!exportNode) return screenToYaml(tree, normalizedCanvasTheme)
+    if (!exportNode) return screenToYaml(tree)
       if (exportNode.type === 'Screen') {
-        return screenToYaml(tree, normalizedCanvasTheme, [exportNode])
+      return screenToYaml(tree, [exportNode])
       }
       return componentToYaml(exportNode)
     })()
@@ -3004,6 +3171,13 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
       <AppLoadingOverlay isVisible={chatLoading || tweakLoading} onCancel={handleCancelAI} message={aiLoadingMessage} />
+      <ExitProjectModal
+        isOpen={showExitPrompt}
+        isSaving={isSaving}
+        onClose={handleCancelExitProject}
+        onSaveAndExit={handleSaveAndExitProject}
+        onDiscard={handleDiscardAndExitProject}
+      />
 
       {/* Top Bar */}
       <div id="top-menu" className="relative flex items-center justify-center gap-4 px-5 py-2.5 border-b border-overlay/40 bg-surface/55 shrink-0 min-h-[58px]">
@@ -3772,9 +3946,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
           {/* Zoom Controls */}
           <div className={`absolute right-6 flex items-center bg-surface/90 backdrop-blur-md border border-overlay/30 shadow-md shadow-black/10 rounded-lg overflow-hidden z-40 transition-all duration-300 ${chatOpen ? 'bottom-[260px]' : 'bottom-6'}`}>
               <button 
-                onClick={(e) => { e.stopPropagation(); setZoom(z => Math.max(0.25, z - 0.1)); }}
+                onClick={(e) => { e.stopPropagation(); zoomOut(); }}
                 className="p-2 text-subtext hover:bg-overlay/10 hover:text-text transition-colors"
-                title="Zoom Out"
+                title="Zoom Out (Ctrl/Cmd -)"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               </button>
@@ -3782,9 +3956,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                 {Math.round(zoom * 100)}%
               </div>
               <button 
-                onClick={(e) => { e.stopPropagation(); setZoom(z => Math.min(3, z + 0.1)); }}
+                onClick={(e) => { e.stopPropagation(); zoomIn(); }}
                 className="p-2 text-subtext hover:bg-overlay/10 hover:text-text transition-colors"
-                title="Zoom In"
+                title="Zoom In (Ctrl/Cmd +)"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               </button>
@@ -3965,7 +4139,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             <CodePane 
               node={selectedNode}
               tree={tree}
-              canvasTheme={normalizedCanvasTheme}
               globalErrors={globalErrors}
               notify={notify}
               width={codeWidth}
@@ -4024,7 +4197,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
             </div>
             {/* Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {Object.keys(localVars).length > 0 ? (
+              {Object.keys(visibleLocalVars).length > 0 ? (
                 <div className="flex-1 overflow-y-auto w-full">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-surface/50 border-b border-overlay/20 sticky top-0 z-10">
@@ -4034,7 +4207,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-overlay/10">
-                      {Object.entries(localVars).map(([key, val]) => (
+                      {Object.entries(visibleLocalVars).map(([key, val]) => (
                         <tr key={key} className="hover:bg-overlay/5 transition-colors">
                           <td className="px-4 py-2.5 text-xs text-text border-r border-overlay/5 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]" title={key}>{key}</td>
                           <td className="px-4 py-2.5 text-xs font-mono text-emerald-400 bg-emerald-500/5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]" title={typeof val === 'object' ? JSON.stringify(val) : String(val)}>{typeof val === 'object' ? JSON.stringify(val) : String(val)}</td>
@@ -4284,7 +4457,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
                       }
 
                       // 3. Check for conflict with variables
-                      if (localVars[trimmed] !== undefined) {
+                      if (Object.prototype.hasOwnProperty.call(visibleLocalVars, trimmed)) {
                         return `"${trimmed}" is already used as a variable name.`
                       }
 
@@ -4364,38 +4537,4 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, s
       )}
     </div>
   )
-}
-
-export {
-  screenToYaml,
-  componentToYaml,
-  ButtonRenderer,
-  ModernButtonRenderer,
-  ModernDropdownRenderer,
-  ModernCheckboxRenderer,
-  ModernComboBoxRenderer,
-  ModernProgressBarRenderer,
-  ModernSliderRenderer,
-  ModernSpinnerRenderer,
-  ModernTextRenderer,
-  ModernTextInputRenderer,
-  ModernToggleRenderer,
-  LinkRenderer,
-  NumberInputRenderer,
-  ModernDatePickerRenderer,
-  RichTextEditorRenderer,
-  RatingRenderer,
-  LabelRenderer,
-  TextInputRenderer,
-  DropdownRenderer,
-  ContainerRenderer,
-  GalleryRenderer,
-  CheckboxRenderer,
-  RectangleRenderer,
-  IconRenderer,
-  ToggleRenderer,
-  RadioRenderer,
-  SliderRenderer,
-  UnknownPowerAppsObjectRenderer,
-  createFromSpec
 }

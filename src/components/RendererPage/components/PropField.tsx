@@ -152,10 +152,6 @@ function ValidatedStringInput({ prop, value, onChange, className = "", localVars
   }
 
   const handleBlur = () => {
-    if (sError) {
-      setTempValue(String(value || ""))
-      return
-    }
     onChange(tempValue.trim())
   }
 
@@ -277,10 +273,6 @@ function ValidatedFormulaPropertyInput({ prop, value, onChange, className = "", 
   }
 
   const handleBlur = () => {
-    if (error) {
-      setTempValue(normalizeFormulaString(String(value || "")))
-      return
-    }
     onChange(normalizeFormulaString(tempValue), { formula: true })
   }
 

@@ -31,7 +31,7 @@ import toggleSchema from '../../../schemas/toggle.json'
 import radioSchema from '../../../schemas/radio.json'
 import sliderSchema from '../../../schemas/slider.json'
 import screenSchema from '../../../schemas/screen.json'
-import { FUNCTIONS } from '@/components/RendererPage/Functions'
+import { FUNCTIONS } from '@/features/powerapps/functions'
 
 type CoverageStatus = 'supported' | 'partial' | 'unsupported'
 type AvailabilityStatus = 'current' | 'preview' | 'experimental'

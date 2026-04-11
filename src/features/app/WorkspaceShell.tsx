@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -85,6 +85,8 @@ const AdminIcon = () => (
   </svg>
 );
 
+const LAST_PROJECT_ROUTE_KEY = "velocity-canvas:last-project-route";
+
 function isPathActive(pathname: string, href: string) {
   if (href === "/projects") return pathname.startsWith("/projects");
   return pathname === href;
@@ -94,6 +96,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = pathname ?? "";
+  const [projectsHref, setProjectsHref] = useState("/projects");
   const { user, authLoading, credits, isAdmin, isDarkMode, setIsDarkMode, signOutUser } = useAppShell();
 
   useEffect(() => {
@@ -101,6 +104,29 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
       router.replace("/");
     }
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const savedRoute = window.sessionStorage.getItem(LAST_PROJECT_ROUTE_KEY);
+    if (savedRoute?.startsWith("/projects/")) {
+      setProjectsHref(savedRoute);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (currentPath.startsWith("/projects/")) {
+      window.sessionStorage.setItem(LAST_PROJECT_ROUTE_KEY, currentPath);
+      setProjectsHref(currentPath);
+      return;
+    }
+
+    if (currentPath === "/projects") {
+      setProjectsHref("/projects");
+    }
+  }, [currentPath]);
 
   if (authLoading || !user) {
     return (
@@ -111,9 +137,9 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   }
 
   const navItems = [
-    { href: "/projects", label: "Projects", Icon: ProjectsIcon },
+    { href: projectsHref, matchHref: "/projects", label: "Projects", Icon: ProjectsIcon },
     { href: "/docs", label: "Documentation", Icon: DocsIcon },
-    ...(isAdmin ? [{ href: "/admin", label: "Admin", Icon: AdminIcon }] : []),
+    ...(isAdmin ? [{ href: "/admin", matchHref: "/admin", label: "Admin", Icon: AdminIcon }] : []),
   ];
 
   return (
@@ -123,7 +149,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
     >
       <header className="sticky top-0 z-10 shrink-0 border-b border-surface/60 bg-base/90 backdrop-blur-sm">
         <div className="relative flex items-center justify-between px-6 py-3">
-          <Link href="/projects" className="flex items-center gap-3">
+          <Link href={projectsHref} className="flex items-center gap-3">
             <Image
               src={logo}
               alt="Velocity Canvas Logo"
@@ -138,8 +164,8 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-overlay/40 bg-surface/50 p-1">
-            {navItems.map(({ href, label, Icon }) => {
-              const active = isPathActive(currentPath, href);
+            {navItems.map(({ href, matchHref, label, Icon }) => {
+              const active = isPathActive(currentPath, matchHref ?? href);
 
               return (
                 <Link

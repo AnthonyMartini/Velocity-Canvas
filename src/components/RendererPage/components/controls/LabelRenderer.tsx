@@ -28,7 +28,7 @@ export default function LabelRenderer({ comp, selected, isPlaying, localVars, se
       : 'none',
     ...getSelectionStyles(selected),
     overflow: 'hidden', zIndex: renderZIndex,
-    lineHeight: comp.LineHeight,
+    lineHeight: comp.LineHeight || 1.5,
     transition: 'box-shadow 0.1s, outline 0.1s',
   }
   const displayText = resolveSampleText((comp.Text !== undefined && comp.Text !== null) ? comp.Text : '')

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { TEXT_SIZING_RUNTIME_GUIDE } from "@/features/powerapps/text-sizing";
 import { tweakModel, TWEAK_MODEL_NAME } from "@/lib/gemini";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 import { sanitizeTweakResult } from "@/lib/component-security";
@@ -80,6 +81,7 @@ function buildTweakPrompt({ canvasWidth, canvasHeight, component, parent, siblin
     `Canvas size: ${canvasWidth} x ${canvasHeight} px.`,
     `Selected component:\n${JSON.stringify(component)}`,
     ENGINE_COMPATIBILITY_PROMPT,
+    TEXT_SIZING_RUNTIME_GUIDE,
   ];
 
   if (parent) {

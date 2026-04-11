@@ -1,7 +1,7 @@
 import React from 'react'
-import { parseFormula, evaluateAST } from './FormulaParser'
-import { ALL_ENUM_VALUES } from '../components/RendererPage/Functions'
-import { SCHEMAS } from '../components/RendererPage/constants'
+import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
+import { ALL_ENUM_VALUES } from '@/features/powerapps/functions'
+import { SCHEMAS } from '@/features/powerapps/schema'
 import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
 
 const PROPERTY_DEF_CACHE = new Map()
@@ -237,60 +237,6 @@ export function flattenTree(nodes, collapsedIds: Set<any> = new Set(), depth = 0
     }
   }
   return result
-}
-
-export function countComponentNodes(node) {
-  if (!node || typeof node !== 'object') return 0
-
-  let count = node.type && node.type !== 'App' && node.type !== 'Screen' ? 1 : 0
-  if (Array.isArray(node.children)) {
-    for (const child of node.children) {
-      count += countComponentNodes(child)
-    }
-  }
-
-  return count
-}
-
-export function buildTreeMetadata(tree) {
-  const nodeById = new Map()
-  const parentById = new Map()
-  const screenById = new Map()
-  const componentCountByScreenId = new Map()
-
-  const walk = (nodes, parent: any = null, screen: any = null) => {
-    for (const node of nodes || []) {
-      nodeById.set(node.id, node)
-      parentById.set(node.id, parent)
-
-      const nextScreen = node.type === 'Screen' ? node : screen
-      if (node.type === 'Screen' && !componentCountByScreenId.has(node.id)) {
-        componentCountByScreenId.set(node.id, 0)
-      }
-      if (nextScreen) {
-        screenById.set(node.id, nextScreen)
-      }
-      if (nextScreen && node.type !== 'App' && node.type !== 'Screen') {
-        componentCountByScreenId.set(
-          nextScreen.id,
-          (componentCountByScreenId.get(nextScreen.id) || 0) + 1
-        )
-      }
-
-      if (node.children?.length) {
-        walk(node.children, node, nextScreen)
-      }
-    }
-  }
-
-  walk(tree)
-
-  return {
-    nodeById,
-    parentById,
-    screenById,
-    componentCountByScreenId,
-  }
 }
 
 /** Find the direct parent container of a node, or null if at root */

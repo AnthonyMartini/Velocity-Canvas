@@ -1,7 +1,20 @@
 import PropTypes from 'prop-types'
 import ButtonRenderer from './ButtonRenderer'
 import ModernButtonRenderer from './ModernButtonRenderer'
+import ModernDropdownRenderer from './ModernDropdownRenderer'
+import ModernCheckboxRenderer from './ModernCheckboxRenderer'
+import ModernComboBoxRenderer from './ModernComboBoxRenderer'
+import ModernProgressBarRenderer from './ModernProgressBarRenderer'
+import ModernSliderRenderer from './ModernSliderRenderer'
+import ModernSpinnerRenderer from './ModernSpinnerRenderer'
 import ModernTextRenderer from './ModernTextRenderer'
+import ModernTextInputRenderer from './ModernTextInputRenderer'
+import ModernToggleRenderer from './ModernToggleRenderer'
+import LinkRenderer from './LinkRenderer'
+import NumberInputRenderer from './NumberInputRenderer'
+import ModernDatePickerRenderer from './ModernDatePickerRenderer'
+import RichTextEditorRenderer from './RichTextEditorRenderer'
+import RatingRenderer from './RatingRenderer'
 import LabelRenderer from './LabelRenderer'
 import TextInputRenderer from './TextInputRenderer'
 import DropdownRenderer from './DropdownRenderer'
@@ -16,7 +29,7 @@ import RadioRenderer from './RadioRenderer'
 import SliderRenderer from './SliderRenderer'
 import ContainerRenderer from './ContainerRenderer'
 import { resolveProperties } from '../../../../common/helpers'
-import { parseFormula, evaluateAST } from '../../../../common/FormulaParser'
+import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
 import { getDragOutlineStyles, getSelectionStyles, themeVars } from '@/theme/theme'
 
 // Normalise Items to an array of records.
@@ -127,7 +140,20 @@ export default function GalleryRenderer({
       }
       if (child.type === 'Button')     return <ButtonRenderer key={child.id} {...childProps} />
       if (child.type === 'ModernButton') return <ModernButtonRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernDropdown') return <ModernDropdownRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernCheckbox') return <ModernCheckboxRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernComboBox') return <ModernComboBoxRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernProgressBar') return <ModernProgressBarRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernSlider') return <ModernSliderRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernSpinner') return <ModernSpinnerRenderer key={child.id} {...childProps} />
       if (child.type === 'ModernText') return <ModernTextRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernTextInput') return <ModernTextInputRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernToggle') return <ModernToggleRenderer key={child.id} {...childProps} />
+      if (child.type === 'Link') return <LinkRenderer key={child.id} {...childProps} />
+      if (child.type === 'NumberInput') return <NumberInputRenderer key={child.id} {...childProps} />
+      if (child.type === 'ModernDatePicker') return <ModernDatePickerRenderer key={child.id} {...childProps} />
+      if (child.type === 'RichTextEditor') return <RichTextEditorRenderer key={child.id} {...childProps} />
+      if (child.type === 'Rating') return <RatingRenderer key={child.id} {...childProps} />
       if (child.type === 'Label')      return <LabelRenderer key={child.id} {...childProps} />
       if (child.type === 'TextInput')  return <TextInputRenderer key={child.id} {...childProps} />
       if (child.type === 'Dropdown')   return <DropdownRenderer key={child.id} {...childProps} />

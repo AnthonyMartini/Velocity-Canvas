@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 import { PROP_TYPE_COLORS, SCHEMAS } from './constants'
 import { formatDefaultValue, formatPropertyType } from './helpers'
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '../RendererPage/Functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '@/features/powerapps/functions'
 
 
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rendererChatModel, RENDERER_CHAT_MODEL_NAME } from "@/lib/gemini";
+import { TEXT_SIZING_RUNTIME_GUIDE } from "@/features/powerapps/text-sizing";
 import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
 import { applyPatchToLookup, buildNodeLookup, sanitizeRendererPatch, sanitizeReplyText } from "@/lib/component-security";
@@ -259,7 +260,7 @@ export async function POST(req) {
       canvas_ctx += `The active screen "${screenParentId}" is currently empty.`;
     }
 
-    const full_prompt = `${canvas_ctx}\n\n${ENGINE_COMPATIBILITY_PROMPT}\n\nUser prompt: ${message.trim()}`;
+    const full_prompt = `${canvas_ctx}\n\n${ENGINE_COMPATIBILITY_PROMPT}\n\n${TEXT_SIZING_RUNTIME_GUIDE}\n\nUser prompt: ${message.trim()}`;
     const history = (chat_history || []).map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
