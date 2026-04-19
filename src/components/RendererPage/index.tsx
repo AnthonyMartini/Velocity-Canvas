@@ -178,10 +178,6 @@ function compactNodeForAIRequest(node, { summaryOnly = false, childLimit = 0 } =
   return out
 }
 
-function serializeCopiedNodes(nodes) {
-  return `${INTERNAL_COMPONENT_CLIPBOARD_PREFIX}${JSON.stringify(nodes)}`
-}
-
 function deserializeCopiedNodes(text) {
   if (typeof text !== 'string' || !text.startsWith(INTERNAL_COMPONENT_CLIPBOARD_PREFIX)) {
     return null
@@ -282,12 +278,16 @@ async function consumeAIResponse(res, options: any = {}) {
 
     buffer += decoder.decode(value, { stream: true })
 
-    let boundary = buffer.indexOf('\n\n')
+    const boundaryMatch = buffer.match(/\r?\n\r?\n/)
+    let boundary = boundaryMatch ? boundaryMatch.index ?? -1 : -1
+    let boundaryLength = boundaryMatch ? boundaryMatch[0].length : 0
     while (boundary !== -1) {
       const eventBlock = buffer.slice(0, boundary)
-      buffer = buffer.slice(boundary + 2)
+      buffer = buffer.slice(boundary + boundaryLength)
       processEvent(eventBlock)
-      boundary = buffer.indexOf('\n\n')
+      const nextBoundaryMatch = buffer.match(/\r?\n\r?\n/)
+      boundary = nextBoundaryMatch ? nextBoundaryMatch.index ?? -1 : -1
+      boundaryLength = nextBoundaryMatch ? nextBoundaryMatch[0].length : 0
     }
   }
 
@@ -1277,16 +1277,45 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
   const copySelectedToClipboard = useCallback(async () => {
     if (selectedIds.length <= 0) return false
-    const nodesToCopy = selectedIds.map(id => findNode(treeRef.current, id)).filter(Boolean)
+    const t = treeRef.current
+    const nodesToCopy = selectedIds.map(id => findNode(t, id)).filter(Boolean)
     if (nodesToCopy.length <= 0) return false
     clipboardRef.current = nodesToCopy
+
+    const exportErrors = getAllAppErrors(t, runtimeLocalVars, SCHEMAS)
+
+    let yaml = ''
+    if (nodesToCopy.some(n => n.type === 'App')) {
+      yaml = screenToYaml(t)
+    } else if (nodesToCopy.length === 1) {
+      const n = nodesToCopy[0]
+      yaml = n.type === 'Screen' ? screenToYaml(t, [n]) : componentToYaml(n)
+    } else {
+      yaml = nodesToCopy
+        .map(n => (n.type === 'Screen' ? screenToYaml(t, [n]) : componentToYaml(n)))
+        .join('\n\n')
+    }
+
+    const hasErrors = nodesToCopy.some(n => n.type === 'App')
+      ? exportErrors.length > 0
+      : nodesToCopy.some(node =>
+          exportErrors.some(err => err.nodeId === node.id || isDescendant(t, err.nodeId, node.id))
+        )
+
+    if (hasErrors) {
+      notify('Cannot copy YAML with validation errors. Please fix them in the Errors pane first.', 'Error')
+      return false
+    }
+
     try {
-      await navigator.clipboard.writeText(serializeCopiedNodes(nodesToCopy))
+      await navigator.clipboard.writeText(yaml)
+      notify('Power Apps YAML copied to clipboard.', 'Success')
     } catch {
-      // Keep the in-memory clipboard as a fallback if browser clipboard access is blocked.
+      notify('Failed to copy YAML to clipboard.', 'Error')
+      return false
     }
     return true
-  }, [selectedIds])
+  }, [selectedIds, runtimeLocalVars, notify])
 
   const pasteCopiedNodes = useCallback((sourceNodes) => {
     if (!Array.isArray(sourceNodes) || sourceNodes.length <= 0) return false
@@ -1450,6 +1479,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const activeEl = document.activeElement as HTMLElement | null
+      const activeTag = activeEl?.tagName
+      const isTypingTarget =
+        activeTag === 'INPUT' ||
+        activeTag === 'TEXTAREA' ||
+        activeTag === 'SELECT' ||
+        !!activeEl?.isContentEditable
+      const isDeleteShortcut = e.key === 'Delete' || e.key === 'Backspace'
+      const isFocusedInsideCanvas = !!activeEl?.closest('#canvas-scroll-wrapper')
+
       // Zoom hotkeys
       if (e.ctrlKey || e.metaKey) {
         const isZoomInShortcut =
@@ -1475,8 +1514,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         }
       }
 
-      // Don't trigger if typing in an input/textarea
-      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+      // Don't trigger shortcuts while typing/editing text.
+      if (isTypingTarget && !(isDeleteShortcut && isFocusedInsideCanvas)) {
         return
       }
       
@@ -1492,6 +1531,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         } else if (e.key === 'y') {
           e.preventDefault()
           redo()
+        } else if (e.key.toLowerCase() === 'a') {
+          e.preventDefault()
+          const currentTree = treeRef.current
+          const currentScreenId = activeScreenIdRef.current
+          const currentScreenNode = findNode(currentTree, currentScreenId)
+          if (currentScreenNode?.type === 'Screen') {
+            const selectableIds = flattenTree(currentScreenNode.children || [], new Set()).map(node => node.id)
+            setSelectedIds(selectableIds)
+          }
         }
       } else {
         if (e.key === 'Escape' && effectiveIsPlaying) { setIsPlaying(false); setSelectedIds([]) }
@@ -2758,7 +2806,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       // Don't trigger if typing in an input
       const tag = document.activeElement?.tagName
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-      if (inInput) return
+      const inContentEditable = document.activeElement?.getAttribute?.('contenteditable') === 'true'
+      if (inInput || inContentEditable) return
 
       // Copy: Ctrl+C / Cmd+C
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
@@ -2777,7 +2826,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     const handlePaste = (e) => {
       const tag = document.activeElement?.tagName
       const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-      if (inInput) return
+      const inContentEditable = document.activeElement?.getAttribute?.('contenteditable') === 'true'
+      if (inInput || inContentEditable) return
 
       const text = e.clipboardData?.getData('text/plain') || ''
       const copiedNodes = deserializeCopiedNodes(text)

@@ -86,6 +86,41 @@ export function parseItemsValue(value: any, fallback: any[] = []) {
   }
 }
 
+/** Tab List Default / Selected: Power Apps uses a record (e.g. `{ Value: "Tab1" }`). Accept object, JSON string, Power Fx record string, or plain label. */
+export function parseTabListSelectionRecord(value: any): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'object' && !Array.isArray(value) && value.Value !== undefined && value.Value !== null) {
+    return normalizeLiteralString(value.Value)
+  }
+  if (typeof value !== 'string') return ''
+
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed && typeof parsed === 'object' && 'Value' in parsed) {
+        return normalizeLiteralString(parsed.Value)
+      }
+    } catch {
+      // not JSON — try Power Fx record shape
+    }
+    const quoted = trimmed.match(/Value\s*:\s*"((?:\\.|[^"\\])*)"/i)
+    if (quoted) return normalizeLiteralString(quoted[1].replace(/\\"/g, '"'))
+    const single = trimmed.match(/Value\s*:\s*'([^']*)'/i)
+    if (single) return normalizeLiteralString(single[1])
+  }
+
+  return normalizeLiteralString(trimmed)
+}
+
+export function formatTabListDefaultRecordFormula(label: string) {
+  const inner = normalizeLiteralString(label)
+  const escaped = inner.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return `{ Value: "${escaped}" }`
+}
+
 export function getCollectionItemLabel(item: any, displayFields: string[] = [], itemDisplayText = '') {
   if (item === undefined || item === null) return ''
   if (typeof item !== 'object') return String(item)
@@ -105,8 +140,11 @@ export function getCollectionItemLabel(item: any, displayFields: string[] = [], 
     if (item[key] !== undefined && item[key] !== null) return String(item[key])
   }
 
-  const firstKey = Object.keys(item)[0]
-  return firstKey ? String(item[firstKey]) : JSON.stringify(item)
+  const keys = Object.keys(item)
+  if (keys.length === 0) return ''
+
+  const firstKey = keys[0]
+  return String(item[firstKey])
 }
 
 export function areItemsEqual(left: any, right: any) {

@@ -10,6 +10,8 @@ import { normalizeSingleQuotedStringLiteralsDeep } from "@/lib/powerfx-string-no
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-cache, no-transform",
+  "X-Accel-Buffering": "no",
+  "Content-Encoding": "none",
   Connection: "keep-alive",
 };
 const ALLOWED_RENDERER_CHAT_MODELS = new Set([
@@ -85,8 +87,10 @@ const ENGINE_COMPATIBILITY_PROMPT = [
   '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
   '- Never use unsupported Power Apps runtime references such as "Parent.X", "Parent.Y", or "Self.*". The only supported App path is "App.Theme.*".',
   '- If you need gallery or container layout math, use numeric X/Y/Width/Height values plus supported Gallery properties like TemplateSize, TemplatePadding, and WrapCount.',
-  '- For ModernTabList, Alignment must be one of "TabListAlignment.Start", "TabListAlignment.Center", or "TabListAlignment.End".',
-  '- For ModernTabList, Appearance must be one of "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.Underline", or "TabListAppearance.Filled".',
+  '- For ModernTabList, Alignment must be one of "LayoutDirection.Horizontal" or "LayoutDirection.Vertical".',
+  '- For ModernTabList, Appearance must be one of "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.SubtleCircular", or "TabListAppearance.FilledCircular".',
+  '- For ModernTabList, TabSize must be one of "TabSize.Small", "TabSize.Medium", or "TabSize.Large".',
+  '- For ModernTabList, Default and Selected must be a record with a Value field (use a JSON string like "{\\"Value\\":\\"Overview\\"}" in the component JSON).',
   `- For Icon controls, Icon must be one of these exact enum strings: ${SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ")}.`,
   '- For Image controls, do not use URLs, media names, uploaded assets, custom SVG, or source properties. Images are fixed cloud placeholders in this renderer.',
   '- Use double quotes for string literals in component properties and formulas. Never emit single-quoted strings.',
@@ -174,6 +178,63 @@ function parseStreamOperation(line) {
     return null;
   }
 }
+
+function extractCompleteJsonObjects(buffer) {
+  const objects: string[] = [];
+  let startIndex = -1;
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  let lastProcessedIndex = 0;
+
+  for (let i = 0; i < buffer.length; i += 1) {
+    const char = buffer[i];
+
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaping = true;
+        continue;
+      }
+      if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      if (depth === 0) startIndex = i;
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && startIndex !== -1) {
+        objects.push(buffer.slice(startIndex, i + 1));
+        lastProcessedIndex = i + 1;
+        startIndex = -1;
+      }
+    }
+  }
+
+  const remainder = depth > 0 && startIndex !== -1
+    ? buffer.slice(startIndex)
+    : buffer.slice(lastProcessedIndex);
+
+  return { objects, remainder };
+}
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req) {
   const requestStartedAt = Date.now();
@@ -299,7 +360,7 @@ export async function POST(req) {
           };
 
           let rawText = "";
-          let lineBuffer = "";
+          let operationBuffer = "";
           let usage: any = null;
           let firstChunkAt: number | null = null;
           let sawStructuredOps = false;
@@ -329,17 +390,13 @@ export async function POST(req) {
             }
           };
 
-          const flushLines = (flushRemainder = false) => {
-            const normalized = lineBuffer.replace(/\r\n/g, "\n");
-            const lines = normalized.split("\n");
-            const remainder = flushRemainder ? "" : lines.pop() || "";
-
-            for (const rawLine of lines) {
-              const op = parseStreamOperation(rawLine);
+          const flushOperations = () => {
+            const { objects, remainder } = extractCompleteJsonObjects(operationBuffer);
+            for (const rawObject of objects) {
+              const op = parseStreamOperation(rawObject);
               if (op) processOperation(op);
             }
-
-            lineBuffer = remainder;
+            operationBuffer = remainder;
           };
 
           try {
@@ -359,11 +416,11 @@ export async function POST(req) {
               }
 
               rawText += text;
-              lineBuffer += text;
-              flushLines(false);
+              operationBuffer += text;
+              flushOperations();
             }
 
-            flushLines(true);
+            flushOperations();
 
             if (usage) {
               logTokenUsage(

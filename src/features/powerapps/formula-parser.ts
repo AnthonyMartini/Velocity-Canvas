@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance } from '@/features/powerapps/functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 
 /**
@@ -356,6 +356,7 @@ export function evaluateAST(
     else if (compName === 'FontWeight') targetNode = FontWeight
     else if (compName === 'BorderStyle') targetNode = BorderStyle
     else if (compName === 'DisplayMode') targetNode = DisplayMode
+    else if (compName === 'DateTimeFormat') targetNode = DateTimeFormat
     else if (compName === 'Overflow') targetNode = Overflow
     else if (compName === 'Icon') targetNode = Icon
     else if (compName === 'DropShadow') targetNode = DropShadow
@@ -467,7 +468,7 @@ export function evaluateAST(
 
       if (rawVal !== undefined) {
         // If resolving from an enum, return literal value and don't re-evaluate
-        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance].includes(targetNode)
+        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize].includes(targetNode)
         if (isEnum) return rawVal
 
         // If the property itself is a formula, parse and evaluate it
@@ -526,7 +527,7 @@ export function evaluateAST(
       if (compNode && !strict) return node.name
 
       // Implicitly resolve known enum keys (e.g. typing "Add" instead of "Icon.Add")
-      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, TabListAppearance]
+      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize]
       for (const enumObj of implicitEnums) {
           if (enumObj[node.name] !== undefined) return enumObj[node.name]
       }

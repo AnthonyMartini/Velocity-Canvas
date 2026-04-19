@@ -41,6 +41,10 @@ body {
   margin: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

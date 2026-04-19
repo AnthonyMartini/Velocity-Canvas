@@ -21,8 +21,10 @@ Supported enum values:
 - BorderStyle: "BorderStyle.None", "BorderStyle.Solid", "BorderStyle.Dashed", "BorderStyle.Dotted"
 - DisplayMode: "DisplayMode.Edit", "DisplayMode.View", "DisplayMode.Disabled"
 - Overflow: "Overflow.Hidden", "Overflow.Scroll", "Overflow.Visible"
-- TabListAlignment: "TabListAlignment.Start", "TabListAlignment.Center", "TabListAlignment.End"
-- TabListAppearance: "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.Underline", "TabListAppearance.Filled"
+- LayoutDirection (ModernTabList Alignment): "LayoutDirection.Horizontal", "LayoutDirection.Vertical"
+- TabListAppearance: "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.SubtleCircular", "TabListAppearance.FilledCircular"
+- TabSize (ModernTabList): "TabSize.Small", "TabSize.Medium", "TabSize.Large"
+- ModernTabList Default / Selected: use a record shape with a Value field, for example {"Value":"Overview"} as a JSON string in the component JSON
 - TextMode: "TextMode.SingleLine", "TextMode.Multiline", "TextMode.Password"
 - TextFormat: "TextFormat.Text", "TextFormat.Number"
 - NotificationType: "NotificationType.Information", "NotificationType.Warning", "NotificationType.Success", "NotificationType.Error"

@@ -115,7 +115,6 @@ export const appTheme = {
     ModernButton: {},
     ModernDropdown: {},
     ModernTabList: {
-      BorderColor: '#d1d5db',
       Color: '#1f2937',
     },
     ModernCheckbox: {},

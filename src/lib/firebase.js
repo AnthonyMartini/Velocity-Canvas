@@ -41,7 +41,7 @@ export async function upsertUserProfile(user) {
         ? {}
         : {
             createdAt: serverTimestamp(),
-            credits: 100,
+            credits: 25,
           }),
     },
     { merge: true },

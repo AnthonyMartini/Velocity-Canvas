@@ -94,6 +94,42 @@ function coercePowerAppsValue(rawValue: string) {
   return value;
 }
 
+function stripOuterPowerFxStringQuotes(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const t = value.trim();
+  if (
+    t.length >= 2 &&
+    ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))
+  ) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+/** Power Apps expects Default/Selected as a record `{ Value: "..." }`; coerce plain strings from YAML. */
+function normalizeImportedTabListRecordProp(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return raw;
+  if (typeof raw !== "string") return raw;
+
+  const t = raw.trim();
+  if (!t) return raw;
+
+  if (t.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(t);
+      if (parsed && typeof parsed === "object" && "Value" in parsed) {
+        return JSON.stringify({ Value: String(parsed.Value) });
+      }
+    } catch {
+      if (/Value\s*:/i.test(t)) return t;
+    }
+    return raw;
+  }
+
+  const label = stripOuterPowerFxStringQuotes(t);
+  return JSON.stringify({ Value: label });
+}
+
 function isControlHeader(trimmedLine: string) {
   return /^-\s+.+:\s*$/.test(trimmedLine);
 }
@@ -218,6 +254,23 @@ function buildParsedNode(input: {
     name,
     ...properties,
   };
+
+  if (mappedType === "ModernTabList") {
+    if (parsedNode.Default !== undefined) {
+      parsedNode.Default = normalizeImportedTabListRecordProp(parsedNode.Default);
+    }
+    if (parsedNode.Selected !== undefined) {
+      parsedNode.Selected = normalizeImportedTabListRecordProp(parsedNode.Selected);
+    }
+    const align = parsedNode.Alignment;
+    if (
+      align === "TabListAlignment.Start" ||
+      align === "TabListAlignment.Center" ||
+      align === "TabListAlignment.End"
+    ) {
+      parsedNode.Alignment = "LayoutDirection.Horizontal";
+    }
+  }
 
   if (variantRaw) parsedNode.Variant = variantRaw;
   if (children.length) parsedNode.children = children;

@@ -48,6 +48,11 @@ export const DisplayMode = {
     Disabled: "DisplayMode.Disabled"
 }
 
+export const DateTimeFormat = {
+    ShortDate: "DateTimeFormat.ShortDate",
+    LongDate: "DateTimeFormat.LongDate"
+}
+
 export const ModernButtonAppearance = {
     Primary: "ModernButtonAppearance.Primary",
     Secondary: "ModernButtonAppearance.Secondary",
@@ -68,17 +73,33 @@ export const ModernButtonIconStyle = {
     Filled: "ModernButtonIconStyle.Filled"
 }
 
+/** @deprecated Power Apps tab list previously used TabListAlignment for horizontal distribution; prefer LayoutDirection for new apps. */
 export const TabListAlignment = {
     Start: "TabListAlignment.Start",
     Center: "TabListAlignment.Center",
     End: "TabListAlignment.End"
 }
 
+/** Tab list orientation (Power Apps modern Tab List). */
+export const LayoutDirection = {
+    Horizontal: "LayoutDirection.Horizontal",
+    Vertical: "LayoutDirection.Vertical",
+}
+
 export const TabListAppearance = {
     Transparent: "TabListAppearance.Transparent",
     Subtle: "TabListAppearance.Subtle",
-    Underline: "TabListAppearance.Underline",
-    Filled: "TabListAppearance.Filled"
+    SubtleCircular: "TabListAppearance.SubtleCircular",
+    FilledCircular: "TabListAppearance.FilledCircular",
+    /** @deprecated */ Underline: "TabListAppearance.Underline",
+    /** @deprecated */ Filled: "TabListAppearance.Filled",
+}
+
+/** Tab list overall scale (modern Tab List). */
+export const TabSize = {
+    Small: "TabSize.Small",
+    Medium: "TabSize.Medium",
+    Large: "TabSize.Large",
 }
 
 export const Overflow = {
@@ -106,8 +127,8 @@ export const TextFormat = {
 }
 
 export const Layout = {
-    Vertical: "Vertical",
-    Horizontal: "Horizontal"
+    Vertical: "Layout.Vertical",
+    Horizontal: "Layout.Horizontal"
 }
 
 export const Icon = {
@@ -184,11 +205,14 @@ export const ALL_ENUM_VALUES = new Set([
     ...Object.values(FontWeight),
     ...Object.values(BorderStyle),
     ...Object.values(DisplayMode),
+    ...Object.values(DateTimeFormat),
     ...Object.values(ModernButtonAppearance),
     ...Object.values(ModernButtonLayout),
     ...Object.values(ModernButtonIconStyle),
     ...Object.values(TabListAlignment),
+    ...Object.values(LayoutDirection),
     ...Object.values(TabListAppearance),
+    ...Object.values(TabSize),
     ...Object.values(Overflow),
     ...Object.values(DropShadow),
     ...Object.values(TextMode),

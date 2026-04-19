@@ -532,7 +532,16 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
 
     if (expectedType === 'enum') {
       const validValues = getPropertyOptionValues(propDef)
-      if (!validValues.includes(evaluated)) {
+      const evaluatedText = String(evaluated)
+      const evaluatedSuffix = evaluatedText.includes('.') ? evaluatedText.split('.').pop() : evaluatedText
+      const isEnumMatch = validValues.some((candidate: any) => {
+        const candidateText = String(candidate)
+        if (candidateText === evaluatedText) return true
+        const candidateSuffix = candidateText.includes('.') ? candidateText.split('.').pop() : candidateText
+        return candidateSuffix === evaluatedSuffix
+      })
+
+      if (!isEnumMatch) {
         return `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`
       }
     }

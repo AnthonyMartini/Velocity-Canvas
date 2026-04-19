@@ -1,5 +1,6 @@
 import { SCHEMAS, BORDER_MAP } from '@/features/powerapps/schema'
 import { resolveSampleTextDeep } from '@/features/powerapps/sample-text'
+import { formatTabListDefaultRecordFormula, parseTabListSelectionRecord } from '@/components/RendererPage/components/controls/modernControlUtils'
 
 const CLOUD_IMAGE_DATA_URI = `"data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 120' fill='none'%3E%3Crect x='8' y='8' width='144' height='104' rx='22' fill='%23bfdbfe' fill-opacity='.25'/%3E%3Cpath d='M49 79h50c12.15 0 22-9.85 22-22 0-10.666-8.053-19.52-18.731-20.13C100.23 23.34 88.59 13 74.5 13 62.873 13 53.06 20.21 49.818 31.245 40.283 32.773 33 41.036 33 51c0 11.046 8.954 20 20 20' stroke='%2360a5fa' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M71 56l9 9 18-18' stroke='%2360a5fa' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"`
 
@@ -358,11 +359,19 @@ export function componentToYaml(node, col = 0) {
 
   const p = (k, v) => {
     if (v === undefined || v === null) return
+    const propDef = getPropertyDef(node?.type, k)
+    const isTextProperty = propDef?.type === 'text' || propDef?.type === 'string'
+
+    const pushLiteralBlock = (valueLine: string) => {
+      lines.push(`${sp(col + 6)}${k}: |-`)
+      lines.push(`${sp(col + 8)}${valueLine}`)
+    }
+
     // Normalize smart quotes to straight quotes
     let valStr = String(v).trim().replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
     
     // Legacy formula prefix support
-    if (isFormulaPropertyValue(node, k, valStr, getPropertyDef(node?.type, k)) || valStr.startsWith('=')) {
+    if (isFormulaPropertyValue(node, k, valStr, propDef) || valStr.startsWith('=')) {
       let formula = normalizeFormulaString(valStr)
       // Strip outer quotes if redundant (e.g. ="Notify(...)")
       if ((formula.startsWith('"') && formula.endsWith('"')) || (formula.startsWith("'") && formula.endsWith("'"))) {
@@ -372,9 +381,8 @@ export function componentToYaml(node, col = 0) {
           formula = inner
         }
       }
-      if (k === 'Items') {
-        lines.push(`${sp(col + 6)}${k}: |+`)
-        lines.push(`${sp(col + 8)}=${formula}`)
+      if (k === 'Items' || isTextProperty) {
+        pushLiteralBlock(`=${formula}`)
       } else {
         lines.push(`${sp(col + 6)}${k}: =${formula}`)
       }
@@ -402,15 +410,20 @@ export function componentToYaml(node, col = 0) {
     const isFormulaSpecial = valStr.startsWith('[') || valStr.startsWith('{')
 
     if (k === 'Items') {
-      lines.push(`${sp(col + 6)}${k}: |+`)
-      lines.push(`${sp(col + 8)}=${valStr}`)
+      pushLiteralBlock(`=${valStr}`)
     } else if (isQuoted || isEnum || isFormulaSpecial) {
-      lines.push(`${sp(col + 6)}${k}: =${valStr}`)
+      const serialized = `=${valStr}`
+      if (isTextProperty) pushLiteralBlock(serialized)
+      else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
     } else if (isNumeric || isBoolean || isFunction) {
-      lines.push(`${sp(col + 6)}${k}: =${valStr}`)
+      const serialized = `=${valStr}`
+      if (isTextProperty) pushLiteralBlock(serialized)
+      else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
     } else {
       // It's a literal string that isn't quoted. Wrap it in quotes.
-      lines.push(`${sp(col + 6)}${k}: ="${valStr}"`)
+      const serialized = `="${valStr}"`
+      if (isTextProperty) pushLiteralBlock(serialized)
+      else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
     }
   }
 
@@ -518,14 +531,17 @@ export function componentToYaml(node, col = 0) {
     if (node.OnChange) p('OnChange', node.OnChange)
   } else if (node.type === 'ModernTabList') {
     if (node.Items) p('Items', node.Items)
-    if (node.Default !== undefined) p('Default', node.Default)
+    if (node.Default !== undefined) {
+      const tabDefaultLabel = parseTabListSelectionRecord(node.Default)
+      if (tabDefaultLabel) {
+        p('Default', formatTabListDefaultRecordFormula(tabDefaultLabel))
+      }
+    }
     if (node.Align) p('Align', node.Align)
     if (node.Alignment) p('Alignment', node.Alignment)
     if (node.Appearance) p('Appearance', node.Appearance)
+    if (node.TabSize) p('TabSize', node.TabSize)
     if (node.Color) p('Color', color('Color', node.Color))
-    if (node.BorderColor) p('BorderColor', color('BorderColor', node.BorderColor))
-    if (node.BorderStyle) p('BorderStyle', node.BorderStyle)
-    if (node.BorderThickness !== undefined) p('BorderThickness', node.BorderThickness)
     if (node.Font) p('Font', node.Font)
     if (node.FontWeight) p('FontWeight', node.FontWeight)
     if (node.Size !== undefined) p('Size', node.Size)
@@ -536,10 +552,6 @@ export function componentToYaml(node, col = 0) {
     if (node.PaddingRight !== undefined) p('PaddingRight', node.PaddingRight)
     if (node.PaddingBottom !== undefined) p('PaddingBottom', node.PaddingBottom)
     if (node.PaddingLeft !== undefined) p('PaddingLeft', node.PaddingLeft)
-    if (node.RadiusTopLeft !== undefined) p('RadiusTopLeft', node.RadiusTopLeft)
-    if (node.RadiusTopRight !== undefined) p('RadiusTopRight', node.RadiusTopRight)
-    if (node.RadiusBottomLeft !== undefined) p('RadiusBottomLeft', node.RadiusBottomLeft)
-    if (node.RadiusBottomRight !== undefined) p('RadiusBottomRight', node.RadiusBottomRight)
     p('X', node.X)
     p('Y', node.Y)
     p('Width', node.Width)

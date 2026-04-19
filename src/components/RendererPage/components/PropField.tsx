@@ -535,6 +535,14 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
   }
   if (prop.type === 'select') {
     const isFormula = isFormulaValue(value, prop, selfNode)
+    const selectError = validateProperty(
+      selfNode,
+      prop,
+      value,
+      localVars,
+      flatNodes,
+      parentNode
+    )
     return (
       <div className="flex flex-col py-1.5 gap-1">
         <div className="flex items-center justify-between gap-2">
@@ -564,6 +572,11 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             </div>
           )}
         </div>
+        {!isFormula && selectError && (
+          <span className="text-[10px] text-red/100 font-medium px-1 leading-none">
+            {selectError}
+          </span>
+        )}
         {isFormula && (
           <ValidatedFormulaPropertyInput
             prop={prop}

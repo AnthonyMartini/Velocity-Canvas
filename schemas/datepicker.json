@@ -4,7 +4,7 @@
   "defaults": {
     "DefaultDate": "",
     "SelectedDate": "",
-    "Format": "\"ShortDate\"",
+    "Format": "DateTimeFormat.ShortDate",
     "Language": "\"en-US\"",
     "AccessibleLabel": "\"\"",
     "BorderColor": "#8a8886",
