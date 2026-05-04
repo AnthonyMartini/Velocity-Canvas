@@ -8,8 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Brackets, Moon, Sun } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { useAppShell } from "./AppShellProvider";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 const LIGHT_THEME_OVERRIDES: CSSProperties & Record<string, string> = {
   "--vc-color-base": "#e9edf4",
@@ -132,15 +131,28 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
     if (!feedbackMessage.trim() || feedbackSubmitting) return;
     setFeedbackSubmitting(true);
     try {
-      await addDoc(collection(db, "feedback"), {
-        uid: user?.uid ?? null,
-        email: user?.email ?? null,
-        type: feedbackType,
-        message: feedbackMessage.trim(),
-        wantsReply: wantsReply && Boolean(user?.email),
-        createdAt: serverTimestamp(),
-        path: pathname ?? "/",
+      const idToken = await auth.currentUser?.getIdToken();
+      
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          type: feedbackType,
+          message: feedbackMessage.trim(),
+          wantsReply: wantsReply && Boolean(user?.email),
+          email: user?.email ?? null,
+          path: pathname ?? "/",
+        }),
       });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to submit feedback');
+      }
+
       setFeedbackMessage("");
       setFeedbackSuccess(true);
       setTimeout(() => {
@@ -257,15 +269,15 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                   type="button"
                   id="feedback-trigger"
                   onClick={() => { setFeedbackOpen((prev) => !prev); setFeedbackSuccess(false); }}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold shadow-sm transition-all duration-300 ${
+                  className={`flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-all duration-300 ${
                     feedbackOpen
-                      ? "border-accent/50 bg-accent/15 text-accent shadow-inner"
-                      : "border-accent/40 bg-surface/80 text-accent hover:bg-accent/10 animate-soft-pulse"
+                      ? "bg-accent-dark text-white scale-95 shadow-inner"
+                      : "bg-accent text-white hover:bg-accent-dark hover:scale-105 shadow-accent/20 animate-soft-pulse"
                   }`}
                   title="Send feedback"
                   aria-label="Send feedback"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </button>
@@ -365,8 +377,9 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                             {feedbackSubmitting ? (
                               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                             ) : (
-                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="m22 2-7 20-4-9-9-4Z" />
+                                <path d="M22 2 11 13" />
                               </svg>
                             )}
                             {feedbackSubmitting ? "Sending..." : "Send Feedback"}

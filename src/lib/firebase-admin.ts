@@ -332,3 +332,26 @@ export async function savePlanInterest(uid: string, email: string, planId: strin
     return { success: false, error: 'Database error while saving interest' };
   }
 }
+/**
+ * Saves user feedback to Firestore.
+ */
+export async function saveFeedback(feedback: {
+  uid: string | null;
+  email: string | null;
+  type: string;
+  message: string;
+  wantsReply: boolean;
+  path: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!adminDb) return { success: false, error: 'Database uninitialized' };
+  try {
+    await adminDb.collection('feedback').add({
+      ...feedback,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving feedback:', error);
+    return { success: false, error: 'Database error while saving feedback' };
+  }
+}

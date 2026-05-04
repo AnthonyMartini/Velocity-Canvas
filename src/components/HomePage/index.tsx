@@ -51,16 +51,7 @@ function clampPreviewNumber(value: any, fallback: number) {
 
 function getProjectPreviewScreen(tree: any[]) {
   if (!Array.isArray(tree) || tree.length === 0) return null;
-
-  const directScreen = tree.find((node) => node?.type === 'Screen');
-  if (directScreen) return directScreen;
-
-  const appNode = tree.find((node) => node?.type === 'App');
-  if (appNode?.children?.length) {
-    return appNode.children.find((node: any) => node?.type === 'Screen') ?? null;
-  }
-
-  return null;
+  return flattenTree(tree, new Set()).find((node: any) => node?.type === 'Screen') ?? null;
 }
 
 function getPreviewGlyphSeed(node: any) {
@@ -153,9 +144,12 @@ function getPreviewNodeStyle(node: any, resolvedNode: any) {
 
   if (PREVIEW_CONTAINER_TYPES.has(node?.type)) {
     return {
-      fill: withPreviewAlpha(baseColor, baseColor ? Math.max(0.12, baseColor.a * 0.28) : 0.06) || 'rgba(255,255,255,0.06)',
-      stroke: withPreviewAlpha(baseColor, 0.42) || 'rgba(148,163,184,0.34)',
-      strokeWidth: 1.2,
+      fill: withPreviewAlpha(baseColor, baseColor ? Math.max(0.06, baseColor.a * 0.16) : 0.03) || 'rgba(255,255,255,0.03)',
+      stroke: withPreviewAlpha(baseColor, 0.78) || 'rgba(148,163,184,0.72)',
+      strokeWidth: 1.5,
+      outlineInset: 4,
+      outlineStroke: withPreviewAlpha(baseColor, 0.4) || 'rgba(226,232,240,0.34)',
+      outlineStrokeWidth: 0.9,
       radius: 12,
     };
   }
@@ -312,6 +306,19 @@ function ProjectCanvasPreview({ project }: { project: ProjectDocument }) {
               stroke={shape.style.stroke}
               strokeWidth={shape.style.strokeWidth}
             />
+            {PREVIEW_CONTAINER_TYPES.has(shape.type) && shape.width > 18 && shape.height > 18 ? (
+              <rect
+                x={shape.x + (shape.style.outlineInset ?? 4)}
+                y={shape.y + (shape.style.outlineInset ?? 4)}
+                width={Math.max(4, shape.width - ((shape.style.outlineInset ?? 4) * 2))}
+                height={Math.max(4, shape.height - ((shape.style.outlineInset ?? 4) * 2))}
+                rx={Math.max(4, shape.style.radius - 4)}
+                fill="none"
+                stroke={shape.style.outlineStroke || 'rgba(226,232,240,0.34)'}
+                strokeWidth={shape.style.outlineStrokeWidth ?? 0.9}
+                strokeDasharray="6 4"
+              />
+            ) : null}
             <PreviewGlyphs shape={shape} />
           </g>
         ))}

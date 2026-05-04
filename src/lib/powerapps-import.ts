@@ -94,6 +94,46 @@ function coercePowerAppsValue(rawValue: string) {
   return value;
 }
 
+function isYamlBlockScalarIndicator(value: string) {
+  return /^(?:\|[+-]?|>[+-]?)$/.test(String(value || "").trim());
+}
+
+function parseYamlBlockScalar(lines: string[], startIndex: number, parentIndent: number) {
+  const blockLines: string[] = [];
+  let index = startIndex;
+  let blockIndent: number | null = null;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    const indent = countIndent(line);
+
+    if (!trimmed) {
+      if (blockIndent !== null) {
+        blockLines.push("");
+      }
+      index += 1;
+      continue;
+    }
+
+    if (indent <= parentIndent) break;
+
+    if (blockIndent === null) {
+      blockIndent = indent;
+    }
+
+    if (indent < blockIndent) break;
+
+    blockLines.push(line.slice(blockIndent));
+    index += 1;
+  }
+
+  return {
+    value: blockLines.join("\n").trimEnd(),
+    nextIndex: index,
+  };
+}
+
 function stripOuterPowerFxStringQuotes(value: unknown): string {
   if (typeof value !== "string") return "";
   const t = value.trim();
@@ -171,6 +211,12 @@ function parsePropertyEntries(lines: string[], startIndex: number, parentIndent:
 
     const keyValue = splitKeyValue(trimmed);
     if (keyValue) {
+      if (isYamlBlockScalarIndicator(keyValue.value)) {
+        const block = parseYamlBlockScalar(lines, index + 1, indent);
+        properties[keyValue.key] = coercePowerAppsValue(block.value);
+        index = block.nextIndex;
+        continue;
+      }
       properties[keyValue.key] = coercePowerAppsValue(keyValue.value);
     }
 
