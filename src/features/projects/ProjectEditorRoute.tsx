@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import RendererPage from "@/components/RendererPage";
 import { useAppShell } from "@/features/app/AppShellProvider";
 import { loadProjectById, type ProjectDocument } from "./api";
-import { readProjectSession } from "./session";
+import { clearProjectSession, readProjectSession } from "./session";
 
 interface ProjectEditorRouteProps {
   mode: "new" | "existing";
@@ -32,7 +32,19 @@ export default function ProjectEditorRoute({ mode, projectId, initialName }: Pro
     if (mode === "new") return "new-project";
     return `project:${projectId ?? "unknown"}`;
   }, [mode, projectId]);
-  const initialSessionProject = useMemo(() => readProjectSession(editorKey), [editorKey]);
+  const rawInitialSessionProject = useMemo(() => readProjectSession(editorKey), [editorKey]);
+  const initialSessionProject = useMemo(() => {
+    if (mode !== "new") return rawInitialSessionProject;
+    if (!rawInitialSessionProject) return null;
+
+    // A saved project ID in the transient "new project" slot is stale handoff state.
+    // Treat /projects/new as a fresh editor instead of bouncing into an old project URL.
+    if (rawInitialSessionProject.id) {
+      return null;
+    }
+
+    return rawInitialSessionProject;
+  }, [mode, rawInitialSessionProject]);
   const [loading, setLoading] = useState(mode === "existing" && !initialSessionProject);
   const [error, setError] = useState<string | null>(null);
   const [hasInitializedProject, setHasInitializedProject] = useState(mode === "new" || Boolean(initialSessionProject));
@@ -89,9 +101,10 @@ export default function ProjectEditorRoute({ mode, projectId, initialName }: Pro
 
   useEffect(() => {
     if (mode === "new" && activeProject?.id) {
+      clearProjectSession(editorKey);
       router.replace(`/projects/${activeProject.id}`);
     }
-  }, [mode, activeProject?.id, router]);
+  }, [mode, activeProject?.id, editorKey, router]);
 
   useEffect(() => {
     if (hasInitializedProject && !loading && !error && activeProject === null) {

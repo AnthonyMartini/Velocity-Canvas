@@ -11,6 +11,315 @@ import {
 import { DEFAULT_PROJECT_NAME, RECENT_PROJECTS_LIMIT } from './constants';
 import { getProjectDisplayName, getProjectUpdatedLabel } from './helpers';
 import { themeVars } from '@/theme/theme';
+import { findParent, flattenTree, getNodeAbsolutePosition, resolveProperties } from '@/common/helpers';
+
+const PREVIEW_MAX_NODES = 80;
+const PREVIEW_TEXT_NODE_TYPES = new Set([
+  'Button',
+  'ModernButton',
+  'Label',
+  'ModernText',
+  'TextInput',
+  'ModernTextInput',
+  'Dropdown',
+  'ModernDropdown',
+  'ListBox',
+  'ComboBox',
+  'ModernComboBox',
+  'Link',
+  'NumberInput',
+  'DatePicker',
+  'ModernDatePicker',
+  'Checkbox',
+  'ModernCheckbox',
+  'Radio',
+  'Toggle',
+  'ModernToggle',
+  'RichTextEditor',
+]);
+
+const PREVIEW_CONTAINER_TYPES = new Set([
+  'Container',
+  'Gallery',
+  'Screen',
+]);
+
+function clampPreviewNumber(value: any, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getProjectPreviewScreen(tree: any[]) {
+  if (!Array.isArray(tree) || tree.length === 0) return null;
+
+  const directScreen = tree.find((node) => node?.type === 'Screen');
+  if (directScreen) return directScreen;
+
+  const appNode = tree.find((node) => node?.type === 'App');
+  if (appNode?.children?.length) {
+    return appNode.children.find((node: any) => node?.type === 'Screen') ?? null;
+  }
+
+  return null;
+}
+
+function getPreviewGlyphSeed(node: any) {
+  return String(
+    node?.Text ??
+      node?.Label ??
+      node?.Placeholder ??
+      node?.HintText ??
+      node?.Default ??
+      node?.name ??
+      ''
+  ).trim();
+}
+
+function getPreviewLineCount(node: any, height: number) {
+  if (!PREVIEW_TEXT_NODE_TYPES.has(node?.type)) return 0;
+  if (height < 16) return 1;
+
+  const seedLength = getPreviewGlyphSeed(node).length;
+  if (seedLength > 36 && height >= 34) return 3;
+  if (seedLength > 12 && height >= 24) return 2;
+  return 1;
+}
+
+function clampChannel(value: number) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parsePreviewColor(value: any) {
+  const text = String(value || '').trim();
+  if (!text || text.toLowerCase() === 'transparent' || text === 'RGBA(0, 0, 0, 0)') return null;
+
+  const rgbaMatch = text.match(/^RGBA?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/i);
+  if (rgbaMatch) {
+    return {
+      r: clampChannel(Number(rgbaMatch[1])),
+      g: clampChannel(Number(rgbaMatch[2])),
+      b: clampChannel(Number(rgbaMatch[3])),
+      a: Math.max(0, Math.min(1, Number(rgbaMatch[4]))),
+    };
+  }
+
+  const hex = text.replace('#', '');
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+      a: 1,
+    };
+  }
+
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    return {
+      r: parseInt(hex[0] + hex[0], 16),
+      g: parseInt(hex[1] + hex[1], 16),
+      b: parseInt(hex[2] + hex[2], 16),
+      a: 1,
+    };
+  }
+
+  return null;
+}
+
+function withPreviewAlpha(color: any, alpha = 1) {
+  if (!color) return null;
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${Math.max(0, Math.min(1, alpha))})`;
+}
+
+function getResolvedPreviewColor(node: any) {
+  const candidates = [
+    node?.Fill,
+    node?.BasePaletteColor,
+    node?.Color,
+    node?.HoverFill,
+    node?.PressedFill,
+    node?.BorderColor,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parsePreviewColor(candidate);
+    if (parsed) return parsed;
+  }
+
+  return null;
+}
+
+function getPreviewNodeStyle(node: any, resolvedNode: any) {
+  const baseColor = getResolvedPreviewColor(resolvedNode);
+
+  if (PREVIEW_CONTAINER_TYPES.has(node?.type)) {
+    return {
+      fill: withPreviewAlpha(baseColor, baseColor ? Math.max(0.12, baseColor.a * 0.28) : 0.06) || 'rgba(255,255,255,0.06)',
+      stroke: withPreviewAlpha(baseColor, 0.42) || 'rgba(148,163,184,0.34)',
+      strokeWidth: 1.2,
+      radius: 12,
+    };
+  }
+
+  if (node?.type === 'Image' || node?.type === 'Icon') {
+    return {
+      fill: withPreviewAlpha(baseColor, baseColor ? Math.max(0.2, baseColor.a * 0.4) : 0.16) || 'rgba(96,165,250,0.16)',
+      stroke: withPreviewAlpha(baseColor, 0.58) || 'rgba(96,165,250,0.45)',
+      strokeWidth: 1.1,
+      radius: 10,
+    };
+  }
+
+  return {
+    fill: withPreviewAlpha(baseColor, baseColor ? Math.max(0.24, baseColor.a * 0.7) : 0.12) || 'rgba(255,255,255,0.12)',
+    stroke: withPreviewAlpha(baseColor, 0.85) || 'rgba(255,255,255,0.2)',
+    strokeWidth: 1,
+    radius: 10,
+  };
+}
+
+function getPreviewScreenFill(screen: any) {
+  const baseColor = getResolvedPreviewColor(screen);
+  return withPreviewAlpha(baseColor, baseColor ? Math.max(0.72, baseColor.a) : 1) || 'rgba(15, 23, 42, 0.82)';
+}
+
+function getPreviewTextColor(node: any) {
+  const candidates = [
+    node?.Color,
+    node?.FontColor,
+    node?.HoverColor,
+    node?.PressedColor,
+    node?.Fill,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parsePreviewColor(candidate);
+    if (parsed) {
+      return withPreviewAlpha(parsed, Math.max(0.78, parsed.a));
+    }
+  }
+
+  return 'rgba(255,255,255,0.72)';
+}
+
+function buildProjectPreviewModel(project: ProjectDocument) {
+  const screen = getProjectPreviewScreen(project?.tree || []);
+  const canvasW = Math.max(1, clampPreviewNumber(project?.canvasW ?? screen?.Width, 1366));
+  const canvasH = Math.max(1, clampPreviewNumber(project?.canvasH ?? screen?.Height, 768));
+
+  if (!screen) {
+    return {
+      canvasW,
+      canvasH,
+      screenFill: 'rgba(15, 23, 42, 0.82)',
+      shapes: [],
+    };
+  }
+
+  const baseTree = [screen];
+  const resolvedScreen = resolveProperties(screen, {}, [], null);
+  const flatNodes = flattenTree(screen.children || [], new Set()).reverse().slice(0, PREVIEW_MAX_NODES);
+  const shapes = flatNodes
+    .map((node: any) => {
+      const parent = findParent(baseTree, node.id) ?? screen;
+      const resolved = resolveProperties(node, {}, flatNodes, parent);
+      const position = getNodeAbsolutePosition(baseTree, node.id, flatNodes, {});
+      const width = Math.max(6, clampPreviewNumber(resolved?.Width, 32));
+      const height = Math.max(6, clampPreviewNumber(resolved?.Height, 20));
+      const x = clampPreviewNumber(position?.x, 0);
+      const y = clampPreviewNumber(position?.y, 0);
+
+      if (resolved?.Visible === false) return null;
+      if (x > canvasW || y > canvasH || x + width < 0 || y + height < 0) return null;
+
+      return {
+        id: node.id,
+        type: node.type,
+        x,
+        y,
+        width,
+        height,
+        lineCount: getPreviewLineCount(node, height),
+        glyphColor: getPreviewTextColor(resolved),
+        style: getPreviewNodeStyle(node, resolved),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    canvasW,
+    canvasH,
+    screenFill: getPreviewScreenFill(resolvedScreen),
+    shapes,
+  };
+}
+
+function PreviewGlyphs({ shape }: { shape: any }) {
+  if (!shape?.lineCount) return null;
+
+  const insetX = Math.max(5, Math.min(shape.width * 0.12, 16));
+  const lineHeight = Math.max(2.2, Math.min(5, shape.height * 0.11));
+  const gap = Math.max(2, Math.min(5, shape.height * 0.08));
+  const firstY = shape.y + Math.max(5, Math.min(shape.height * 0.24, 14));
+  const widths = [0.62, 0.46, 0.71];
+
+  return (
+    <>
+      {Array.from({ length: shape.lineCount }).map((_, index) => (
+        <rect
+          key={`${shape.id}-glyph-${index}`}
+          x={shape.x + insetX}
+          y={firstY + index * (lineHeight + gap)}
+          width={Math.max(6, (shape.width - insetX * 2) * widths[index % widths.length])}
+          height={lineHeight}
+          rx={lineHeight / 2}
+          fill={shape.glyphColor || 'rgba(255,255,255,0.72)'}
+        />
+      ))}
+    </>
+  );
+}
+
+function ProjectCanvasPreview({ project }: { project: ProjectDocument }) {
+  const preview = buildProjectPreviewModel(project);
+
+  if (preview.shapes.length === 0) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80" style={{ aspectRatio: `${preview.canvasW} / ${preview.canvasH}` }}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(148,163,184,0.12),transparent_55%)]" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400/70">
+            Empty Screen
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 shadow-inner" style={{ aspectRatio: `${preview.canvasW} / ${preview.canvasH}` }}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.12),transparent_58%)]" />
+      <svg viewBox={`0 0 ${preview.canvasW} ${preview.canvasH}`} className="absolute inset-0 h-full w-full">
+        <rect x="0" y="0" width={preview.canvasW} height={preview.canvasH} rx="20" fill={preview.screenFill} />
+        {preview.shapes.map((shape: any) => (
+          <g key={shape.id}>
+            <rect
+              x={shape.x}
+              y={shape.y}
+              width={shape.width}
+              height={shape.height}
+              rx={shape.style.radius}
+              fill={shape.style.fill}
+              stroke={shape.style.stroke}
+              strokeWidth={shape.style.strokeWidth}
+            />
+            <PreviewGlyphs shape={shape} />
+          </g>
+        ))}
+      </svg>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-950/55 to-transparent" />
+    </div>
+  );
+}
 
 export default function ProjectsDashboard({
   user,
@@ -205,11 +514,38 @@ export default function ProjectsDashboard({
                   onClick={() => renamingId !== proj.id && onOpenProject(proj)}
                   className="relative flex flex-col p-6 bg-surface/50 border border-overlay/20 rounded-2xl cursor-pointer hover:bg-surface/80 hover:border-overlay/40 hover:-translate-y-1 transition-all group shadow-sm hover:shadow-xl"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="w-10 h-10 bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-400">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2Zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2Z" />
-                      </svg>
+                  <div className="flex justify-between items-start gap-3 mb-4">
+                    <div className="min-w-0 flex-1">
+                      {renamingId === proj.id ? (
+                        <input
+                          ref={renameInputRef}
+                          type="text"
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onBlur={() => commitRename(proj)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRename(proj);
+                            if (e.key === 'Escape') setRenamingId(null);
+                          }}
+                          className="text-lg font-bold text-text bg-base/60 border border-accent/60 rounded-lg px-2 py-1 w-full focus:outline-none focus:ring-1 focus:ring-accent/40"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-1.5 group/name">
+                          <h3 className="text-lg font-bold text-text leading-tight truncate flex-1">
+                            {getProjectDisplayName(proj.name)}
+                          </h3>
+                          <button
+                            onClick={e => startRename(e, proj)}
+                            className="p-1 text-subtext/30 hover:text-accent rounded opacity-0 group-hover/name:opacity-100 transition-all flex-shrink-0"
+                            title="Rename project"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={(e) => {
@@ -226,37 +562,9 @@ export default function ProjectsDashboard({
                     </button>
                   </div>
 
-                  {/* Editable project name */}
-                  {renamingId === proj.id ? (
-                    <input
-                        ref={renameInputRef}
-                        type="text"
-                        value={renameValue}
-                        onChange={e => setRenameValue(e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      onBlur={() => commitRename(proj)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') commitRename(proj);
-                        if (e.key === 'Escape') setRenamingId(null);
-                      }}
-                      className="text-lg font-bold text-text bg-base/60 border border-accent/60 rounded-lg px-2 py-1 mb-2 w-full focus:outline-none focus:ring-1 focus:ring-accent/40"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-1.5 mb-2 group/name">
-                      <h3 className="text-lg font-bold text-text leading-tight truncate flex-1">
-                        {getProjectDisplayName(proj.name)}
-                      </h3>
-                      <button
-                        onClick={e => startRename(e, proj)}
-                        className="p-1 text-subtext/30 hover:text-accent rounded opacity-0 group-hover/name:opacity-100 transition-all flex-shrink-0"
-                        title="Rename project"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+                  <div className="mb-4">
+                    <ProjectCanvasPreview project={proj} />
+                  </div>
 
                   <div className="flex items-center gap-3 mt-auto pt-4 border-t border-white/5 text-[10px] font-medium text-subtext">
                     <span className="flex items-center gap-1.5">

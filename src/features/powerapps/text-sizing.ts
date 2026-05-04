@@ -2,7 +2,7 @@ import { resolveSampleText } from "@/features/powerapps/sample-text";
 import { SCHEMAS } from "@/features/powerapps/schema";
 
 const GRID_SIZE = 8;
-const SINGLE_LINE_SAFETY_WIDTH = 16;
+const SINGLE_LINE_SAFETY_WIDTH = 32;
 const BUTTON_LINE_HEIGHT_MULTIPLIER = 1.2;
 const BODY_LINE_HEIGHT_MULTIPLIER = 1.35;
 const DEFAULT_LABEL_LINE_HEIGHT_MULTIPLIER = 1.5;
@@ -28,11 +28,11 @@ export const TEXT_SIZING_PROMPT_GUIDE = [
   "1. Size every text-bearing control from its content. Do not guess Width or Height.",
   "2. Estimate single-line text width before placing Button, ModernButton, Label, Link, TextInput, or ModernTextInput controls.",
   "3. Use this heuristic for average character width:",
-  "   - regular text: 0.52 * font size",
-  "   - semibold text: 0.55 * font size",
-  "   - bold/title text: 0.58 * font size",
+  "   - regular text: 0.60 * font size",
+  "   - semibold text: 0.64 * font size",
+  "   - bold/title text: 0.68 * font size",
   "   - spaces: 0.32 * font size",
-  "4. Add 12-16 px of safety width after estimating the text width to avoid accidental wrapping.",
+  "4. Add 24-32 px of safety width after estimating the text width to avoid accidental wrapping.",
   "5. Include control padding, border thickness, and icon width/gap in the final Width.",
   "6. Use line height of about 1.2 * font size for buttons and 1.35 * font size for labels/body text unless the component already specifies a larger line height.",
   "7. Titles and headings should stay on one line by default. Give them more width before increasing height.",
@@ -44,13 +44,13 @@ export const TEXT_SIZING_PROMPT_GUIDE = [
 
 export const TEXT_SIZING_RUNTIME_GUIDE = [
   "Text sizing guide:",
-  '- Estimate regular text at ~0.52 x font size per character, semibold at ~0.55 x, bold/title text at ~0.58 x, and spaces at ~0.32 x.',
-  "- Add 16 px of safety width for single-line controls.",
-  "- Classic Button padding defaults: Left/Right 10, Top/Bottom 5, Height 40.",
+  '- Estimate regular text at ~0.60 x font size per character, semibold at ~0.64 x, bold/title text at ~0.68 x, and spaces at ~0.32 x.',
+  "- Add 32 px of safety width for single-line controls.",
+  "- Classic Button padding defaults: Left/Right 16, Top/Bottom 5, Height 40.",
   "- ModernButton defaults: FontSize 14, horizontal padding 12 per side when text is visible, icon width 14, icon gap 8, icon-only width target 32+.",
-  "- Label defaults: Left/Right padding 8, Top/Bottom 4, line-height 1.5.",
-  "- ModernText defaults: Left/Right padding 8, Top/Bottom 6, line-height about 1.35.",
-  "- TextInput defaults: Left/Right padding 12, Height 40, line-height about 1.2.",
+  "- Label defaults: Left/Right padding 12, Top/Bottom 4, line-height 1.5.",
+  "- ModernText defaults: Left/Right padding 12, Top/Bottom 6, line-height about 1.35.",
+  "- TextInput defaults: Left/Right padding 16, Height 40, line-height about 1.2.",
   "- Favor wider titles and buttons over wrapped titles and wrapped button text.",
   "- Snap Width and Height to multiples of 8.",
 ].join("\n");
@@ -148,7 +148,7 @@ function normalizeLiteralText(value: unknown) {
 }
 
 function fontWeightWidthMultiplier(fontWeight: string) {
-  if (fontWeight === "FontWeight.Bold") return 1.12;
+  if (fontWeight === "FontWeight.Bold") return 1.13;
   if (fontWeight === "FontWeight.Semibold") return 1.06;
   if (fontWeight === "FontWeight.Lighter") return 0.96;
   return 1;
@@ -160,7 +160,7 @@ function estimateCharacterWidthRatio(char: string) {
   if ("MW@%#&QGOD".includes(char)) return 0.82;
   if (/[A-Z]/.test(char)) return 0.62;
   if (/[0-9]/.test(char)) return 0.56;
-  return 0.52;
+  return 0.60;
 }
 
 function estimateSingleLineTextWidth(text: string, fontSize: number, fontWeight: string, italic = false) {
@@ -357,7 +357,7 @@ function resizeButton(component: Record<string, any>) {
     fontSize,
     fontWeight,
     italic: readBoolean(component, "Italic", false),
-    horizontalPadding: readNumber(component, "PaddingLeft", 10) + readNumber(component, "PaddingRight", 10),
+    horizontalPadding: readNumber(component, "PaddingLeft", 16) + readNumber(component, "PaddingRight", 16),
     verticalPadding: readNumber(component, "PaddingTop", 5) + readNumber(component, "PaddingBottom", 5),
     borderThickness: readNumber(component, "BorderThickness", 1),
     minimumHeight: readNumber(component, "Height", 40),
@@ -407,7 +407,7 @@ function resizeLabel(component: Record<string, any>) {
     fontSize: readNumber(component, "Size", 14),
     fontWeight: readString(component, "FontWeight", "FontWeight.Normal"),
     italic: readBoolean(component, "Italic", false),
-    horizontalPadding: readNumber(component, "PaddingLeft", 8) + readNumber(component, "PaddingRight", 8),
+    horizontalPadding: readNumber(component, "PaddingLeft", 12) + readNumber(component, "PaddingRight", 12),
     verticalPadding: readNumber(component, "PaddingTop", 4) + readNumber(component, "PaddingBottom", 4),
     borderThickness: readNumber(component, "BorderThickness", 0),
     wrap: true,
@@ -423,7 +423,7 @@ function resizeModernText(component: Record<string, any>) {
     fontSize: readNumber(component, "Size", 14),
     fontWeight: readString(component, "FontWeight", "FontWeight.Normal"),
     italic: readBoolean(component, "Italic", false),
-    horizontalPadding: readNumber(component, "PaddingLeft", 8) + readNumber(component, "PaddingRight", 8),
+    horizontalPadding: readNumber(component, "PaddingLeft", 12) + readNumber(component, "PaddingRight", 12),
     verticalPadding: readNumber(component, "PaddingTop", 6) + readNumber(component, "PaddingBottom", 6),
     borderThickness: readNumber(component, "BorderThickness", 0),
     wrap: readBoolean(component, "Wrap", true),
@@ -440,7 +440,7 @@ function resizeLink(component: Record<string, any>) {
     fontSize: readNumber(component, "Size", 14),
     fontWeight: readString(component, "FontWeight", "FontWeight.Normal"),
     italic: readBoolean(component, "Italic", false),
-    horizontalPadding: readNumber(component, "PaddingLeft", 6) + readNumber(component, "PaddingRight", 6),
+    horizontalPadding: readNumber(component, "PaddingLeft", 12) + readNumber(component, "PaddingRight", 12),
     verticalPadding: readNumber(component, "PaddingTop", 4) + readNumber(component, "PaddingBottom", 4),
     borderThickness: readNumber(component, "BorderThickness", 0),
     wrap: readBoolean(component, "Wrap", false),
@@ -467,7 +467,7 @@ function resizeTextInput(component: Record<string, any>) {
   const fontSize = readNumber(component, "Size", 14);
   const fontWeight = readString(component, "FontWeight", "FontWeight.Normal");
   const borderThickness = readNumber(component, "BorderThickness", 1);
-  const horizontalPadding = readNumber(component, "PaddingLeft", 12) + readNumber(component, "PaddingRight", 12);
+  const horizontalPadding = readNumber(component, "PaddingLeft", 16) + readNumber(component, "PaddingRight", 16);
   const verticalPadding = readNumber(component, "PaddingTop", 0) + readNumber(component, "PaddingBottom", 0);
   const currentWidth = readNumber(component, "Width", 0);
   const currentHeight = readNumber(component, "Height", 0);

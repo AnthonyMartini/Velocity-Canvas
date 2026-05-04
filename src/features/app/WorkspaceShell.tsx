@@ -206,7 +206,16 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
       {!isImmersiveMode && (
         <header className="sticky top-0 z-10 shrink-0 border-b border-surface/60 bg-base/90 backdrop-blur-sm">
           <div className="relative flex items-center justify-between px-6 py-3">
-            <Link href={projectsHref} className="flex items-center gap-3">
+            <Link
+              href="/projects"
+              onClick={(e) => {
+                if (currentPath.startsWith("/projects/")) {
+                  e.preventDefault();
+                  window.dispatchEvent(new CustomEvent("velocity-canvas:exit-editor"));
+                }
+              }}
+              className="flex items-center gap-3"
+            >
               <Image
                 src={logo}
                 alt="Velocity Canvas Logo"

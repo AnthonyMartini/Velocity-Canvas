@@ -4,6 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   LoaderCircle,
+  Linkedin,
+  Check,
+  Sparkles,
+  Zap,
+  ClipboardCopy,
+  RotateCcw,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import logo from "@/assets/logo.png";
@@ -196,6 +202,14 @@ function GoogleIcon() {
 export default function LandingPage({ onAuthenticated }: { onAuthenticated: (signedInUser?: any) => void }) {
   const [signingIn, setSigningIn] = useState(false);
   const popupFlowIdRef = useRef(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const handleRestartDemo = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      void videoRef.current.play();
+    }
+  };
 
   const isPopupDismissError = (errorCode: string) =>
     errorCode === "auth/popup-closed-by-user" ||
@@ -340,13 +354,13 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
 
             <nav className="hidden items-center gap-1 md:flex">
               <a
-                href="#"
+                href="#demo"
                 className="px-4 py-2 text-sm text-[#b3bfd4] transition-colors hover:text-white"
               >
                 Product
               </a>
               <a
-                href="#"
+                href="#pricing"
                 className="px-4 py-2 text-sm text-[#b3bfd4] transition-colors hover:text-white"
               >
                 Pricing
@@ -413,28 +427,194 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
 
       <section id="demo" className="flex min-h-screen items-center bg-[#020202] px-4 py-24 sm:px-6">
         <div className="mx-auto w-full max-w-7xl">
-          <div className="mb-8 text-center">
-            <p className="text-xs uppercase tracking-[0.28em] text-[#6f7a92]">Product Demo</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.02em] text-white sm:text-4xl">
-              See Velocity Canvas in action
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#94a0b8] sm:text-lg">
-              Placeholder section for an interactive application demo, video embed, or walkthrough.
-            </p>
-          </div>
+          <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
+            {/* Left Side: Features */}
+            <div className="order-2 lg:order-1">
+              <p className="text-xs uppercase tracking-[0.28em] text-[#6f7a92]">Product Demo</p>
+              <h2 className="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">
+                See Velocity Canvas in action
+              </h2>
+              
+              <div className="mt-12 space-y-10">
+                <div className="flex gap-6">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#00D1FF]/10 text-[#00D1FF] shadow-[0_0_20px_rgba(0,209,255,0.1)]">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">AI-Powered Creation</h3>
+                    <p className="mt-2 text-[#94a0b8] leading-relaxed">
+                      Prompt your way to professional layouts. The AI understands Power Apps logic and generates native YAML instantly.
+                    </p>
+                  </div>
+                </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#070707] p-6 sm:p-8">
-            <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-white/20 bg-black/30 text-center">
-              <div>
-                <p className="text-lg font-medium text-white">Demo Area Template</p>
-                <p className="mt-2 text-sm text-[#8c98b0]">
-                  Replace this block with your app demo component when ready.
-                </p>
+                <div className="flex gap-6">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#00D1FF]/10 text-[#00D1FF] shadow-[0_0_20px_rgba(0,209,255,0.1)]">
+                    <Zap className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Familiar Canvas Experience</h3>
+                    <p className="mt-2 text-[#94a0b8] leading-relaxed">
+                      Design in a workspace that mirrors the look and feel of Power Apps Studio. Transition your skills seamlessly with zero learning curve.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-6">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#00D1FF]/10 text-[#00D1FF] shadow-[0_0_20px_rgba(0,209,255,0.1)]">
+                    <ClipboardCopy className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Seamless Integration</h3>
+                    <p className="mt-2 text-[#94a0b8] leading-relaxed">
+                      Copy-paste directly into Power Apps Studio. Your layouts are fully editable and native once imported.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Smaller Video */}
+            <div className="relative order-1 lg:order-2">
+              <div className="absolute -inset-4 rounded-[3rem] bg-gradient-to-tr from-[#00D1FF]/20 to-transparent blur-3xl opacity-50" />
+              <div className="relative flex flex-col items-center">
+                <div className="overflow-hidden rounded-[2rem] border border-[#00D1FF]/30 bg-[#070707] shadow-2xl">
+                  <video
+                    ref={videoRef}
+                    className="w-full"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  >
+                    <source src="/videos/preview.webm" type="video/webm" />
+                    <source src="/videos/preview.mp4" type="video/mp4" />
+                  </video>
+                </div>
+                <button
+                  onClick={handleRestartDemo}
+                  className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-medium text-[#6f7a92] transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restart Demo
+                </button>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      <section id="pricing" className="bg-[#050505] px-4 py-32 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-20 text-center">
+            <p className="text-xs uppercase tracking-[0.28em] text-[#6f7a92]">Simple Pricing</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              Built for fast-moving teams
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:max-w-4xl lg:mx-auto">
+            {/* Free Plan */}
+            <div className="flex flex-col rounded-3xl border border-white/5 bg-[#0A0A0A] p-8 transition-all hover:border-white/10">
+              <div>
+                <h3 className="text-lg font-medium text-white">Starter</h3>
+                <p className="mt-4 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold tracking-tight text-white">$0</span>
+                  <span className="text-sm font-semibold text-[#6f7a92]">/one-time</span>
+                </p>
+                <p className="mt-6 text-sm leading-6 text-[#94a0b8]">
+                  Perfect for trying out the AI builder and exploring the workspace.
+                </p>
+                <ul className="mt-8 space-y-4 text-sm leading-6 text-[#b3bfd4]">
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
+                    25 one-time credits
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
+                    Unlimited local projects
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
+                    Full export to Power Apps
+                  </li>
+                </ul>
+              </div>
+              <button 
+                onClick={handleGoogleSignIn}
+                className="mt-10 block w-full rounded-2xl bg-[#00D1FF] py-4 px-4 text-center text-sm font-bold text-[#050505] transition hover:bg-[#00D1FF]/90 active:scale-[0.98]"
+              >
+                Start for Free
+              </button>
+            </div>
+
+            {/* Early Access / Pro */}
+            <div className="relative flex flex-col rounded-3xl border border-white/5 bg-[#0A0A0A] p-8 transition-all">
+              <div className="absolute -top-4 left-8 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#6f7a92]">
+                Coming Soon
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-white">Early Access</h3>
+                <p className="mt-4 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold tracking-tight text-white/50">$10</span>
+                  <span className="text-sm font-semibold text-[#6f7a92]">/month</span>
+                </p>
+                <p className="mt-6 text-sm leading-6 text-[#94a0b8]">
+                  For power users who need high-volume AI generations every month.
+                </p>
+                <ul className="mt-8 space-y-4 text-sm leading-6 text-[#b3bfd4]/50">
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    Everything in Starter
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    500 credits per month
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    Priority access to models
+                  </li>
+                </ul>
+              </div>
+              <button 
+                disabled
+                className="mt-10 block w-full rounded-2xl bg-white/5 py-4 px-4 text-center text-sm font-bold text-[#6f7a92] cursor-not-allowed border border-white/5"
+              >
+                Upgrade
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/5 bg-[#020202] py-12 px-4 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
+            <p className="text-sm text-[#6f7a92]">
+              Created by <span className="text-white font-medium">Anthony Martini</span>
+            </p>
+            
+            <div className="flex items-center gap-8">
+              <a 
+                href="/privacy" 
+                className="text-sm text-[#6f7a92] transition-colors hover:text-white"
+              >
+                Privacy Policy
+              </a>
+              <a 
+                href="https://www.linkedin.com/in/anthony-martini/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#6f7a92] transition-colors hover:text-white"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

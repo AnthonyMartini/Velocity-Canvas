@@ -1722,6 +1722,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       
       // Update activeProject with the new ID so future queries act as 'updates'
       if (activeProject === 'new' || !activeProject?.id) {
+        writeProjectSession(`project:${data.projectId}`, {
+          ...payload,
+          id: data.projectId,
+          historyState: getPersistedHistoryStateSnapshot(historyState),
+          activeScreenId: activeScreenIdRef.current,
+        })
         loadedProjectIdRef.current = data.projectId // keep guard in sync so the sync effect doesn't re-init
         setActiveProject({ ...payload, id: data.projectId });
       }
@@ -1733,7 +1739,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     } finally {
       setIsSaving(false);
     }
-  }, [activeProject, tree, canvasW, canvasH, normalizedCanvasTheme, serializedProjectState, user, notify, projectSessionKey, setActiveProject]);
+  }, [activeProject, tree, canvasW, canvasH, normalizedCanvasTheme, serializedProjectState, user, notify, projectSessionKey, setActiveProject, historyState]);
 
   const handleSaveProject = useCallback(async () => {
     await saveProjectToCloud({ showSuccessToast: true });
@@ -1816,6 +1822,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       setIsImmersiveMode(false)
     }
   }, [isPlaying, setIsImmersiveMode])
+
+  // Listen for global logo/shell exit event
+  useEffect(() => {
+    const handleGlobalExit = () => {
+      handleExitProject()
+    }
+    window.addEventListener('velocity-canvas:exit-editor', handleGlobalExit)
+    return () => window.removeEventListener('velocity-canvas:exit-editor', handleGlobalExit)
+  }, [handleExitProject])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -2992,7 +3007,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     if (!isNaN(h) && h > 0) setCanvasH(h)
   }
 
-  const handleExportToPowerApps = useCallback(() => {
+  const handleCopyToPowerApps = useCallback(() => {
     const exportNode = selectedNode?.type === 'App' ? null : selectedNode
     const yaml = (() => {
     if (!exportNode) return screenToYaml(tree)
@@ -3476,15 +3491,15 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
           </button>
 
           <button
-            onClick={handleExportToPowerApps}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all mr-3 bg-surface/50 text-subtext/80 hover:bg-surface border border-overlay/30 hover:text-text"
+            onClick={handleCopyToPowerApps}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all mr-3 bg-emerald-600 text-white hover:bg-emerald-700 border-none shadow-lg shadow-emerald-600/20 active:scale-95"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3v12" />
               <path d="m7 10 5 5 5-5" />
               <path d="M5 21h14" />
             </svg>
-            Export to PA
+            Copy to PA
           </button>
 
           <button

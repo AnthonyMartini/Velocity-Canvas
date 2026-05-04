@@ -31,7 +31,7 @@ export function readProjectSession(sessionKey: string): ProjectSessionSnapshot |
   }
 }
 
-export function writeProjectSession(sessionKey: string, snapshot: ProjectDocument) {
+export function writeProjectSession(sessionKey: string, snapshot: Omit<ProjectSessionSnapshot, "savedAt">) {
   if (typeof window === "undefined" || !sessionKey) return;
 
   try {

@@ -467,6 +467,25 @@ function formatPreservedYamlValue(key: string, value: unknown) {
   return `=${String(value ?? "").trim()}`;
 }
 
+function shouldUseLiteralBlockForPreservedValue(key: string, value: unknown) {
+  if (["X", "Y", "Width", "Height"].includes(key)) return false;
+  const normalized = String(value ?? "").trim().replace(/^\s*=/, "").trim();
+  return /:\s|[\r\n]/.test(normalized);
+}
+
+function formatPreservedYamlPropertyLines(key: string, value: unknown, indent: number) {
+  const prefix = " ".repeat(indent);
+  const formattedValue = formatPreservedYamlValue(key, value);
+  if (!shouldUseLiteralBlockForPreservedValue(key, formattedValue)) {
+    return [`${prefix}${key}: ${formattedValue}`];
+  }
+
+  return [
+    `${prefix}${key}: |-`,
+    `${" ".repeat(indent + 2)}${formattedValue}`,
+  ];
+}
+
 function upsertYamlProperty(rawYaml: string, key: string, value: unknown) {
   const normalized = normalizeInput(rawYaml);
   const lines = normalized.split("\n");
@@ -505,14 +524,28 @@ function upsertYamlProperty(rawYaml: string, key: string, value: unknown) {
 
     const keyValue = splitKeyValue(trimmed);
     if (keyValue?.key === key) {
-      lines[i] = `${" ".repeat(indent)}${key}: ${formatPreservedYamlValue(key, value)}`;
+      let endIndex = i + 1;
+      while (endIndex < lines.length) {
+        const nextLine = lines[endIndex];
+        const nextTrimmed = nextLine.trim();
+        if (!nextTrimmed) {
+          endIndex += 1;
+          continue;
+        }
+
+        const nextIndent = countIndent(nextLine);
+        if (nextIndent <= indent) break;
+        endIndex += 1;
+      }
+
+      lines.splice(i, endIndex - i, ...formatPreservedYamlPropertyLines(key, value, indent));
       return lines.join("\n");
     }
 
     insertIndex = i + 1;
   }
 
-  lines.splice(insertIndex, 0, `${" ".repeat(propertyIndent)}${key}: ${formatPreservedYamlValue(key, value)}`);
+  lines.splice(insertIndex, 0, ...formatPreservedYamlPropertyLines(key, value, propertyIndent));
   return lines.join("\n");
 }
 

@@ -211,6 +211,15 @@ function isFormulaPropertyValue(node, key, value, propDef = null) {
   return looksLikeFormulaExpression(value, propDef)
 }
 
+function shouldUseLiteralBlockForFormula(key, serializedFormula, propDef = null) {
+  const normalized = normalizeFormulaString(serializedFormula)
+  if (key === 'Items') return true
+  if (propDef?.type === 'text' || propDef?.type === 'string') return true
+
+  // YAML plain scalars break on Power Fx record syntax like `{ Value: "Tab" }`.
+  return /:\s|[\r\n]/.test(normalized)
+}
+
 function formatColorValue(node, key, value) {
   const propDef = getPropertyDef(node?.type, key)
   if (isFormulaPropertyValue(node, key, value, propDef)) {
@@ -381,11 +390,9 @@ export function componentToYaml(node, col = 0) {
           formula = inner
         }
       }
-      if (k === 'Items' || isTextProperty) {
-        pushLiteralBlock(`=${formula}`)
-      } else {
-        lines.push(`${sp(col + 6)}${k}: =${formula}`)
-      }
+      const serialized = `=${formula}`
+      if (shouldUseLiteralBlockForFormula(k, serialized, propDef)) pushLiteralBlock(serialized)
+      else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
       return
     }
 
@@ -398,7 +405,9 @@ export function componentToYaml(node, col = 0) {
     if (isQuoted) {
       const inner = valStr.slice(1, -1).trim()
       if (/^[A-Z][a-zA-Z0-9]*\s*\(/.test(inner)) {
-        lines.push(`${sp(col + 6)}${k}: =${inner}`)
+        const serialized = `=${inner}`
+        if (shouldUseLiteralBlockForFormula(k, serialized, propDef)) pushLiteralBlock(serialized)
+        else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
         return
       }
     }
@@ -413,11 +422,11 @@ export function componentToYaml(node, col = 0) {
       pushLiteralBlock(`=${valStr}`)
     } else if (isQuoted || isEnum || isFormulaSpecial) {
       const serialized = `=${valStr}`
-      if (isTextProperty) pushLiteralBlock(serialized)
+      if (shouldUseLiteralBlockForFormula(k, serialized, propDef)) pushLiteralBlock(serialized)
       else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
     } else if (isNumeric || isBoolean || isFunction) {
       const serialized = `=${valStr}`
-      if (isTextProperty) pushLiteralBlock(serialized)
+      if (shouldUseLiteralBlockForFormula(k, serialized, propDef)) pushLiteralBlock(serialized)
       else lines.push(`${sp(col + 6)}${k}: ${serialized}`)
     } else {
       // It's a literal string that isn't quoted. Wrap it in quotes.
