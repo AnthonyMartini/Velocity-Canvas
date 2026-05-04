@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rendererChatModel, RENDERER_CHAT_MODEL_NAME } from "@/lib/gemini";
-import { AI_ADDABLE_COMPONENT_TYPES, SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
+import { SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
+import { AI_PROMPT_COMPONENT_RULES_TEXT } from "@/features/powerapps/ai-prompt-access";
 import { TEXT_SIZING_RUNTIME_GUIDE } from "@/features/powerapps/text-sizing";
 import { RENDERER_CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
@@ -79,9 +80,9 @@ function summarizeItemsForPrompt(items) {
 
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
-  `- Only add supported controls from this list: ${AI_ADDABLE_COMPONENT_TYPES.join(", ")}.`,
+  AI_PROMPT_COMPONENT_RULES_TEXT,
+  "- Follow the component/property allowlist from the system prompt for every add and update.",
   '- ModernTabList is the only allowed modern control exception. Do not add other modern controls or modern-only properties.',
-  '- Only use supported component property keys and formulas that this renderer understands.',
   '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
   '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
   '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',

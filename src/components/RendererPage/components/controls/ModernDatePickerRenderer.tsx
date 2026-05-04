@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { CSS_FW } from './cssProps'
 import { executeAction } from '../../../../common/helpers'
+import { formatDateSelectionForStorage, toDateInputValue } from '@/features/powerapps/date-values'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 import { normalizeLiteralString, resolveModernPalette, toRgba } from './modernControlUtils'
 
@@ -31,7 +32,7 @@ export default function ModernDatePickerRenderer({
   renderZIndex = 1,
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [value, setValue] = useState(normalizeLiteralString(comp.SelectedDate))
+  const [value, setValue] = useState(toDateInputValue(comp.SelectedDate))
   const [isFocused, setIsFocused] = useState(false)
   const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled'
   const isViewMode = comp.DisplayMode === 'DisplayMode.View'
@@ -43,7 +44,7 @@ export default function ModernDatePickerRenderer({
     : (isFocused ? palette : lighter10)
 
   useEffect(() => {
-    setValue(normalizeLiteralString(comp.SelectedDate))
+    setValue(toDateInputValue(comp.SelectedDate))
   }, [comp.id, comp.SelectedDate])
 
   const openPicker = () => {
@@ -96,9 +97,10 @@ export default function ModernDatePickerRenderer({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         onChange={(event) => {
-          const nextValue = event.target.value
-          setValue(nextValue)
-          updateProp?.(comp.id, 'SelectedDate', nextValue)
+          const nextInputValue = event.target.value
+          const nextStoredValue = formatDateSelectionForStorage(nextInputValue, comp.SelectedDate)
+          setValue(nextInputValue)
+          updateProp?.(comp.id, 'SelectedDate', nextStoredValue)
           if (comp.OnChange) {
             executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
           }

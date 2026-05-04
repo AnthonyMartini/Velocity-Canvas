@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Moon, Sun } from "lucide-react";
+import { Brackets, Moon, Sun } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { useAppShell } from "./AppShellProvider";
 
@@ -87,6 +87,8 @@ const AdminIcon = () => (
 
 const LAST_PROJECT_ROUTE_KEY = "velocity-canvas:last-project-route";
 
+const FormulaParserNavIcon = () => <Brackets className="h-4 w-4" />;
+
 function isPathActive(pathname: string, href: string) {
   if (href === "/projects") return pathname.startsWith("/projects");
   return pathname === href;
@@ -97,7 +99,8 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const currentPath = pathname ?? "";
   const [projectsHref, setProjectsHref] = useState("/projects");
-  const { user, authLoading, credits, isAdmin, isDarkMode, setIsDarkMode, signOutUser } = useAppShell();
+  const { user, authLoading, credits, isAdmin, isDarkMode, isImmersiveMode, setIsDarkMode, signOutUser } =
+    useAppShell();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -139,6 +142,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const navItems = [
     { href: projectsHref, matchHref: "/projects", label: "Projects", Icon: ProjectsIcon },
     { href: "/docs", label: "Documentation", Icon: DocsIcon },
+    { href: "/formula-builder", label: "Formula builder", Icon: FormulaParserNavIcon },
     ...(isAdmin ? [{ href: "/admin", matchHref: "/admin", label: "Admin", Icon: AdminIcon }] : []),
   ];
 
@@ -147,97 +151,99 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
       className="flex h-screen flex-col overflow-hidden bg-base"
       style={isDarkMode ? undefined : LIGHT_THEME_OVERRIDES}
     >
-      <header className="sticky top-0 z-10 shrink-0 border-b border-surface/60 bg-base/90 backdrop-blur-sm">
-        <div className="relative flex items-center justify-between px-6 py-3">
-          <Link href={projectsHref} className="flex items-center gap-3">
-            <Image
-              src={logo}
-              alt="Velocity Canvas Logo"
-              width={45}
-              height={45}
-              className="h-11 w-11"
-            />
-            <div>
-              <h1 className="text-lg font-bold leading-tight tracking-tight text-text">Velocity Canvas</h1>
-              <p className="text-xs leading-tight text-subtext">Power Apps UI Generator</p>
-            </div>
-          </Link>
+      {!isImmersiveMode && (
+        <header className="sticky top-0 z-10 shrink-0 border-b border-surface/60 bg-base/90 backdrop-blur-sm">
+          <div className="relative flex items-center justify-between px-6 py-3">
+            <Link href={projectsHref} className="flex items-center gap-3">
+              <Image
+                src={logo}
+                alt="Velocity Canvas Logo"
+                width={45}
+                height={45}
+                className="h-11 w-11"
+              />
+              <div>
+                <h1 className="text-lg font-bold leading-tight tracking-tight text-text">Velocity Canvas</h1>
+                <p className="text-xs leading-tight text-subtext">Power Apps UI Generator</p>
+              </div>
+            </Link>
 
-          <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-overlay/40 bg-surface/50 p-1">
-            {navItems.map(({ href, matchHref, label, Icon }) => {
-              const active = isPathActive(currentPath, matchHref ?? href);
+            <nav className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-overlay/40 bg-surface/50 p-1">
+              {navItems.map(({ href, matchHref, label, Icon }) => {
+                const active = isPathActive(currentPath, matchHref ?? href);
 
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                    active
-                      ? "bg-accent text-base shadow-md shadow-accent/30"
-                      : "text-subtext hover:bg-overlay/40 hover:text-text"
-                  }`}
-                >
-                  <Icon />
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDarkMode((prev) => !prev)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-overlay/40 bg-surface/55 text-subtext shadow-sm transition-all duration-200 hover:bg-overlay/35 hover:text-text"
-              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-
-            {credits !== null && (
-              <Link
-                href="/plans"
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition-all duration-200 ${
-                  currentPath === "/plans"
-                    ? "border-accent bg-accent text-base ring-2 ring-accent/20"
-                    : "border-accent/20 bg-accent/10 hover:border-accent/30 hover:bg-accent/20"
-                }`}
-              >
-                <div className="flex flex-col items-center leading-none">
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-wider ${
-                      currentPath === "/plans" ? "text-base/70" : "text-accent/70"
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      active
+                        ? "bg-accent text-base shadow-md shadow-accent/30"
+                        : "text-subtext hover:bg-overlay/40 hover:text-text"
                     }`}
                   >
-                    Credits
-                  </span>
-                  <span className={`text-sm font-black ${currentPath === "/plans" ? "text-base" : "text-text"}`}>
-                    {credits}
-                  </span>
-                </div>
-              </Link>
-            )}
+                    <Icon />
+                    {label}
+                  </Link>
+                );
+              })}
+            </nav>
 
-            <div className="flex items-center gap-2">
-              {user.photoURL && (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName ?? "User"}
-                  className="h-7 w-7 rounded-full"
-                  referrerPolicy="no-referrer"
-                />
-              )}
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => void signOutUser()}
-                className="cursor-pointer text-xs text-subtext transition-colors hover:text-text"
+                type="button"
+                onClick={() => setIsDarkMode((prev) => !prev)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-overlay/40 bg-surface/55 text-subtext shadow-sm transition-all duration-200 hover:bg-overlay/35 hover:text-text"
+                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
               >
-                Sign out
+                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
+
+              {credits !== null && (
+                <Link
+                  href="/plans"
+                  className={`flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition-all duration-200 ${
+                    currentPath === "/plans"
+                      ? "border-accent bg-accent text-base ring-2 ring-accent/20"
+                      : "border-accent/20 bg-accent/10 hover:border-accent/30 hover:bg-accent/20"
+                  }`}
+                >
+                  <div className="flex flex-col items-center leading-none">
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        currentPath === "/plans" ? "text-base/70" : "text-accent/70"
+                      }`}
+                    >
+                      Credits
+                    </span>
+                    <span className={`text-sm font-black ${currentPath === "/plans" ? "text-base" : "text-text"}`}>
+                      {credits}
+                    </span>
+                  </div>
+                </Link>
+              )}
+
+              <div className="flex items-center gap-2">
+                {user.photoURL && (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName ?? "User"}
+                    className="h-7 w-7 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <button
+                  onClick={() => void signOutUser()}
+                  className="cursor-pointer text-xs text-subtext transition-colors hover:text-text"
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
     </div>

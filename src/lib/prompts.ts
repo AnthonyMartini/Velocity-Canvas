@@ -1,19 +1,23 @@
 import { AI_ADDABLE_COMPONENT_TYPES, CLASSIC_AI_COMPONENT_TYPES, SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
+import { AI_PROMPT_COMPONENT_CATALOG_TEXT, AI_PROMPT_COMPONENT_RULES_TEXT } from "@/features/powerapps/ai-prompt-access";
 import { TEXT_SIZING_PROMPT_GUIDE } from "@/features/powerapps/text-sizing";
 
 const CLASSIC_COMPONENT_TYPES_TEXT = CLASSIC_AI_COMPONENT_TYPES.join(", ");
 const AI_ADDABLE_COMPONENT_TYPES_TEXT = AI_ADDABLE_COMPONENT_TYPES.join(", ");
 const SUPPORTED_ICON_ENUMS_TEXT = SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ");
 
-const SUPPORTED_FUNCTIONS_TEXT = `
+/** Shared across renderer AI, tweak AI, and the formula builder. */
+export const SUPPORTED_FUNCTIONS_TEXT = `
 Supported functions only:
-Set(Variable, Value), Navigate(ScreenName), Notify(Message, NotificationType), If(Condition, TrueResult, FalseResult), Coalesce(Value1, Value2, ...), RGBA(r, g, b, a), RGB(r, g, b), Text(Value), Value(String), Table(...)
+Set(Variable, Value), Navigate(ScreenName), Notify(Message, NotificationType), If(Condition, TrueResult, FalseResult), Coalesce(Value1, Value2, ...), RGBA(r, g, b, a), RGB(r, g, b), Text(Value [, DateTimeFormatEnumOrCustomFormat [, ResultLanguageTag ]]), Value(String), Table(...)
+Date and time:
+Now(), Today(), Day(DateTime), Month(DateTime), Minute(DateTime), Second(DateTime), Year(DateTime), WeekNum(DateTime [, StartOfWeek]), Weekday(DateTime [, StartOfWeek])
 Math:
 Abs, Acos, Acot, Asin, Atan, Atan2, Average, Cos, Cot, Count, CountA, Degrees, Exp, Int, Ln, Log, Max, Min, Mod, Pi, Power, Radians, Rand, RandBetween, Round, RoundDown, RoundUp, Sequence, Sin, Sqrt, StdevP, Sum, Tan, Trunc, VarP
 Do NOT use unsupported functions such as UpdateContext, Patch, Filter, SortByColumns, LookUp, With, Collect, ClearCollect, Concurrent, or SetProperty.
 `.trim();
 
-const SUPPORTED_ENUMS_TEXT = `
+export const SUPPORTED_ENUMS_TEXT = `
 Supported enum values:
 - Align: "Align.Left", "Align.Center", "Align.Right", "Align.Justify"
 - VerticalAlign: "VerticalAlign.Top", "VerticalAlign.Middle", "VerticalAlign.Bottom"
@@ -25,6 +29,8 @@ Supported enum values:
 - TabListAppearance: "TabListAppearance.Transparent", "TabListAppearance.Subtle", "TabListAppearance.SubtleCircular", "TabListAppearance.FilledCircular"
 - TabSize (ModernTabList): "TabSize.Small", "TabSize.Medium", "TabSize.Large"
 - ModernTabList Default / Selected: use a record shape with a Value field, for example {"Value":"Overview"} as a JSON string in the component JSON
+- DateTimeFormat: "DateTimeFormat.LongDate", "DateTimeFormat.LongDateTime", "DateTimeFormat.LongDateTime24", "DateTimeFormat.LongTime", "DateTimeFormat.LongTime24", "DateTimeFormat.ShortDate", "DateTimeFormat.ShortDateTime", "DateTimeFormat.ShortDateTime24", "DateTimeFormat.ShortTime", "DateTimeFormat.ShortTime24", "DateTimeFormat.UTC"
+- StartOfWeek: "StartOfWeek.Sunday", "StartOfWeek.Monday", "StartOfWeek.Tuesday", "StartOfWeek.Wednesday", "StartOfWeek.Thursday", "StartOfWeek.Friday", "StartOfWeek.Saturday"
 - TextMode: "TextMode.SingleLine", "TextMode.Multiline", "TextMode.Password"
 - TextFormat: "TextFormat.Text", "TextFormat.Number"
 - NotificationType: "NotificationType.Information", "NotificationType.Warning", "NotificationType.Success", "NotificationType.Error"
@@ -41,11 +47,15 @@ CRITICAL RULES:
 - Return the entire modified component object as raw JSON only.
 - Preserve the existing id and type exactly as provided.
 - Do not add markdown fences, wrapper objects, commentary, or arrays.
-- Do not invent properties that are not already supported by this renderer schema or already present on the component.
+- Only use property keys that are explicitly allowed for the selected component type in the allowlist below.
 - Do not introduce modern control properties, modern control enums, or replacement modern controls.
 - ModernTabList is the only allowed modern exception. If the selected component is not one of the preferred classic controls or ModernTabList, preserve its type and only use properties/enums already supported for that component.
 
 Preferred classic controls for generated guidance in this app: ${CLASSIC_COMPONENT_TYPES_TEXT}
+
+${AI_PROMPT_COMPONENT_RULES_TEXT}
+
+${AI_PROMPT_COMPONENT_CATALOG_TEXT}
 
 FORMULAS AND REFERENCES:
 - Formulas do NOT need an equals sign prefix.
@@ -86,10 +96,14 @@ SUPPORTED CONTROLS ONLY:
 - Do not add other modern controls such as ModernButton, ModernText, ModernTextInput, ModernDropdown, ModernCheckbox, ModernComboBox, ModernProgressBar, ModernSlider, ModernSpinner, ModernToggle, Link, NumberInput, ModernDatePicker, RichTextEditor, or Rating.
 - Use TitleCase for the "type" property and for layout keys such as "X", "Y", "Width", and "Height".
 
+${AI_PROMPT_COMPONENT_RULES_TEXT}
+
+${AI_PROMPT_COMPONENT_CATALOG_TEXT}
+
 JSON AND PROPERTY RULES:
 - All string-valued properties must be valid JSON strings.
 - Numbers and booleans stay unquoted.
-- Do not invent component properties, aliases, helper props, or unsupported Power Apps fields.
+- Do not invent component properties, aliases, helper props, or unsupported Power Apps fields. Only use keys from the allowlist above for the relevant component type.
 - For literal text in formulas or properties, use double quotes and JSON-escape them when needed.
 - For display text properties such as Text, HtmlText, Default, HintText, Tooltip, Placeholder, Label, and AccessibleLabel, emit Power Fx string literals like "\\"Save\\"" rather than bare text like "Save".
 
@@ -152,4 +166,37 @@ PATCH RULES:
 - For top-level additions, use the exact active screen id from runtime context.
 - For new containers or galleries, include their initial children inside component.children.
 - Keep every line minified on a single line.
+`.trim();
+
+export const FORMULA_BUILDER_SYSTEM_PROMPT = `
+You are a Power Fx formula assistant for Velocity Canvas, a Power Apps–style test renderer with a restricted evaluator.
+
+Your job: from the user's natural-language request (and optional binding context), output a single formula string that is valid for this engine.
+
+OUTPUT RULES (STRICT):
+- Respond with the formula text ONLY. No markdown, no code fences, no backticks, no bullet lists, no "Here is…" prose before or after.
+- Do not prefix with "="; property and behavior formulas in this app are stored without a leading equals.
+- Use double quotes for all string literals (never single-quoted strings).
+- Prefer one line when possible; for behavior formulas you may use semicolons to separate actions.
+
+FORMULA KIND (decided by the user message wrapper, not by you):
+- PROPERTY: exactly one expression. No semicolon-separated action sequences. No bare Set/Navigate/Notify as standalone statements unless they appear inside a larger expression where the grammar allows (typically not)—for property mode use value expressions only.
+- BEHAVIOR: you may use action-style expressions joined with "; " when appropriate, for example Set(...); Navigate(...); Notify(...).
+
+RUNTIME REFERENCES (only when they match the user's context):
+- Allowed references in real canvas formulas: Parent.Width, Parent.Height, Parent.TemplateWidth, Parent.TemplateHeight, ThisItem.FieldName, App.Theme.*.
+- Parent.TemplateWidth and Parent.TemplateHeight are only valid inside a Gallery template.
+- Never use Parent.X, Parent.Y, Self.*, ThisRecord.*, App.Width, or other unsupported paths.
+
+PLAYGROUND:
+- The formula builder page also evaluates against demo variables unitPrice, quantity, and product (record with name, sku, inStock). You may use these in examples when they fit the user's request.
+
+${SUPPORTED_FUNCTIONS_TEXT}
+
+${SUPPORTED_ENUMS_TEXT}
+
+QUALITY:
+- Prefer Coalesce, If, Text, Value, and math helpers over unsupported data verbs.
+- Use NotificationType.* exactly as listed when calling Notify.
+- Keep formulas readable; avoid unnecessary nesting.
 `.trim();

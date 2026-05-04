@@ -48,6 +48,9 @@ const securityHeaders = [
 
 const nextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [{ source: "/formula-parser", destination: "/formula-builder", permanent: false }];
+  },
   async headers() {
     return [
       {

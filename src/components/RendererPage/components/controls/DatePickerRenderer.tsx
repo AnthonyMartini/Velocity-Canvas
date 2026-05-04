@@ -1,6 +1,7 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { executeAction } from '../../../../common/helpers'
+import { formatDateSelectionForStorage, toDateInputValue } from '@/features/powerapps/date-values'
 import { getSelectionStyles, themeVars } from '@/theme/theme'
 // Inline calendar icon (no external dependency needed)
 const CalendarIcon = ({ size = 18 }) => (
@@ -22,6 +23,7 @@ export default function DatePickerRenderer({
   navigate,
   flatNodes,
   parentNode,
+  updateProp,
   onMouseDown, 
   onClick,
   renderZIndex = 1
@@ -33,14 +35,21 @@ export default function DatePickerRenderer({
   const selectedDateStr = comp.SelectedDate
   
   // PowerApps uses SelectedDate if provided, otherwise DefaultDate
-  const displayDateStr = selectedDateStr || defaultDateStr || ''
+  const displayDateStr = toDateInputValue(selectedDateStr) || toDateInputValue(defaultDateStr)
+  const [liveValue, setLiveValue] = useState(displayDateStr)
 
-  const isInteractive = isPlaying && !comp.disabled
+  useEffect(() => {
+    setLiveValue(displayDateStr)
+  }, [comp.id, displayDateStr])
+
+  const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled'
+  const isInteractive = isPlaying && !comp.disabled && !isDisabledMode
+  const allowsKeyboardEditing = comp.IsEditable !== false
 
   // Calculate borders based on state
   let currentBorderColor = comp.BorderColor
   let currentBorderThickness = comp.BorderThickness
-  if (comp.DisplayMode === 'DisplayMode.Disabled' && comp.DisabledBorderColor) {
+  if (isDisabledMode && comp.DisabledBorderColor) {
     currentBorderColor = comp.DisabledBorderColor
   } else if (comp.HoverBorderColor && comp.HoverBorderColor !== 'transparent') {
     // Basic fallback without full hover state tracking implemented per component
@@ -48,7 +57,7 @@ export default function DatePickerRenderer({
   
   let currentFill = comp.Fill
   let currentColor = comp.Color
-  if (comp.DisplayMode === 'DisplayMode.Disabled') {
+  if (isDisabledMode) {
     currentFill = comp.DisabledFill || themeVars.colors.controlDisabledFill
     currentColor = comp.DisabledColor || themeVars.colors.controlDisabled
   }
@@ -121,8 +130,25 @@ export default function DatePickerRenderer({
     onClick(e)
   }
 
-  const handleChange = () => {
+  const openPicker = () => {
     if (!isInteractive) return
+    if (inputRef.current && typeof inputRef.current.showPicker === 'function') {
+      try {
+        inputRef.current.showPicker()
+      } catch (err) {
+        inputRef.current.focus()
+      }
+    } else if (inputRef.current) {
+      inputRef.current.focus()
+    }
+  }
+
+  const handleChange = (event) => {
+    if (!isInteractive) return
+    const nextInputValue = event.target.value
+    const nextStoredValue = formatDateSelectionForStorage(nextInputValue, comp.SelectedDate)
+    setLiveValue(nextInputValue)
+    updateProp?.(comp.id, 'SelectedDate', nextStoredValue)
     if (comp.OnChange) executeAction(comp.OnChange, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
   }
 
@@ -135,17 +161,8 @@ export default function DatePickerRenderer({
     }
     
     if (comp.OnSelect) executeAction(comp.OnSelect, localVars, setLocalVars, notify, navigate, flatNodes, parentNode, comp)
-    
-    // Trigger native date picker if supported
-    if (inputRef.current && typeof inputRef.current.showPicker === 'function') {
-      try {
-        inputRef.current.showPicker()
-      } catch (err) {
-        inputRef.current.focus()
-      }
-    } else if (inputRef.current) {
-      inputRef.current.focus()
-    }
+
+    openPicker()
   }
 
   return (
@@ -159,15 +176,27 @@ export default function DatePickerRenderer({
         ref={inputRef}
         type="date"
         style={inputStyle}
-        value={displayDateStr}
+        value={liveValue}
         onChange={handleChange}
         placeholder={comp.InputTextPlaceholder}
-        readOnly={!isInteractive || comp.IsEditable === false}
-        disabled={comp.DisplayMode === 'DisplayMode.Disabled'}
+        readOnly={!isInteractive}
+        disabled={isDisabledMode}
         min={comp.StartYear ? `${comp.StartYear}-01-01` : undefined}
         max={comp.EndYear ? `${comp.EndYear}-12-31` : undefined}
-        // In preview mode, allow standard native events. In edit mode, suppress them.
-        onMouseDown={!isPlaying ? (e) => onMouseDown(e) : undefined} 
+        onMouseDown={(e) => {
+          if (isPlaying) {
+            e.stopPropagation()
+            return
+          }
+          onMouseDown(e)
+        }}
+        onClick={(e) => {
+          if (!isPlaying) return
+          e.stopPropagation()
+          if (!allowsKeyboardEditing) {
+            openPicker()
+          }
+        }}
       />
       <div 
         style={iconAreaStyle} 
@@ -204,6 +233,7 @@ DatePickerRenderer.propTypes = {
   setLocalVars: PropTypes.func,
   notify: PropTypes.func,
   navigate: PropTypes.func,
+  updateProp: PropTypes.func,
   renderZIndex: PropTypes.number,
   onMouseDown: PropTypes.func.isRequired,
   onClick: PropTypes.func.isRequired,

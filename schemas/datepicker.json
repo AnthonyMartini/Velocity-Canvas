@@ -42,6 +42,7 @@
   },
   "properties": [
     { "key": "DefaultDate",          "label": "Default Date",           "type": "text",    "propertyType": "Input" },
+    { "key": "SelectedDate",         "label": "Selected Date",          "type": "date",    "propertyType": "Output" },
     { "key": "Format",               "label": "Format",                 "type": "select", "options": ["DateTimeFormat.ShortDate", "DateTimeFormat.LongDate"], "propertyType": "Input" },
     { "key": "Language",             "label": "Language",               "type": "text",    "propertyType": "Input" },
     { "key": "X",                    "label": "X",                      "type": "number",  "propertyType": "Input" },

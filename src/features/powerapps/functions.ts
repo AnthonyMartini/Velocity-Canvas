@@ -1,7 +1,10 @@
 
+import { parseStoredDateValue } from "@/features/powerapps/date-values"
+
 export const Type = {
     EVENT: "event",
     TEXT: "text",
+    DATE: "date",
     NUMBER: "number",
     ANY: "any",
     BOOLEAN: "boolean",
@@ -50,7 +53,16 @@ export const DisplayMode = {
 
 export const DateTimeFormat = {
     ShortDate: "DateTimeFormat.ShortDate",
-    LongDate: "DateTimeFormat.LongDate"
+    LongDate: "DateTimeFormat.LongDate",
+    LongDateTime: "DateTimeFormat.LongDateTime",
+    LongDateTime24: "DateTimeFormat.LongDateTime24",
+    LongTime: "DateTimeFormat.LongTime",
+    LongTime24: "DateTimeFormat.LongTime24",
+    ShortDateTime: "DateTimeFormat.ShortDateTime",
+    ShortDateTime24: "DateTimeFormat.ShortDateTime24",
+    ShortTime: "DateTimeFormat.ShortTime",
+    ShortTime24: "DateTimeFormat.ShortTime24",
+    UTC: "DateTimeFormat.UTC"
 }
 
 export const ModernButtonAppearance = {
@@ -129,6 +141,17 @@ export const TextFormat = {
 export const Layout = {
     Vertical: "Layout.Vertical",
     Horizontal: "Layout.Horizontal"
+}
+
+/** First day of the week (used by WeekNum and Weekday). Defaults to Sunday when omitted. */
+export const StartOfWeek = {
+    Sunday: "StartOfWeek.Sunday",
+    Monday: "StartOfWeek.Monday",
+    Tuesday: "StartOfWeek.Tuesday",
+    Wednesday: "StartOfWeek.Wednesday",
+    Thursday: "StartOfWeek.Thursday",
+    Friday: "StartOfWeek.Friday",
+    Saturday: "StartOfWeek.Saturday"
 }
 
 export const Icon = {
@@ -218,6 +241,7 @@ export const ALL_ENUM_VALUES = new Set([
     ...Object.values(TextMode),
     ...Object.values(TextFormat),
     ...Object.values(Layout),
+    ...Object.values(StartOfWeek),
     ...Object.values(Icon)
 ])
 
@@ -282,6 +306,27 @@ const numericValuesFromArgs = (...args) => {
 const isBlankFormulaValue = (value) =>
     value === null || value === undefined || value === ''
 
+const toFormulaText = (value) =>
+    value === null || value === undefined ? '' : String(value)
+
+const toTextCount = (value, functionName) => {
+    const count = toFiniteNumber(value)
+    if (count === null) {
+        return { status: 'error', message: `${functionName} requires a numeric count` }
+    }
+    if (count < 0) {
+        return { status: 'error', message: `${functionName} requires a non-negative count` }
+    }
+    return { status: 'success', value: Math.trunc(count) }
+}
+
+const toFormulaTable = (value, functionName) => {
+    if (!Array.isArray(value)) {
+        return { status: 'error', message: `${functionName} requires a table argument` }
+    }
+    return { status: 'success', value }
+}
+
 const countNonBlankValues = (...args) =>
     flattenFormulaValues(args).filter(value => !isBlankFormulaValue(value)).length
 
@@ -315,6 +360,406 @@ const roundWithMode = (value, digits = 0, mode = 'nearest') => {
 const populationVariance = (values) => {
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length
     return values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length
+}
+
+const DEFAULT_TEXT_LANGUAGE_TAG = 'en-US'
+const TEXT_LANGUAGE_PLACEHOLDER_REGEX = /\[\$-([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)\]/i
+
+const resolveTextLocale = (candidate) => {
+    const fallback = Intl.DateTimeFormat().resolvedOptions().locale || DEFAULT_TEXT_LANGUAGE_TAG
+    const requested = typeof candidate === 'string' && candidate.trim() ? candidate.trim() : fallback
+
+    try {
+        return new Intl.DateTimeFormat(requested).resolvedOptions().locale
+    } catch {
+        return DEFAULT_TEXT_LANGUAGE_TAG
+    }
+}
+
+const getLocaleNumberSeparators = (locale) => {
+    try {
+        const parts = new Intl.NumberFormat(locale).formatToParts(1234567.89)
+        return {
+            decimal: parts.find(part => part.type === 'decimal')?.value || '.',
+            group: parts.find(part => part.type === 'group')?.value || ','
+        }
+    } catch {
+        return { decimal: '.', group: ',' }
+    }
+}
+
+const extractCustomFormatLanguage = (customFormat, fallbackLocale) => {
+    const rawFormat = String(customFormat ?? '')
+    const match = TEXT_LANGUAGE_PLACEHOLDER_REGEX.exec(rawFormat)
+    return {
+        format: match ? rawFormat.replace(match[0], '') : rawFormat,
+        formatLocale: resolveTextLocale(match?.[1] || fallbackLocale)
+    }
+}
+
+const coerceTextNumberValue = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+    return null
+}
+
+const coerceTextDateValue = (value) => {
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : new Date(value.getTime())
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        const parsed = new Date(value)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    const storedDate = parseStoredDateValue(value)
+    if (storedDate) return storedDate
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = new Date(value)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    return null
+}
+
+const dateTimePart = (value, functionName, extract) => {
+    if (isBlankFormulaValue(value)) {
+        return { status: 'success', message: null }
+    }
+    const date = coerceTextDateValue(value)
+    if (!date) {
+        return { status: 'error', message: `${functionName} requires a valid date/time value` }
+    }
+    return { status: 'success', message: extract(date) }
+}
+
+const START_OF_WEEK_TO_JS = {
+    [StartOfWeek.Sunday]: 0,
+    [StartOfWeek.Monday]: 1,
+    [StartOfWeek.Tuesday]: 2,
+    [StartOfWeek.Wednesday]: 3,
+    [StartOfWeek.Thursday]: 4,
+    [StartOfWeek.Friday]: 5,
+    [StartOfWeek.Saturday]: 6
+}
+
+/** Excel-style weekday codes accepted by Power Fx for StartOfWeek (subset). */
+const EXCEL_START_OF_WEEK = {
+    1: 0,
+    2: 1,
+    11: 1,
+    12: 2,
+    13: 3,
+    14: 4,
+    15: 5,
+    16: 6,
+    17: 0
+}
+
+const resolveStartOfWeekJsDay = (arg, functionName) => {
+    if (arg === undefined || arg === null || arg === '') {
+        return { status: 'success', value: 0 }
+    }
+    if (typeof arg === 'string' && Object.prototype.hasOwnProperty.call(START_OF_WEEK_TO_JS, arg)) {
+        return { status: 'success', value: START_OF_WEEK_TO_JS[arg] }
+    }
+    if (typeof arg === 'number' && Number.isFinite(arg)) {
+        const n = Math.trunc(arg)
+        if (Object.prototype.hasOwnProperty.call(EXCEL_START_OF_WEEK, n)) {
+            return { status: 'success', value: EXCEL_START_OF_WEEK[n] }
+        }
+    }
+    return { status: 'error', message: `${functionName} has an invalid StartOfWeek value` }
+}
+
+const startOfWeekContaining = (d, startDayJs) => {
+    const day = d.getDay()
+    const diff = (day - startDayJs + 7) % 7
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff)
+}
+
+const daysBetweenUtcDates = (a, b) => {
+    const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())
+    const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
+    return Math.round((ub - ua) / 86400000)
+}
+
+const weekNumForDate = (d, startDayJs) => {
+    const y = d.getFullYear()
+    const jan1 = new Date(y, 0, 1)
+    const weekStartJan1 = startOfWeekContaining(jan1, startDayJs)
+    const weekStartD = startOfWeekContaining(d, startDayJs)
+    return 1 + Math.floor(daysBetweenUtcDates(weekStartJan1, weekStartD) / 7)
+}
+
+const formatIntlDatePart = (value, locale, options, useUTC = false) => {
+    const nextOptions = useUTC ? { ...options, timeZone: 'UTC' } : options
+    return new Intl.DateTimeFormat(locale, nextOptions).format(value)
+}
+
+const formatDateTimeEnumValue = (value, formatEnum, resultLocale) => {
+    if (formatEnum === DateTimeFormat.UTC) {
+        return { status: 'success', message: value.toISOString() }
+    }
+
+    const dateOptionsByFormat = {
+        [DateTimeFormat.LongDate]: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+        [DateTimeFormat.LongDateTime]: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+        [DateTimeFormat.LongDateTime24]: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+        [DateTimeFormat.ShortDate]: { month: 'numeric', day: 'numeric', year: 'numeric' },
+        [DateTimeFormat.ShortDateTime]: { month: 'numeric', day: 'numeric', year: 'numeric' },
+        [DateTimeFormat.ShortDateTime24]: { month: 'numeric', day: 'numeric', year: 'numeric' }
+    }
+
+    const timeOptionsByFormat = {
+        [DateTimeFormat.LongDateTime]: { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true },
+        [DateTimeFormat.LongDateTime24]: { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, hourCycle: 'h23' },
+        [DateTimeFormat.LongTime]: { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true },
+        [DateTimeFormat.LongTime24]: { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, hourCycle: 'h23' },
+        [DateTimeFormat.ShortDateTime]: { hour: 'numeric', minute: '2-digit', hour12: true },
+        [DateTimeFormat.ShortDateTime24]: { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' },
+        [DateTimeFormat.ShortTime]: { hour: 'numeric', minute: '2-digit', hour12: true },
+        [DateTimeFormat.ShortTime24]: { hour: '2-digit', minute: '2-digit', hour12: false, hourCycle: 'h23' }
+    }
+
+    const dateOptions = dateOptionsByFormat[formatEnum]
+    const timeOptions = timeOptionsByFormat[formatEnum]
+
+    if (!dateOptions && !timeOptions) {
+        return { status: 'error', message: 'Unsupported DateTimeFormat value' }
+    }
+
+    if (dateOptions && timeOptions) {
+        return {
+            status: 'success',
+            message: `${formatIntlDatePart(value, resultLocale, dateOptions)} ${formatIntlDatePart(value, resultLocale, timeOptions)}`
+        }
+    }
+
+    return {
+        status: 'success',
+        message: formatIntlDatePart(value, resultLocale, dateOptions || timeOptions)
+    }
+}
+
+const tokenizeCustomDateFormat = (customFormat) => {
+    const tokens = []
+    let index = 0
+
+    const pushLiteral = (value) => {
+        if (!value) return
+        const previous = tokens[tokens.length - 1]
+        if (previous?.type === 'literal') {
+            previous.value += value
+            return
+        }
+        tokens.push({ type: 'literal', value })
+    }
+
+    while (index < customFormat.length) {
+        const remaining = customFormat.slice(index)
+        if (/^AM\/PM/i.test(remaining)) {
+            tokens.push({ type: 'meridiem', short: false })
+            index += 5
+            continue
+        }
+        if (/^a\/p/i.test(remaining)) {
+            tokens.push({ type: 'meridiem', short: true })
+            index += 3
+            continue
+        }
+
+        const current = customFormat[index]
+        const lower = current.toLowerCase()
+        if ('ymdhsf'.includes(lower)) {
+            let count = 1
+            while (index + count < customFormat.length && customFormat[index + count].toLowerCase() === lower) {
+                count += 1
+            }
+            tokens.push({ type: 'token', symbol: lower, count })
+            index += count
+            continue
+        }
+
+        pushLiteral(current)
+        index += 1
+    }
+
+    const nextSymbolToken = (startIndex, step) => {
+        for (let currentIndex = startIndex + step; currentIndex >= 0 && currentIndex < tokens.length; currentIndex += step) {
+            if (tokens[currentIndex].type === 'token') return tokens[currentIndex]
+        }
+        return null
+    }
+
+    return tokens.map((token, tokenIndex) => {
+        if (token.type !== 'token' || token.symbol !== 'm') return token
+        const previous = nextSymbolToken(tokenIndex, -1)
+        const next = nextSymbolToken(tokenIndex, 1)
+        return {
+            ...token,
+            kind: previous?.symbol === 'h' || next?.symbol === 's' ? 'minute' : 'month'
+        }
+    })
+}
+
+const looksLikeDateTimeCustomFormat = (customFormat) => {
+    const format = String(customFormat ?? '')
+    if (/AM\/PM|a\/p/i.test(format)) return true
+    return tokenizeCustomDateFormat(format).some(token => token.type === 'token')
+}
+
+const formatCustomDateValue = (value, customFormat, resultLocale) => {
+    const tokens = tokenizeCustomDateFormat(customFormat)
+    const uses12HourClock = tokens.some(token => token.type === 'meridiem')
+    const year = value.getFullYear()
+    const month = value.getMonth() + 1
+    const day = value.getDate()
+    const hours = value.getHours()
+    const minutes = value.getMinutes()
+    const seconds = value.getSeconds()
+    const milliseconds = value.getMilliseconds()
+
+    return {
+        status: 'success',
+        message: tokens.map((token) => {
+            if (token.type === 'literal') return token.value
+            if (token.type === 'meridiem') {
+                if (token.short) return hours < 12 ? 'a' : 'p'
+                return hours < 12 ? 'AM' : 'PM'
+            }
+
+            if (token.symbol === 'y') {
+                return token.count >= 4
+                    ? String(year).padStart(4, '0')
+                    : String(year).slice(-2).padStart(2, '0')
+            }
+
+            if (token.symbol === 'd') {
+                if (token.count === 1) return String(day)
+                if (token.count === 2) return String(day).padStart(2, '0')
+                if (token.count === 3) return formatIntlDatePart(value, resultLocale, { weekday: 'short' })
+                return formatIntlDatePart(value, resultLocale, { weekday: 'long' })
+            }
+
+            if (token.symbol === 'm' && token.kind === 'month') {
+                if (token.count === 1) return String(month)
+                if (token.count === 2) return String(month).padStart(2, '0')
+                if (token.count === 3) return formatIntlDatePart(value, resultLocale, { month: 'short' })
+                return formatIntlDatePart(value, resultLocale, { month: 'long' })
+            }
+
+            if (token.symbol === 'm' && token.kind === 'minute') {
+                return token.count === 1 ? String(minutes) : String(minutes).padStart(2, '0')
+            }
+
+            if (token.symbol === 'h') {
+                const displayHour = uses12HourClock ? (hours % 12 || 12) : hours
+                return token.count === 1 ? String(displayHour) : String(displayHour).padStart(2, '0')
+            }
+
+            if (token.symbol === 's') {
+                return token.count === 1 ? String(seconds) : String(seconds).padStart(2, '0')
+            }
+
+            if (token.symbol === 'f') {
+                return String(milliseconds).padStart(3, '0').padEnd(token.count, '0').slice(0, token.count)
+            }
+
+            return ''
+        }).join('')
+    }
+}
+
+const formatCustomNumberValue = (value, customFormat, formatLocale, resultLocale) => {
+    const numberValue = coerceTextNumberValue(value)
+    if (numberValue === null) {
+        return { status: 'error', message: 'Text requires a numeric value for this custom format' }
+    }
+
+    const { decimal: formatDecimal, group: formatGroup } = getLocaleNumberSeparators(formatLocale)
+    const { decimal: resultDecimal } = getLocaleNumberSeparators(resultLocale)
+    const firstDigitIndex = customFormat.search(/[0#]/)
+    const lastDigitIndex = Math.max(customFormat.lastIndexOf('0'), customFormat.lastIndexOf('#'))
+
+    if (firstDigitIndex < 0 || lastDigitIndex < 0) {
+        return { status: 'success', message: String(numberValue) }
+    }
+
+    const prefix = customFormat.slice(0, firstDigitIndex)
+    const suffix = customFormat.slice(lastDigitIndex + 1)
+    const skeleton = customFormat.slice(firstDigitIndex, lastDigitIndex + 1)
+
+    let decimalIndex = -1
+    for (let index = skeleton.length - 1; index >= 0; index -= 1) {
+        if (skeleton[index] === formatDecimal && /[0#]/.test(skeleton.slice(index + 1))) {
+            decimalIndex = index
+            break
+        }
+    }
+
+    const integerPattern = decimalIndex >= 0 ? skeleton.slice(0, decimalIndex) : skeleton
+    const fractionPattern = decimalIndex >= 0 ? skeleton.slice(decimalIndex + 1) : ''
+    const minimumIntegerDigits = (integerPattern.match(/0/g) || []).length
+    const minimumFractionDigits = (fractionPattern.match(/0/g) || []).length
+    const maximumFractionDigits = (fractionPattern.match(/[0#]/g) || []).length
+    const useGrouping = integerPattern.includes(formatGroup)
+
+    let formatted = new Intl.NumberFormat(resultLocale, {
+        useGrouping,
+        minimumIntegerDigits: Math.max(1, minimumIntegerDigits),
+        minimumFractionDigits,
+        maximumFractionDigits
+    }).format(Math.abs(numberValue))
+
+    if (minimumIntegerDigits === 0 && Math.abs(numberValue) < 1 && formatted.startsWith(`0${resultDecimal}`)) {
+        formatted = formatted.slice(1)
+    }
+
+    return {
+        status: 'success',
+        message: `${numberValue < 0 ? '-' : ''}${prefix}${formatted}${suffix}`
+    }
+}
+
+const formatTextValue = (value, formatOrEnum, resultLanguageTag) => {
+    const resultLocale = resolveTextLocale(
+        isRuntimeContext(resultLanguageTag) || resultLanguageTag === undefined ? undefined : resultLanguageTag
+    )
+    const hasFormat = !isRuntimeContext(formatOrEnum) && formatOrEnum !== undefined
+
+    if (!hasFormat) {
+        if (value === null || value === undefined) return { status: 'success', message: '' }
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+            return formatDateTimeEnumValue(value, DateTimeFormat.ShortDateTime, resultLocale)
+        }
+        return { status: 'success', message: String(value) }
+    }
+
+    if (Object.values(DateTimeFormat).includes(formatOrEnum)) {
+        const dateValue = coerceTextDateValue(value)
+        if (!dateValue) {
+            return { status: 'error', message: 'Text requires a valid date/time value for this format' }
+        }
+        return formatDateTimeEnumValue(dateValue, formatOrEnum, resultLocale)
+    }
+
+    const { format, formatLocale } = extractCustomFormatLanguage(String(formatOrEnum), resultLocale)
+
+    if (looksLikeDateTimeCustomFormat(format)) {
+        const dateValue = coerceTextDateValue(value)
+        if (!dateValue) {
+            return { status: 'error', message: 'Text requires a valid date/time value for this custom format' }
+        }
+        return formatCustomDateValue(dateValue, format, resultLocale)
+    }
+
+    return formatCustomNumberValue(value, format, formatLocale, resultLocale)
 }
 
 // These are the available functions that can be used in the formulas within our app. 
@@ -418,15 +863,18 @@ export const FUNCTIONS = [
     {
         name: "Text",
         type: Type.TEXT,
-        description: "Returns the text value of a component.",
-        example: 'Text(123)',
-        args: [{ name: "value", type: Type.ANY }],
-        function: (value)=>{
-            //Can we convert to string?
+        description: "Formats a number or date/time value with a predefined DateTimeFormat enum or a custom format string, or converts any value to text using a default format.",
+        example: 'Text(quantity, "#.00")',
+        args: [
+            { name: "value", type: Type.ANY },
+            { name: "format", type: Type.ANY, optional: true },
+            { name: "resultLanguageTag", type: Type.TEXT, optional: true }
+        ],
+        function: (value, formatOrEnum, resultLanguageTag)=>{
             try{
-                return {status: "success", message: String(value)}
+                return formatTextValue(value, formatOrEnum, resultLanguageTag)
             }catch(e){
-                return {status: "error", message: "Value cannot be converted to a string"}
+                return {status: "error", message: "Value cannot be formatted as text"}
             }
         }
     },
@@ -447,6 +895,164 @@ export const FUNCTIONS = [
             }catch(e){
                 return {status: "error", message: "Value cannot be converted to a number"}
             }
+        }
+    },
+    {
+        name: "Boolean",
+        type: Type.BOOLEAN,
+        description: "Converts a text string, number, or untyped value to a boolean value.",
+        example: 'Boolean("true")',
+        args: [{ name: "value", type: Type.ANY }],
+        function: (value) => {
+            try {
+                if (typeof value === 'boolean') {
+                    return { status: "success", message: value }
+                }
+                if (typeof value === 'string') {
+                    const lower = value.trim().toLowerCase()
+                    if (lower === 'true') return { status: "success", message: true }
+                    if (lower === 'false') return { status: "success", message: false }
+                }
+                if (typeof value === 'number') {
+                    return { status: "success", message: value !== 0 }
+                }
+                return { status: "error", message: "Value cannot be converted to a boolean" }
+            } catch (e) {
+                return { status: "error", message: "Value cannot be converted to a boolean" }
+            }
+        }
+    },
+    {
+        name: "Char",
+        type: Type.TEXT,
+        description: "Translates a character code into a string.",
+        example: 'Char(65)',
+        args: [{ name: "characterCode", type: Type.NUMBER }],
+        function: (characterCode) => {
+            try {
+                const num = Number(characterCode)
+                if (isNaN(num)) {
+                    return { status: "error", message: "Value is not a valid number" }
+                }
+                if (num <= 0) {
+                    return { status: "error", message: "Character code must be greater than 0" }
+                }
+                return { status: "success", message: String.fromCharCode(Math.trunc(num)) }
+            } catch (e) {
+                return { status: "error", message: "Cannot convert character code to string" }
+            }
+        }
+    },
+    {
+        name: "Now",
+        type: Type.DATE,
+        description: "Returns the current date and time in the local time zone.",
+        example: 'Now()',
+        args: [],
+        function: () => {
+            return { status: "success", message: new Date() }
+        }
+    },
+    {
+        name: "Today",
+        type: Type.DATE,
+        description: "Returns the current date with the time set to 12:00 AM (midnight) in the local time zone.",
+        example: 'Today()',
+        args: [],
+        function: () => {
+            const d = new Date()
+            return {
+                status: "success",
+                message: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+            }
+        }
+    },
+    {
+        name: "Day",
+        type: Type.NUMBER,
+        description: "Returns the day of the month from a date/time value (1–31).",
+        example: 'Day(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Day", (d) => d.getDate())
+    },
+    {
+        name: "Month",
+        type: Type.NUMBER,
+        description: "Returns the month from a date/time value (1 = January through 12 = December).",
+        example: 'Month(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Month", (d) => d.getMonth() + 1)
+    },
+    {
+        name: "Minute",
+        type: Type.NUMBER,
+        description: "Returns the minute from a date/time value (0–59).",
+        example: 'Minute(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Minute", (d) => d.getMinutes())
+    },
+    {
+        name: "Second",
+        type: Type.NUMBER,
+        description: "Returns the second from a date/time value (0–59).",
+        example: 'Second(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Second", (d) => d.getSeconds())
+    },
+    {
+        name: "Year",
+        type: Type.NUMBER,
+        description: "Returns the four-digit year from a date/time value.",
+        example: 'Year(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Year", (d) => d.getFullYear())
+    },
+    {
+        name: "WeekNum",
+        type: Type.NUMBER,
+        description: "Returns the week number for a date/time value; week 1 is the week that contains January 1. Optional StartOfWeek (default Sunday).",
+        example: 'WeekNum(Now(), StartOfWeek.Monday)',
+        args: [
+            { name: "dateTime", type: Type.DATE },
+            { name: "startOfWeek", type: Type.ANY, optional: true }
+        ],
+        function: (value, startOfWeekArg, _context) => {
+            if (isBlankFormulaValue(value)) {
+                return { status: 'success', message: null }
+            }
+            const date = coerceTextDateValue(value)
+            if (!date) {
+                return { status: 'error', message: 'WeekNum requires a valid date/time value' }
+            }
+            const startRaw = isRuntimeContext(startOfWeekArg) ? undefined : startOfWeekArg
+            const start = resolveStartOfWeekJsDay(startRaw, 'WeekNum')
+            if (start.status === 'error') return start
+            return { status: 'success', message: weekNumForDate(date, start.value) }
+        }
+    },
+    {
+        name: "Weekday",
+        type: Type.NUMBER,
+        description: "Returns the weekday for a date/time value as a number 1–7 relative to the week’s start day (default Sunday = 1 through Saturday = 7). Optional StartOfWeek.",
+        example: 'Weekday(Now(), StartOfWeek.Monday)',
+        args: [
+            { name: "dateTime", type: Type.DATE },
+            { name: "startOfWeek", type: Type.ANY, optional: true }
+        ],
+        function: (value, startOfWeekArg, _context) => {
+            if (isBlankFormulaValue(value)) {
+                return { status: 'success', message: null }
+            }
+            const date = coerceTextDateValue(value)
+            if (!date) {
+                return { status: 'error', message: 'Weekday requires a valid date/time value' }
+            }
+            const startRaw = isRuntimeContext(startOfWeekArg) ? undefined : startOfWeekArg
+            const start = resolveStartOfWeekJsDay(startRaw, 'Weekday')
+            if (start.status === 'error') return start
+            const dow = date.getDay()
+            const offset = (dow - start.value + 7) % 7
+            return { status: 'success', message: offset + 1 }
         }
     },
     {
@@ -475,10 +1081,7 @@ export const FUNCTIONS = [
         example: 'Upper("hello")',
         args: [{ name: "text", type: Type.TEXT }],
         function: (value) => {
-            if (value === null || value === undefined) {
-                return { status: "success", message: "" }
-            }
-            return { status: "success", message: String(value).toUpperCase() }
+            return { status: "success", message: toFormulaText(value).toUpperCase() }
         }
     },
     {
@@ -488,10 +1091,57 @@ export const FUNCTIONS = [
         example: 'Lower("HELLO")',
         args: [{ name: "text", type: Type.TEXT }],
         function: (value) => {
-            if (value === null || value === undefined) {
-                return { status: "success", message: "" }
+            return { status: "success", message: toFormulaText(value).toLowerCase() }
+        }
+    },
+    {
+        name: "Len",
+        type: Type.NUMBER,
+        description: "Returns the number of characters in a text value.",
+        example: 'Len("hello")',
+        args: [{ name: "text", type: Type.TEXT }],
+        function: (value) => ({
+            status: "success",
+            message: toFormulaText(value).length
+        })
+    },
+    {
+        name: "Left",
+        type: Type.TEXT,
+        description: "Returns the leftmost characters from a text value.",
+        example: 'Left("hello", 2)',
+        args: [
+            { name: "text", type: Type.TEXT },
+            { name: "count", type: Type.NUMBER }
+        ],
+        function: (value, count) => {
+            const normalizedCount = toTextCount(count, "Left")
+            if (normalizedCount.status === "error") return normalizedCount
+
+            return {
+                status: "success",
+                message: toFormulaText(value).slice(0, normalizedCount.value)
             }
-            return { status: "success", message: String(value).toLowerCase() }
+        }
+    },
+    {
+        name: "Right",
+        type: Type.TEXT,
+        description: "Returns the rightmost characters from a text value.",
+        example: 'Right("hello", 2)',
+        args: [
+            { name: "text", type: Type.TEXT },
+            { name: "count", type: Type.NUMBER }
+        ],
+        function: (value, count) => {
+            const normalizedCount = toTextCount(count, "Right")
+            if (normalizedCount.status === "error") return normalizedCount
+
+            const text = toFormulaText(value)
+            return {
+                status: "success",
+                message: normalizedCount.value === 0 ? "" : text.slice(-normalizedCount.value)
+            }
         }
     },
     {
@@ -738,6 +1388,43 @@ export const FUNCTIONS = [
         }
     },
     {
+        name: "First",
+        type: Type.ANY,
+        description: "Returns the first record of a table.",
+        example: 'First(Table({Name:"Ada"},{Name:"Grace"}))',
+        args: [{ name: "table", type: Type.ANY }],
+        function: (table) => {
+            const normalizedTable = toFormulaTable(table, "First")
+            if (normalizedTable.status === "error") return normalizedTable
+            return {
+                status: "success",
+                message: normalizedTable.value.length ? normalizedTable.value[0] : null
+            }
+        }
+    },
+    {
+        name: "FirstN",
+        type: Type.ANY,
+        description: "Returns the first set of records from a table.",
+        example: 'FirstN(Table({Name:"Ada"},{Name:"Grace"}), 1)',
+        args: [
+            { name: "table", type: Type.ANY },
+            { name: "count", type: Type.NUMBER }
+        ],
+        function: (table, count) => {
+            const normalizedTable = toFormulaTable(table, "FirstN")
+            if (normalizedTable.status === "error") return normalizedTable
+
+            const normalizedCount = toTextCount(count, "FirstN")
+            if (normalizedCount.status === "error") return normalizedCount
+
+            return {
+                status: "success",
+                message: normalizedTable.value.slice(0, normalizedCount.value)
+            }
+        }
+    },
+    {
         name: "Int",
         type: Type.NUMBER,
         description: "Rounds down to the nearest integer.",
@@ -761,6 +1448,45 @@ export const FUNCTIONS = [
             if (num === null) return { status: "error", message: "Ln requires a numeric argument" }
             if (num <= 0) return { status: "error", message: "Ln requires a positive number" }
             return { status: "success", message: Math.log(num) }
+        }
+    },
+    {
+        name: "Last",
+        type: Type.ANY,
+        description: "Returns the last record of a table.",
+        example: 'Last(Table({Name:"Ada"},{Name:"Grace"}))',
+        args: [{ name: "table", type: Type.ANY }],
+        function: (table) => {
+            const normalizedTable = toFormulaTable(table, "Last")
+            if (normalizedTable.status === "error") return normalizedTable
+            return {
+                status: "success",
+                message: normalizedTable.value.length ? normalizedTable.value[normalizedTable.value.length - 1] : null
+            }
+        }
+    },
+    {
+        name: "LastN",
+        type: Type.ANY,
+        description: "Returns the last set of records from a table.",
+        example: 'LastN(Table({Name:"Ada"},{Name:"Grace"}), 1)',
+        args: [
+            { name: "table", type: Type.ANY },
+            { name: "count", type: Type.NUMBER }
+        ],
+        function: (table, count) => {
+            const normalizedTable = toFormulaTable(table, "LastN")
+            if (normalizedTable.status === "error") return normalizedTable
+
+            const normalizedCount = toTextCount(count, "LastN")
+            if (normalizedCount.status === "error") return normalizedCount
+
+            return {
+                status: "success",
+                message: normalizedCount.value === 0
+                    ? []
+                    : normalizedTable.value.slice(-normalizedCount.value)
+            }
         }
     },
     {

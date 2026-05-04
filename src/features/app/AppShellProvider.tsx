@@ -24,7 +24,9 @@ interface AppShellContextValue {
   credits: CreditsState;
   isAdmin: boolean;
   isDarkMode: boolean;
+  isImmersiveMode: boolean;
   setIsDarkMode: Dispatch<SetStateAction<boolean>>;
+  setIsImmersiveMode: Dispatch<SetStateAction<boolean>>;
   refreshCredits: (firebaseUser?: User | null) => Promise<void>;
   signOutUser: () => Promise<void>;
 }
@@ -58,11 +60,22 @@ async function fetchAdminStatus(firebaseUser: User): Promise<boolean> {
 }
 
 export function AppShellProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_E2E_TEST === "true") {
+      return { uid: "test-user-id", email: "test@example.com", getIdToken: async () => "dummy" } as any;
+    }
+    return null;
+  });
+  const [authLoading, setAuthLoading] = useState(() => {
+    if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_E2E_TEST === "true") {
+      return false;
+    }
+    return true;
+  });
   const [credits, setCredits] = useState<CreditsState>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false);
 
   const refreshCredits = useCallback(async (firebaseUser?: User | null) => {
     const targetUser = firebaseUser ?? auth.currentUser;
@@ -101,6 +114,12 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   }, [isDarkMode]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_E2E_TEST === "true") {
+      setCredits(999);
+      setIsAdmin(true);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser ?? null);
 
@@ -138,11 +157,13 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
       credits,
       isAdmin,
       isDarkMode,
+      isImmersiveMode,
       setIsDarkMode,
+      setIsImmersiveMode,
       refreshCredits,
       signOutUser,
     }),
-    [user, authLoading, credits, isAdmin, isDarkMode, refreshCredits, signOutUser],
+    [user, authLoading, credits, isAdmin, isDarkMode, isImmersiveMode, refreshCredits, signOutUser],
   );
 
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;

@@ -1,16 +1,38 @@
 import * as React from 'react'
 import FormulaInput from './FormulaInput'
-import { getPropertyOptionValues, getPropertyValueType, isEventProperty, isFormulaValue, normalizeFormulaString, validateProperty } from '../../../common/helpers'
+import { getPropertyOptionValues, getPropertyValueType, getPropertyValidationIssue, isEventProperty, isFormulaValue, normalizeFormulaString } from '../../../common/helpers'
 import { sanitizeSvgFragment } from '@/lib/content-sanitizer'
 
+function getValidationInputClass(issue) {
+  if (!issue) return ""
+  if (issue.severity === 'warning') return "border-amber-400/80 ring-1 ring-amber-500/20 bg-amber-500/5"
+  return "border-red/100 ring-1 ring-red/100 bg-red/5"
+}
+
+function getValidationTextClass(issue) {
+  if (issue?.severity === 'warning') return "text-[10px] text-amber-300 font-medium px-1 leading-none"
+  return "text-[10px] text-red/100 font-medium px-1 leading-none"
+}
+
 // ── Validated Number Input ─────────────────────────────────────────────────
-function ValidatedNumberInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedNumberInput({
+  prop,
+  value,
+  onChange,
+  className = "",
+  localVars,
+  flatNodes,
+  parentNode,
+  selfNode,
+  completionExtraIdentifiers,
+}: any) {
   const [tempValue, setTempValue] = React.useState(String(value))
   const [nError, setNError] = React.useState<any>(null)
+  const revertAtFocusRef = React.useRef(String(value))
 
   React.useEffect(() => {
     setTempValue(String(value))
-    setNError(validateProperty(
+    setNError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "Value", type: "number" },
       String(value),
@@ -22,7 +44,7 @@ function ValidatedNumberInput({ prop, value, onChange, className = "", localVars
 
   const handleChange = (v) => {
     setTempValue(v)
-    setNError(validateProperty(
+    setNError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "Value", type: "number" },
       v,
@@ -30,6 +52,9 @@ function ValidatedNumberInput({ prop, value, onChange, className = "", localVars
       flatNodes,
       parentNode
     ))
+    if (v.trim().startsWith('=')) {
+      onChange(normalizeFormulaString(v), { formula: true })
+    }
   }
 
   const handleBlur = () => {
@@ -51,30 +76,64 @@ function ValidatedNumberInput({ prop, value, onChange, className = "", localVars
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
+        onFocus={() => {
+          revertAtFocusRef.current = String(value)
+        }}
         hasError={!!nError}
+        validationTone={nError?.severity}
+        completionExtraIdentifiers={completionExtraIdentifiers}
         onKeyDown={(e: any) => {
           if (e.key === 'Enter') e.target.blur()
           if (e.key === 'Escape') {
-            setTempValue(String(value))
-            setNError(null)
+            const snap = revertAtFocusRef.current
+            setTempValue(snap)
+            setNError(getPropertyValidationIssue(
+              selfNode,
+              prop || { name: "Value", type: "number" },
+              snap,
+              localVars,
+              flatNodes,
+              parentNode
+            ))
+            if (snap.trim().startsWith('=')) {
+              onChange(normalizeFormulaString(snap), { formula: true })
+            } else {
+              const n = Number(snap)
+              if (!isNaN(n) && snap.trim() !== '') {
+                onChange(n, { formula: false })
+              } else {
+                onChange(snap.trim(), { formula: true })
+              }
+            }
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${nError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${getValidationInputClass(nError)}`}
       />
-      {nError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{nError}</span>}
+      {nError && <span className={getValidationTextClass(nError)}>{nError.message}</span>}
     </div>
   )
 }
 
 // ── Validated Event Input ──────────────────────────────────────────────────
-function ValidatedEventInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedEventInput({
+  prop,
+  value,
+  onChange,
+  className = "",
+  localVars,
+  flatNodes,
+  parentNode,
+  selfNode,
+  completionExtraIdentifiers,
+}: any) {
   const [tempValue, setTempValue] = React.useState(String(value || ""))
   const [eError, setEError] = React.useState<any>(null)
+  const revertAtFocusRef = React.useRef(String(value ?? ''))
 
   React.useEffect(() => {
     setTempValue(String(value || ""))
-    setEError(validateProperty(
+    setEError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "OnSelect", type: "string" },
       String(value || ""),
@@ -86,7 +145,7 @@ function ValidatedEventInput({ prop, value, onChange, className = "", localVars,
 
   const handleChange = (v) => {
     setTempValue(v)
-    setEError(validateProperty(
+    setEError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "OnSelect", type: "string" },
       v,
@@ -94,6 +153,7 @@ function ValidatedEventInput({ prop, value, onChange, className = "", localVars,
       flatNodes,
       parentNode
     ))
+    onChange(v.trim())
   }
 
   const handleBlur = () => {
@@ -106,30 +166,55 @@ function ValidatedEventInput({ prop, value, onChange, className = "", localVars,
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
+        onFocus={() => {
+          revertAtFocusRef.current = String(value ?? '')
+        }}
         hasError={!!eError}
+        validationTone={eError?.severity}
+        completionExtraIdentifiers={completionExtraIdentifiers}
         onKeyDown={(e: any) => {
           if (e.key === "Enter") e.target.blur()
           if (e.key === "Escape") {
-            setTempValue(String(value || ""))
-            setEError(null)
+            const snap = revertAtFocusRef.current
+            setTempValue(snap)
+            setEError(getPropertyValidationIssue(
+              selfNode,
+              prop || { name: "OnSelect", type: "string" },
+              snap,
+              localVars,
+              flatNodes,
+              parentNode
+            ))
+            onChange(snap.trim())
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${eError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${getValidationInputClass(eError)}`}
       />
-      {eError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{eError}</span>}
+      {eError && <span className={getValidationTextClass(eError)}>{eError.message}</span>}
     </div>
   )
 }
 
 // ── Validated String Input ─────────────────────────────────────────────────
-function ValidatedStringInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedStringInput({
+  prop,
+  value,
+  onChange,
+  className = "",
+  localVars,
+  flatNodes,
+  parentNode,
+  selfNode,
+  completionExtraIdentifiers,
+}: any) {
   const [tempValue, setTempValue] = React.useState(String(value || ""))
   const [sError, setSError] = React.useState<any>(null)
+  const revertAtFocusRef = React.useRef(String(value ?? ''))
 
   React.useEffect(() => {
     setTempValue(String(value || ""))
-    setSError(validateProperty(
+    setSError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "Text", type: "string" },
       String(value || ""),
@@ -141,7 +226,7 @@ function ValidatedStringInput({ prop, value, onChange, className = "", localVars
 
   const handleChange = (v) => {
     setTempValue(v)
-    setSError(validateProperty(
+    setSError(getPropertyValidationIssue(
       selfNode,
       prop || { name: "Text", type: "string" },
       v,
@@ -149,6 +234,7 @@ function ValidatedStringInput({ prop, value, onChange, className = "", localVars
       flatNodes,
       parentNode
     ))
+    onChange(v.trim())
   }
 
   const handleBlur = () => {
@@ -161,18 +247,32 @@ function ValidatedStringInput({ prop, value, onChange, className = "", localVars
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
+        onFocus={() => {
+          revertAtFocusRef.current = String(value ?? '')
+        }}
         hasError={!!sError}
+        validationTone={sError?.severity}
+        completionExtraIdentifiers={completionExtraIdentifiers}
         onKeyDown={(e: any) => {
           if (e.key === "Enter") e.target.blur()
           if (e.key === "Escape") {
-            setTempValue(String(value || ""))
-            setSError(null)
+            const snap = revertAtFocusRef.current
+            setTempValue(snap)
+            setSError(getPropertyValidationIssue(
+              selfNode,
+              prop || { name: "Text", type: "string" },
+              snap,
+              localVars,
+              flatNodes,
+              parentNode
+            ))
+            onChange(snap.trim())
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${sError ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${getValidationInputClass(sError)}`}
       />
-      {sError && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{sError}</span>}
+      {sError && <span className={getValidationTextClass(sError)}>{sError.message}</span>}
     </div>
   )
 }
@@ -243,13 +343,24 @@ function FormulaToggleButton({ onClick, children, tone = 'default' }: any) {
   )
 }
 
-function ValidatedFormulaPropertyInput({ prop, value, onChange, className = "", localVars, flatNodes, parentNode, selfNode }) {
+function ValidatedFormulaPropertyInput({
+  prop,
+  value,
+  onChange,
+  className = "",
+  localVars,
+  flatNodes,
+  parentNode,
+  selfNode,
+  completionExtraIdentifiers,
+}: any) {
   const [tempValue, setTempValue] = React.useState(normalizeFormulaString(String(value || "")))
   const [error, setError] = React.useState<any>(null)
+  const revertAtFocusRef = React.useRef(normalizeFormulaString(String(value ?? '')))
 
   React.useEffect(() => {
     setTempValue(normalizeFormulaString(String(value || "")))
-    setError(validateProperty(
+    setError(getPropertyValidationIssue(
       selfNode,
       prop,
       normalizeFormulaString(String(value || "")),
@@ -262,7 +373,7 @@ function ValidatedFormulaPropertyInput({ prop, value, onChange, className = "", 
   const handleChange = (nextValue) => {
     const normalizedValue = normalizeFormulaString(nextValue)
     setTempValue(normalizedValue)
-    setError(validateProperty(
+    setError(getPropertyValidationIssue(
       selfNode,
       prop,
       normalizedValue,
@@ -270,6 +381,7 @@ function ValidatedFormulaPropertyInput({ prop, value, onChange, className = "", 
       flatNodes,
       parentNode
     ))
+    onChange(normalizedValue, { formula: true })
   }
 
   const handleBlur = () => {
@@ -282,23 +394,43 @@ function ValidatedFormulaPropertyInput({ prop, value, onChange, className = "", 
         value={tempValue}
         onChange={handleChange}
         onBlur={handleBlur}
+        onFocus={() => {
+          revertAtFocusRef.current = normalizeFormulaString(String(value ?? ''))
+        }}
         hasError={!!error}
+        validationTone={error?.severity}
+        completionExtraIdentifiers={completionExtraIdentifiers}
         onKeyDown={(e: any) => {
           if (e.key === "Enter") e.target.blur()
           if (e.key === "Escape") {
-            setTempValue(String(value || ""))
-            setError(null)
+            const snap = revertAtFocusRef.current
+            setTempValue(snap)
+            setError(getPropertyValidationIssue(
+              selfNode,
+              prop,
+              snap,
+              localVars,
+              flatNodes,
+              parentNode
+            ))
+            onChange(snap, { formula: true })
             e.target.blur()
           }
         }}
-        className={`w-full ${className} ${error ? "border-red/100 ring-1 ring-red/100 bg-red/5" : ""}`}
+        className={`w-full ${className} ${getValidationInputClass(error)}`}
       />
-      {error && <span className="text-[10px] text-red/100 font-medium px-1 leading-none">{error}</span>}
+      {error && <span className={getValidationTextClass(error)}>{error.message}</span>}
     </div>
   )
 }
 
 export default function PropField({ prop, value, onChange, localVars = {}, flatNodes = [], parentNode = null, selfNode = null }: any) {
+  const formulaCompletionIdentifiers = React.useMemo(() => {
+    const names = (flatNodes || []).map((n: any) => String(n?.name || "").trim()).filter(Boolean);
+    const keys = Object.keys(localVars || {});
+    return [...new Set([...names, ...keys])];
+  }, [flatNodes, localVars]);
+
   if (prop.type === 'boolean') {
     const isFormula = isFormulaValue(value, prop, selfNode)
 
@@ -336,6 +468,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             flatNodes={flatNodes}
             parentNode={parentNode}
             selfNode={selfNode}
+            completionExtraIdentifiers={formulaCompletionIdentifiers}
           />
         )}
       </div>
@@ -434,6 +567,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             flatNodes={flatNodes}
             parentNode={parentNode}
             selfNode={selfNode}
+            completionExtraIdentifiers={formulaCompletionIdentifiers}
           />
         ) : showPopover && (
           <div ref={popoverRef} 
@@ -515,6 +649,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
                     flatNodes={flatNodes}
                     parentNode={parentNode}
                     selfNode={selfNode}
+                    completionExtraIdentifiers={formulaCompletionIdentifiers}
                   />
                 </div>
               ))}
@@ -535,7 +670,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
   }
   if (prop.type === 'select') {
     const isFormula = isFormulaValue(value, prop, selfNode)
-    const selectError = validateProperty(
+    const selectError = getPropertyValidationIssue(
       selfNode,
       prop,
       value,
@@ -573,8 +708,8 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
           )}
         </div>
         {!isFormula && selectError && (
-          <span className="text-[10px] text-red/100 font-medium px-1 leading-none">
-            {selectError}
+          <span className={getValidationTextClass(selectError)}>
+            {selectError.message}
           </span>
         )}
         {isFormula && (
@@ -587,6 +722,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             flatNodes={flatNodes}
             parentNode={parentNode}
             selfNode={selfNode}
+            completionExtraIdentifiers={formulaCompletionIdentifiers}
           />
         )}
       </div>
@@ -620,6 +756,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
             flatNodes={flatNodes}
             parentNode={parentNode}
             selfNode={selfNode}
+            completionExtraIdentifiers={formulaCompletionIdentifiers}
           />
         ) : (
           <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto pr-1">
@@ -661,6 +798,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
           flatNodes={flatNodes}
           parentNode={parentNode}
           selfNode={selfNode}
+          completionExtraIdentifiers={formulaCompletionIdentifiers}
         />
       </div>
     )
@@ -696,6 +834,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
           flatNodes={flatNodes}
           parentNode={parentNode}
           selfNode={selfNode}
+          completionExtraIdentifiers={formulaCompletionIdentifiers}
         />
       </div>
     )
@@ -712,6 +851,7 @@ export default function PropField({ prop, value, onChange, localVars = {}, flatN
         flatNodes={flatNodes}
         parentNode={parentNode}
         selfNode={selfNode}
+        completionExtraIdentifiers={formulaCompletionIdentifiers}
       />
     </div>
   )

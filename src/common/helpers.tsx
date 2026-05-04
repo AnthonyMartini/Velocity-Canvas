@@ -1,10 +1,26 @@
 import React from 'react'
 import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
-import { ALL_ENUM_VALUES } from '@/features/powerapps/functions'
+import { isStoredDateValue } from '@/features/powerapps/date-values'
+import { ALL_ENUM_VALUES, FUNCTIONS } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
+import powerAppsFormulaFunctions from '../../schemas/powerapps_formula_functions.json'
 
 const PROPERTY_DEF_CACHE = new Map()
+const normalizePowerAppsFunctionName = (value: any) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+const OFFICIAL_POWER_APPS_FUNCTIONS = new Set(
+  ((powerAppsFormulaFunctions as any)?.functions || []).map((func: any) =>
+    normalizePowerAppsFunctionName(func?.name)
+  )
+)
+
+const SUPPORTED_POWER_APPS_FUNCTIONS = new Set(
+  (FUNCTIONS || []).map((func: any) => normalizePowerAppsFunctionName(func?.name))
+)
 
 function getPropertyDefsForType(type) {
   if (!type) return []
@@ -88,6 +104,8 @@ export function getPropertyValueType(propDef) {
   if (getPropertyOptionValues(propDef).length > 0) return 'enum'
 
   switch (propDef?.type) {
+    case 'date':
+      return 'date'
     case 'number':
       return 'number'
     case 'boolean':
@@ -96,9 +114,73 @@ export function getPropertyValueType(propDef) {
       return 'color'
     case 'table':
       return 'table'
+    case 'record':
+      return 'record'
     default:
       return 'text'
   }
+}
+
+function isDateValue(value: any) {
+  return isStoredDateValue(value)
+}
+
+function visitFormulaAst(node: any, visitor: (node: any) => void) {
+  if (!node || typeof node !== 'object') return
+
+  visitor(node)
+
+  switch (node.type) {
+    case 'FunctionCall':
+      ;(node.arguments || []).forEach((child: any) => visitFormulaAst(child, visitor))
+      return
+    case 'BinaryExpression':
+    case 'ActionSequence':
+      visitFormulaAst(node.left, visitor)
+      visitFormulaAst(node.right, visitor)
+      return
+    case 'UnaryExpression':
+      visitFormulaAst(node.argument, visitor)
+      return
+    case 'RecordLiteral':
+      Object.values(node.fields || {}).forEach((child: any) => visitFormulaAst(child, visitor))
+      return
+    case 'ArrayLiteral':
+      ;(node.elements || []).forEach((child: any) => visitFormulaAst(child, visitor))
+      return
+    default:
+      return
+  }
+}
+
+function getRecognizedUnsupportedPowerAppsFunctions(ast: any) {
+  const found = new Map<string, string>()
+
+  visitFormulaAst(ast, (node) => {
+    if (node?.type !== 'FunctionCall') return
+
+    const normalizedName = normalizePowerAppsFunctionName(node.name)
+    if (!OFFICIAL_POWER_APPS_FUNCTIONS.has(normalizedName)) return
+    if (SUPPORTED_POWER_APPS_FUNCTIONS.has(normalizedName)) return
+
+    if (!found.has(normalizedName)) {
+      found.set(normalizedName, String(node.name))
+    }
+  })
+
+  return [...found.values()].sort((left, right) => left.localeCompare(right))
+}
+
+function buildUnsupportedPowerAppsFunctionWarning(functionNames: string[]) {
+  if (!Array.isArray(functionNames) || functionNames.length === 0) return null
+
+  if (functionNames.length === 1) {
+    return `Uses Power Apps function "${functionNames[0]}", which Velocity Canvas does not parse yet. We'll preserve the formula when you copy or export.`
+  }
+
+  const preview = functionNames.slice(0, 2).map((name) => `"${name}"`).join(', ')
+  const remainder = functionNames.length > 2 ? ` and ${functionNames.length - 2} more` : ''
+  return `Uses Power Apps functions ${preview}${remainder}, which Velocity Canvas does not parse yet. We'll preserve the formula when you copy or export.`
 }
 
 /**
@@ -481,27 +563,35 @@ export function resolveProperties(comp, localVars, flatNodes, parentNode: any = 
 
 /**
  * Validates a single property on a component, mimicking the logic in PropField.
- * Returns an error string or null if valid.
+ * Returns a validation issue object or null if valid.
  */
-export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode: any = null, options: any = null) {
+export function getPropertyValidationIssue(node, propDef, value, localVars, flatNodes, parentNode: any = null, options: any = null) {
   if (value === undefined || value === null) return null
   const valStr = String(value)
   const expectedType = getPropertyValueType(propDef)
   const isEvent = expectedType === 'event'
 
   if (valStr.trim() === '') {
-    if (expectedType === 'number') return "Required"
+    if (expectedType === 'number') return { severity: 'error', message: 'Required' }
     return null
   }
 
   if (!isEvent && (propDef.type === 'string' || propDef.type === 'text') && valStr.includes("'")) {
-    return 'Single quotes are not allowed in text properties. Use double quotes instead.'
+    return { severity: 'error', message: 'Single quotes are not allowed in text properties. Use double quotes instead.' }
   }
   
   try {
     const controlNames = options?.controlNames || null
     const screens = options?.screens || null
     const ast = parseFormula(valStr, true)
+    const unsupportedFunctions = getRecognizedUnsupportedPowerAppsFunctions(ast)
+    if (unsupportedFunctions.length > 0) {
+      return {
+        severity: 'warning',
+        code: 'unsupported-official-powerapps-function',
+        message: buildUnsupportedPowerAppsFunctionWarning(unsupportedFunctions),
+      }
+    }
     const context: any = {
       isControl: (name: any) => controlNames ? controlNames.has(name) : flatNodes.some((n: any) => n.name === name),
       screens: screens || flatNodes.filter((n: any) => n.type === 'Screen'),
@@ -510,19 +600,36 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
 
     const evaluated = evaluateAST(ast, localVars, flatNodes, new Set<string>(), parentNode, node, context, true)
 
-    if (evaluated instanceof Error) return evaluated.message
+    if (evaluated instanceof Error) return { severity: 'error', message: evaluated.message }
 
     if (!isEvent && ast.type === 'ActionSequence') {
-      return "Actions cannot be used in property formulas"
+      return { severity: 'error', message: 'Actions cannot be used in property formulas' }
     }
 
     if (expectedType === 'number') {
       const n = Number(evaluated)
-      if (isNaN(n)) return "Must evaluate to a number"
+      if (isNaN(n)) return { severity: 'error', message: 'Must evaluate to a number' }
     }
 
     if (expectedType === 'boolean') {
-      if (typeof evaluated !== 'boolean') return "Must evaluate to a boolean"
+      if (typeof evaluated !== 'boolean') return { severity: 'error', message: 'Must evaluate to a boolean' }
+    }
+
+    if (expectedType === 'date') {
+      if (!isDateValue(evaluated)) return { severity: 'error', message: 'Must evaluate to a date value' }
+    }
+
+    if (expectedType === 'record') {
+      if (
+        evaluated !== null &&
+        evaluated !== undefined &&
+        typeof evaluated === 'object' &&
+        !Array.isArray(evaluated) &&
+        'Value' in evaluated
+      ) {
+        return null
+      }
+      return { severity: 'error', message: 'Must evaluate to a record with a Value field (e.g. {"Value":"Overview"})' }
     }
 
     // 'table' type accepts arrays, objects, or strings — no further type check needed
@@ -542,26 +649,29 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
       })
 
       if (!isEnumMatch) {
-        return `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`
+        return {
+          severity: 'error',
+          message: `Invalid enum value. Expected one of: ${validValues.slice(0, 3).join(', ')}${validValues.length > 3 ? '...' : ''}`,
+        }
       }
     }
 
     if (expectedType === 'color') {
       if (typeof evaluated !== 'string' || ALL_ENUM_VALUES.has(evaluated)) {
-        return "Must evaluate to a color value"
+        return { severity: 'error', message: 'Must evaluate to a color value' }
       }
     }
 
     if (expectedType === 'text') {
 
       if (typeof evaluated === 'string' && ALL_ENUM_VALUES.has(evaluated)) {
-        return "Enum values cannot be used in text properties"
+        return { severity: 'error', message: 'Enum values cannot be used in text properties' }
       }
       // Arrays come from Table() / [...] expressions — don't flag them as text errors.
       // They only appear in table-typed properties like Gallery.Items.
       if (Array.isArray(evaluated)) return null
       if (evaluated !== null && evaluated !== undefined && typeof evaluated !== 'string') {
-        return "Must evaluate to a text value"
+        return { severity: 'error', message: 'Must evaluate to a text value' }
       }
     }
 
@@ -571,23 +681,28 @@ export function validateProperty(node, propDef, value, localVars, flatNodes, par
     // However, strict mode evaluateAST *should* return an Error for unresolved functions now.
     // So this check mainly ensures that if it returns an Error object, we catch it.
     if (evaluated && typeof evaluated === 'object' && evaluated instanceof Error) {
-       return evaluated.message;
+       return { severity: 'error', message: evaluated.message }
     }
 
   } catch (e) {
-    return e.message
+    return { severity: 'error', message: e.message }
   }
 
   return null
 }
 
+export function validateProperty(node, propDef, value, localVars, flatNodes, parentNode: any = null, options: any = null) {
+  const issue = getPropertyValidationIssue(node, propDef, value, localVars, flatNodes, parentNode, options)
+  return issue?.severity === 'error' ? issue.message : null
+}
+
 /**
- * Gets all property validation errors in the app.
- * Returns an array of: { nodeId, nodeName, path, propName, error }
+ * Gets all property validation issues in the app.
+ * Returns an array of: { nodeId, nodeName, path, propName, severity, error }
  */
-export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
+export function getAllAppIssues(tree, localVars, schemas, options: any = {}) {
   const { flatNodes: providedFlatNodes = null, treeMeta = null } = options
-  const errors: any[] = []
+  const issues: any[] = []
   const flatNodes = providedFlatNodes || flattenTree(tree, new Set<string>())
   const parentById = treeMeta?.parentById || null
   const screenById = treeMeta?.screenById || null
@@ -627,21 +742,28 @@ export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
       
       // We validate anything that has a value or is explicitly in the schema
       if (value !== undefined && value !== null) {
-         const error = validateProperty(node, propDef, value, localVars, flatNodes, parentNode, validationContext)
-         if (error) {
-           errors.push({
+         const issue = getPropertyValidationIssue(node, propDef, value, localVars, flatNodes, parentNode, validationContext)
+         if (issue) {
+           issues.push({
              nodeId: node.id,
              nodeName: node.name,
              path: `${screenName}${node.type !== 'Screen' ? '.' + node.name : ''}.${propKey}`,
              propName: propKey,
-             error: error
+             severity: issue.severity,
+             code: issue.code || null,
+             error: issue.message,
+             message: issue.message,
            })
          }
       }
     }
   }
 
-  return errors
+  return issues
+}
+
+export function getAllAppErrors(tree, localVars, schemas, options: any = {}) {
+  return getAllAppIssues(tree, localVars, schemas, options).filter((issue: any) => issue?.severity === 'error')
 }
 
 /**

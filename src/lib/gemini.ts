@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT } from "./prompts";
+import { FORMULA_BUILDER_SYSTEM_PROMPT, TWEAK_SYSTEM_PROMPT, RENDERER_CHAT_SYSTEM_PROMPT } from "./prompts";
 
 // ── Client Factories ─────────────────────────────────────────────────────────
 
@@ -182,3 +182,6 @@ async function* wrapStream(stream: AsyncGenerator<any>) {
 
 export const rendererChatModel = createModel(RENDERER_CHAT_SYSTEM_PROMPT, RENDERER_CHAT_MODEL_NAME, { envPrefix: "RENDERER_CHAT" });
 export const tweakModel = createModel(TWEAK_SYSTEM_PROMPT, TWEAK_MODEL_NAME, { envPrefix: "TWEAK" });
+
+export const FORMULA_BUILDER_MODEL_NAME = TWEAK_MODEL_NAME;
+export const formulaBuilderModel = createModel(FORMULA_BUILDER_SYSTEM_PROMPT, FORMULA_BUILDER_MODEL_NAME, { envPrefix: "FORMULA_BUILDER" });

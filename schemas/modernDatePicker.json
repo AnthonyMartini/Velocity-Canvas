@@ -29,7 +29,7 @@
     "Y": 80
   },
   "properties": [
-    { "key": "SelectedDate", "label": "Selected Date", "type": "text", "propertyType": "Input" },
+    { "key": "SelectedDate", "label": "Selected Date", "type": "date", "propertyType": "Output" },
     { "key": "StartDate", "label": "Start Date", "type": "text", "propertyType": "Input" },
     { "key": "EndDate", "label": "End Date", "type": "text", "propertyType": "Input" },
     { "key": "Format", "label": "Format", "type": "text", "propertyType": "Input" },

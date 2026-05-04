@@ -2,6 +2,7 @@ import PropTypes from 'prop-types'
 import ButtonRenderer from './ButtonRenderer'
 import ModernButtonRenderer from './ModernButtonRenderer'
 import ModernDropdownRenderer from './ModernDropdownRenderer'
+import ModernTabListRenderer from './ModernTabListRenderer'
 import ModernCheckboxRenderer from './ModernCheckboxRenderer'
 import ModernComboBoxRenderer from './ModernComboBoxRenderer'
 import ModernProgressBarRenderer from './ModernProgressBarRenderer'
@@ -122,6 +123,7 @@ export default function ContainerRenderer({
         if (child.type === 'Button') return <ButtonRenderer key={child.id} {...childProps} />
         if (child.type === 'ModernButton') return <ModernButtonRenderer key={child.id} {...childProps} />
         if (child.type === 'ModernDropdown') return <ModernDropdownRenderer key={child.id} {...childProps} />
+        if (child.type === 'ModernTabList') return <ModernTabListRenderer key={child.id} {...childProps} />
         if (child.type === 'ModernCheckbox') return <ModernCheckboxRenderer key={child.id} {...childProps} />
         if (child.type === 'ModernComboBox') return <ModernComboBoxRenderer key={child.id} {...childProps} />
         if (child.type === 'ModernProgressBar') return <ModernProgressBarRenderer key={child.id} {...childProps} />

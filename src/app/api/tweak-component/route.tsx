@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
+import { AI_PROMPT_COMPONENT_RULES_TEXT, buildSelectedComponentPromptAccessText } from "@/features/powerapps/ai-prompt-access";
 import { TEXT_SIZING_RUNTIME_GUIDE } from "@/features/powerapps/text-sizing";
 import { tweakModel, TWEAK_MODEL_NAME } from "@/lib/gemini";
 import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
@@ -38,8 +39,8 @@ const AI_SUMMARY_KEYS = new Set([
 
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
+  AI_PROMPT_COMPONENT_RULES_TEXT,
   '- Preserve the selected component type exactly; do not convert it to a modern control or invent modern-only properties.',
-  '- Only use supported component property keys and formulas that this renderer understands.',
   '- Parent references are limited to "Parent.Width", "Parent.Height", "Parent.TemplateWidth", and "Parent.TemplateHeight" only.',
   '- "Parent.TemplateWidth" and "Parent.TemplateHeight" are only valid for children inside a Gallery.',
   '- For a vertical gallery, Parent.TemplateHeight = Parent.TemplateSize and Parent.TemplateWidth = Parent.Width. For a horizontal gallery, Parent.TemplateWidth = Parent.TemplateSize and Parent.TemplateHeight = Parent.Height.',
@@ -91,6 +92,7 @@ function buildTweakPrompt({ canvasWidth, canvasHeight, component, parent, siblin
     `Canvas size: ${canvasWidth} x ${canvasHeight} px.`,
     `Selected component:\n${JSON.stringify(component)}`,
     ENGINE_COMPATIBILITY_PROMPT,
+    buildSelectedComponentPromptAccessText(component?.type),
     TEXT_SIZING_RUNTIME_GUIDE,
   ];
 

@@ -32,7 +32,7 @@
   },
   "properties": [
     { "key": "Items", "label": "Items", "type": "text", "propertyType": "Input" },
-    { "key": "Default", "label": "Default", "type": "text", "propertyType": "Input" },
+    { "key": "Default", "label": "Default", "type": "record", "propertyType": "Input" },
     { "key": "Selected", "label": "Selected", "type": "text", "propertyType": "Output" },
     { "key": "Align", "label": "Text Align", "type": "select", "options": ["Align.Left", "Align.Center", "Align.Right"], "propertyType": "Input" },
     { "key": "Alignment", "label": "Layout direction", "type": "select", "options": ["LayoutDirection.Horizontal", "LayoutDirection.Vertical"], "propertyType": "Input" },

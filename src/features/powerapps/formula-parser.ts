@@ -2,6 +2,23 @@ import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderSt
 import { SCHEMAS } from '@/features/powerapps/schema'
 
 /**
+ * Output properties (e.g. Tab List `Selected`) are often stored as JSON object strings.
+ * When walking `Control.Selected.Value`, unwrap so nested record fields resolve.
+ */
+function unwrapJsonRecordString(value: any): any {
+  if (typeof value !== 'string') return value
+  const t = value.trim()
+  if (!t.startsWith('{')) return value
+  try {
+    const parsed = JSON.parse(t)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+  } catch {
+    return value
+  }
+  return value
+}
+
+/**
  * Parses a formula string into an Abstract Syntax Tree (AST).
  * Handles function calls, property access (Component.Property), strings, numbers, booleans, and math operators.
  * @param {string} formula
@@ -332,6 +349,7 @@ export function evaluateAST(
       let current = target
       for (const part of parts) {
         if (current == null) return undefined
+        current = unwrapJsonRecordString(current)
         current = getPropertyValue(current, part)
       }
       return current
@@ -437,7 +455,31 @@ export function evaluateAST(
     if (!targetNode && ALL_ENUM_VALUES.has(path)) return path
 
     if (targetNode) {
-      let rawVal = remainingParts.length === 1 ? getPropertyValue(targetNode, propName) : getValueFromPath(targetNode, remainingParts)
+      // Tab List `Selected` is often blank until the user interacts; runtime falls back to `Default`.
+      // Without this, `tab_nav_1.Selected.Value` fails validation and strict evaluation.
+      let lookupNode = targetNode
+      if (targetNode.type === 'ModernTabList') {
+        const selectedVal = getPropertyValue(targetNode, 'Selected')
+        const selectedUnset =
+          selectedVal === undefined ||
+          selectedVal === null ||
+          (typeof selectedVal === 'string' && selectedVal.trim() === '')
+        if (selectedUnset) {
+          const defaultVal = getPropertyValue(targetNode, 'Default')
+          const defaultOk =
+            defaultVal !== undefined &&
+            defaultVal !== null &&
+            !(typeof defaultVal === 'string' && defaultVal.trim() === '')
+          if (defaultOk) {
+            lookupNode = { ...targetNode, Selected: defaultVal }
+          }
+        }
+      }
+
+      let rawVal =
+        remainingParts.length === 1
+          ? getPropertyValue(lookupNode, propName)
+          : getValueFromPath(lookupNode, remainingParts)
       const targetPropDef = getSchemaPropertyDef(targetNode, propName)
 
       // Provide implicit fallbacks for Screen/App dimensions if not explicitly set

@@ -40,17 +40,20 @@ import LayerRow from './components/LayerRow'
 import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
 import { resolveSampleTextDeep } from '@/features/powerapps/sample-text'
 import { uid, nextName, createComponent, createFromSpec, componentToYaml, screenToYaml, extractVariables } from '@/features/powerapps/yaml'
-import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, ensureUniqueNodeNames, ensureUniqueNodeListNames, getNodeAbsolutePosition, getAllAppErrors } from '../../common/helpers'
+import { findNode, updateNode, removeNode, insertNode, reorderNode, flattenTree, findParent, isDescendant, handleDropLogic, highlightYamlLine, resolveProperties, getNextAvailableName, ensureUniqueNodeNames, ensureUniqueNodeListNames, getNodeAbsolutePosition, getAllAppErrors, getAllAppIssues } from '../../common/helpers'
 import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 import { appTheme, themeVars } from '@/theme/theme'
 import { createDefaultCanvasThemeState, getActiveCanvasThemeDefinition, normalizeCanvasThemeState, resolveCanvasTheme } from '@/theme/canvasTheme'
 import { looksLikePowerAppsYaml, parsePowerAppsYaml } from '@/lib/powerapps-import'
 import { clearProjectSession, writeProjectSession } from '@/features/projects/session'
+import { useAppShell } from '@/features/app/AppShellProvider'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
 const MIN_CANVAS_ZOOM = 0.25
 const MAX_CANVAS_ZOOM = 3
 const CANVAS_ZOOM_STEP = 0.1
+const PIXEL_TO_POINT_RATIO = 0.75
+const PREVIEW_VERTICAL_GUTTER_PX = 56
 const MAX_PERSISTED_HISTORY_ITEMS = 25
 const createInitialChatMessages = () => ([
   { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
@@ -724,7 +727,7 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
 }
 
 // ── Code Pane ───────────────────────────────────────────────────────────────────
-function CodePane({ node, tree, globalErrors, notify, width, onClose }) {
+function CodePane({ node, tree, globalErrors, globalWarnings, notify, width, onClose }) {
   const [copied, setCopied] = useState(false)
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
@@ -741,6 +744,9 @@ function CodePane({ node, tree, globalErrors, notify, width, onClose }) {
     const hasErrors = node 
       ? globalErrors.some(err => err.nodeId === node.id || isDescendant(tree, err.nodeId, node.id))
       : globalErrors.length > 0;
+    const hasWarnings = node
+      ? globalWarnings.some(warning => warning.nodeId === node.id || isDescendant(tree, warning.nodeId, node.id))
+      : globalWarnings.length > 0
 
     if (hasErrors) {
       notify("Cannot copy YAML with validation errors. Please fix them in the Errors pane first.", "Error");
@@ -748,7 +754,12 @@ function CodePane({ node, tree, globalErrors, notify, width, onClose }) {
     }
 
     navigator.clipboard.writeText(yaml).then(() => {
-      notify('Power Apps YAML copied to clipboard.', 'Success')
+      notify(
+        hasWarnings
+          ? 'Power Apps YAML copied with warnings. Unsupported Power Apps functions were preserved without local parsing.'
+          : 'Power Apps YAML copied to clipboard.',
+        hasWarnings ? 'Warning' : 'Success'
+      )
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     })
@@ -1010,6 +1021,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
 export default function RendererPage({ user, onCreditDeduction, activeProject, projectSessionKey, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, projectSessionKey: string, setActiveProject: (p: any) => void }) {
+  const { setIsImmersiveMode } = useAppShell()
   const [isSaving, setIsSaving] = useState(false)
   const [showExitPrompt, setShowExitPrompt] = useState(false)
   const [lastSavedState, setLastSavedState] = useState('')
@@ -1038,6 +1050,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
   const [selectedIds, setSelectedIds] = useState([]) // Array of selected component IDs
   const [dragOverId, setDragOverId] = useState(null)
   const [collapsedIds, setCollapsedIds] = useState(new Set()) // Container collapse state
+  const [layerSearchQuery, setLayerSearchQuery] = useState('')
   const [zoom, setZoom] = useState(1) // User-facing zoom level (100% baseline)
   const [showCodePane, setShowCodePane] = useState(false) // Toggle visibility of the YAML CodePane
   const [showErrorsPane, setShowErrorsPane] = useState(false) // Toggle visibility of the Errors Pane
@@ -1076,6 +1089,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
   // Drag-to-select state
   const [selectionBox, setSelectionBox] = useState(null)
+  const canvasScrollWrapperRef = useRef<HTMLDivElement | null>(null)
 
   // AI Tweak state
   const [tweakOriginalNode, setTweakOriginalNode] = useState(null)
@@ -1200,6 +1214,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
   // Preview mode
   const [isPlaying, setIsPlaying] = useState(false)
+  const [playModeZoom, setPlayModeZoom] = useState(1)
   const [isAltPressed, setIsAltPressed] = useState(false)
   const effectiveIsPlaying = isPlaying || isAltPressed
 
@@ -1236,7 +1251,6 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     () => JSON.stringify({ name: projectName, tree, canvasW, canvasH, canvasTheme: normalizedCanvasTheme }),
     [projectName, tree, canvasW, canvasH, normalizedCanvasTheme]
   )
-
   // Auto-extract and sync variables from the tree into localVars
   useEffect(() => {
     const extractedNames = declaredLocalVarNames
@@ -1274,6 +1288,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       return { message, type, timer }
     })
   }, [])
+  const globalWarningsRef = useRef<any[]>([])
 
   const copySelectedToClipboard = useCallback(async () => {
     if (selectedIds.length <= 0) return false
@@ -1301,6 +1316,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       : nodesToCopy.some(node =>
           exportErrors.some(err => err.nodeId === node.id || isDescendant(t, err.nodeId, node.id))
         )
+    const warningIssues = globalWarningsRef.current
+    const hasWarnings = nodesToCopy.some(n => n.type === 'App')
+      ? warningIssues.length > 0
+      : nodesToCopy.some(node =>
+          warningIssues.some(warning => warning.nodeId === node.id || isDescendant(t, warning.nodeId, node.id))
+        )
 
     if (hasErrors) {
       notify('Cannot copy YAML with validation errors. Please fix them in the Errors pane first.', 'Error')
@@ -1309,7 +1330,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
     try {
       await navigator.clipboard.writeText(yaml)
-      notify('Power Apps YAML copied to clipboard.', 'Success')
+      notify(
+        hasWarnings
+          ? 'Power Apps YAML copied with warnings. Unsupported Power Apps functions were preserved without local parsing.'
+          : 'Power Apps YAML copied to clipboard.',
+        hasWarnings ? 'Warning' : 'Success'
+      )
     } catch {
       notify('Failed to copy YAML to clipboard.', 'Error')
       return false
@@ -1769,6 +1795,56 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     }
   }, [initialScrollDone, canvasW, canvasH, activeProject])
 
+  const syncPlayModeZoom = useCallback(() => {
+    const wrapper = canvasScrollWrapperRef.current
+    if (!wrapper || canvasH <= 0) return
+
+    const availableHeight = Math.max(wrapper.clientHeight - PREVIEW_VERTICAL_GUTTER_PX, 0)
+    if (availableHeight <= 0) return
+
+    setPlayModeZoom(clampZoomLevel((availableHeight * PIXEL_TO_POINT_RATIO) / canvasH))
+  }, [canvasH])
+
+  useEffect(() => {
+    setIsImmersiveMode(isPlaying)
+
+    return () => {
+      setIsImmersiveMode(false)
+    }
+  }, [isPlaying, setIsImmersiveMode])
+
+  useEffect(() => {
+    if (!isPlaying) return
+
+    syncPlayModeZoom()
+
+    const wrapper = canvasScrollWrapperRef.current
+    if (!wrapper) return
+
+    const centerCanvas = () => {
+      wrapper.scrollLeft = Math.max(0, (wrapper.scrollWidth - wrapper.clientWidth) / 2)
+      wrapper.scrollTop = Math.max(0, (wrapper.scrollHeight - wrapper.clientHeight) / 2)
+    }
+
+    const animationFrame = window.requestAnimationFrame(centerCanvas)
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            syncPlayModeZoom()
+            centerCanvas()
+          })
+
+    resizeObserver?.observe(wrapper)
+    window.addEventListener('resize', syncPlayModeZoom)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', syncPlayModeZoom)
+    }
+  }, [isPlaying, syncPlayModeZoom])
+
   // Derived
   const selectedNode = selectedIds.length === 1 ? findNode(tree, selectedIds[0]) : null
   const schema = selectedNode ? SCHEMAS[selectedNode.type] : null
@@ -1780,9 +1856,32 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
   const flatNodes = flattenTree(tree, collapsedIds)
   const fullFlatNodes = flattenTree(tree, new Set())
 
-  const globalErrors = useMemo(() => {
-    return getAllAppErrors(tree, runtimeLocalVars, SCHEMAS)
+  const layersListForPanel = useMemo(() => {
+    const q = layerSearchQuery.trim().toLowerCase()
+    if (!q) return flatNodes
+    return flatNodes.filter((entry) => {
+      const { _depth, ...node } = entry
+      const display = String(
+        node.name || (node.type === 'Container' ? 'Container' : (node.text || node.type)) || ''
+      ).toLowerCase()
+      return display.includes(q)
+    })
+  }, [flatNodes, layerSearchQuery])
+
+  const globalIssues = useMemo(() => {
+    return getAllAppIssues(tree, runtimeLocalVars, SCHEMAS)
   }, [tree, runtimeLocalVars])
+
+  const globalErrors = useMemo(() => {
+    return globalIssues.filter((issue) => issue.severity === 'error')
+  }, [globalIssues])
+
+  const globalWarnings = useMemo(() => {
+    return globalIssues.filter((issue) => issue.severity === 'warning')
+  }, [globalIssues])
+  useEffect(() => {
+    globalWarningsRef.current = globalWarnings
+  }, [globalWarnings])
 
   // Sticky active screen â€” only changes when the selection moves to a different screen.
   // Deselecting (empty selectedIds) keeps the last active screen.
@@ -2261,7 +2360,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
   // Keep canvas size ref in sync
   useEffect(() => { canvasSizeRef.current = { w: canvasW, h: canvasH } }, [canvasW, canvasH])
 
-  const effectiveZoom = zoom * CANVAS_ZOOM_BASE
+  const effectiveZoom = isPlaying ? playModeZoom : zoom * CANVAS_ZOOM_BASE
   const zoomRef = useRef(effectiveZoom)
   useEffect(() => { zoomRef.current = effectiveZoom }, [effectiveZoom])
 
@@ -2902,6 +3001,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     const hasErrors = exportNode
       ? globalErrors.some(err => err.nodeId === exportNode.id || isDescendant(tree, err.nodeId, exportNode.id))
       : globalErrors.length > 0
+    const hasWarnings = exportNode
+      ? globalWarnings.some(warning => warning.nodeId === exportNode.id || isDescendant(tree, warning.nodeId, exportNode.id))
+      : globalWarnings.length > 0
 
     if (hasErrors) {
       notify('Cannot copy YAML with validation errors. Please fix them in the Errors pane first.', 'Error')
@@ -2909,11 +3011,16 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
     }
 
     navigator.clipboard.writeText(yaml).then(() => {
-      notify('Power Apps YAML copied to clipboard.', 'Success')
+      notify(
+        hasWarnings
+          ? 'Power Apps YAML copied with warnings. Unsupported Power Apps functions were preserved without local parsing.'
+          : 'Power Apps YAML copied to clipboard.',
+        hasWarnings ? 'Warning' : 'Success'
+      )
     }).catch(() => {
       notify('Failed to copy YAML to clipboard.', 'Error')
     })
-  }, [selectedNode, tree, normalizedCanvasTheme, globalErrors, notify])
+  }, [selectedNode, tree, normalizedCanvasTheme, globalErrors, globalWarnings, notify])
 
   // ── AI Component Tweaking ───────────────────────────────────────────────────
   const handleTweakSubmit = useCallback(async () => {
@@ -3238,6 +3345,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       />
 
       {/* Top Bar */}
+      {!isPlaying && (
       <div id="top-menu" className="relative flex items-center justify-center gap-4 px-5 py-2.5 border-b border-overlay/40 bg-surface/55 shrink-0 min-h-[58px]">
         <div className="absolute left-5 z-10 flex items-center gap-4">
         {/* Editable Project Name */}
@@ -3511,11 +3619,13 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
           </button>
         </div>
       </div>
+      )}
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left Toolbar */}
+        {!isPlaying && (
         <div id="left-toolbar" style={{ width: 256 }} className="shrink-0 border-r border-overlay/40 bg-surface/40 flex flex-col overflow-hidden relative">
 
           {/* Component Library */}
@@ -3585,8 +3695,42 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                 </button>
               )}
             </div>
+            {tree.length > 0 && (
+              <div className="px-2 pb-2 pt-0 shrink-0 border-b border-overlay/25 bg-surface/50">
+                <label htmlFor="layers-search" className="sr-only">Search layers by name</label>
+                <div className="relative">
+                  <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-subtext/45 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                  <input
+                    id="layers-search"
+                    type="search"
+                    value={layerSearchQuery}
+                    onChange={(e) => setLayerSearchQuery(e.target.value)}
+                    placeholder="Search by name…"
+                    autoComplete="off"
+                    className="w-full pl-8 pr-8 py-1.5 text-[11px] rounded-lg bg-base/80 border border-overlay/35 text-text placeholder:text-subtext/45 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+                  />
+                  {layerSearchQuery.trim() !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => setLayerSearchQuery('')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-subtext/50 hover:text-text hover:bg-overlay/30 transition-colors"
+                      title="Clear search"
+                      aria-label="Clear search"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className={`overflow-y-auto flex-1 pb-16 space-y-0.5 ${showLayerNames ? 'p-3' : 'px-2 py-3'}`}>
-              {flatNodes.map(({ _depth, ...node }) => (
+              {tree.length > 0 && layerSearchQuery.trim() !== '' && layersListForPanel.length === 0 && (
+                <div className="text-xs text-subtext/50 italic px-2 py-3">No layers match your search.</div>
+              )}
+              {layersListForPanel.map(({ _depth, ...node }) => (
                 <LayerRow
                   key={node.id}
                   node={node}
@@ -3630,7 +3774,10 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
             </div>
           </div>
         </div>
-      </div>    {/* Center: Canvas + Chat */}
+        </div>
+        )}
+
+        {/* Center: Canvas + Chat */}
       <div className="flex-1 relative overflow-hidden" style={{ backgroundColor: themeVars.colors.canvasWorkspace }}>
           {/* Notification Toast centered inside Canvas Workspace */}
           {notification && (() => {
@@ -3722,8 +3869,26 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
             />
           )}
 
+          {isPlaying && (
+            <button
+              type="button"
+              onClick={() => setIsPlaying(false)}
+              className="absolute left-1/2 top-6 z-[70] flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/20 bg-slate-950/72 px-4 py-3 text-sm font-semibold text-white shadow-2xl shadow-black/30 backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900/80"
+              title="Pause preview"
+              aria-label="Pause preview and return to editing"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/14 ring-1 ring-white/10">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M7.5 5.25A.75.75 0 0 1 8.25 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V5.25Zm6 0A.75.75 0 0 1 14.25 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1-.75-.75V5.25Z" />
+                </svg>
+              </span>
+              <span className="whitespace-nowrap">Pause preview</span>
+            </button>
+          )}
+
           <div
             id="canvas-scroll-wrapper"
+            ref={canvasScrollWrapperRef}
             className="absolute inset-0 overflow-auto"
             style={{ backgroundColor: themeVars.colors.canvasSurface, backgroundImage: themeVars.gradients.canvasGrid, backgroundSize: '20px 20px' }}
             onContextMenu={(e) => {
@@ -3739,7 +3904,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               // Handle Marquee Selection (Left Click only)
               if (effectiveIsPlaying) return; // Cannot marquee selection during play mode
               if (e.button !== 0) return; // Only allow left-clicks for marquee selection
-              const isBg = (e.target as HTMLElement).id === 'canvas-scroll-wrapper' || (e.target as HTMLElement).id === 'canvas-padding-wrapper' || (e.target as HTMLElement).id === 'canvas-root'
+              const targetId = (e.target as HTMLElement).id
+              const isBg = targetId === 'canvas-scroll-wrapper' || targetId === 'canvas-padding-wrapper' || targetId === 'canvas-root' || targetId === 'canvas-content-layer'
               if (isBg) {
                 // console.log('--- MOUSE DOWN ON bg ---', e.target.id)
                 if (!e.shiftKey) setSelectedIds([activeScreenNode?.id].filter(Boolean))
@@ -3760,9 +3926,17 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               }
             }}
           >
-            <div id="canvas-padding-wrapper" className="inline-block transition-transform duration-200" style={{ padding: '50vh 50vw', transform: `scale(${effectiveZoom})`, transformOrigin: 'center' }}>
+            <div
+              id="canvas-padding-wrapper"
+              className="inline-block transition-transform duration-200"
+              style={{
+                padding: isPlaying ? '28px 50vw' : '50vh 50vw',
+                transform: `scale(${effectiveZoom})`,
+                transformOrigin: 'center',
+              }}
+            >
               {/* Screen name label above canvas */}
-              {activeScreenNode && (
+              {!isPlaying && activeScreenNode && (
                 <div style={{ marginBottom: 6, marginLeft: 2 }} className="flex items-center gap-2">
                   <div className="inline-flex items-center gap-2 rounded-full border border-overlay/40 bg-base/90 px-3 py-1 shadow-sm backdrop-blur-sm">
                     <div className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -3780,7 +3954,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                 onDragOver={e => { e.preventDefault(); setDragOverId('_canvas') }}
                 onDrop={e => { e.preventDefault(); setDragOverId(null) }}
               >
-                {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
+                <div id="canvas-content-layer" className="absolute inset-0 overflow-hidden">
+                  {(!activeScreenNode || activeScreenNode.children?.length === 0) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center mb-3">
                       <svg className="w-7 h-7 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -3791,7 +3966,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                     <p className="text-gray-200 text-xs mt-1">{canvasW} × {canvasH}</p>
                   </div>
                 )}
-                {(activeScreenNode?.children || []).map((rawComp, siblingIndex) => {
+                  {(activeScreenNode?.children || []).map((rawComp, siblingIndex) => {
                   const isSelected = selectedIds.includes(rawComp.id)
                   const comp = resolveProperties(rawComp, runtimeLocalVars, fullFlatNodes, activeScreenNode)
                   const sharedProps = {
@@ -3838,6 +4013,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
                   return <RendererSwitch key={comp.id} comp={comp} sharedProps={sharedProps} />
                 })}
+                </div>
                 
                 {/* Snap Lines (Guides) */}
                 {snapLines.map((line, i) => {
@@ -4002,6 +4178,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
           </div>
 
           {/* Zoom Controls */}
+          {!isPlaying && (
           <div className={`absolute right-6 flex items-center bg-surface/90 backdrop-blur-md border border-overlay/30 shadow-md shadow-black/10 rounded-lg overflow-hidden z-40 transition-all duration-300 ${chatOpen ? 'bottom-[260px]' : 'bottom-6'}`}>
               <button 
                 onClick={(e) => { e.stopPropagation(); zoomOut(); }}
@@ -4021,8 +4198,9 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               </button>
             </div>
+          )}
 
-          {!chatOpen && (
+          {!isPlaying && !chatOpen && (
             <button
               id="chat-panel-trigger"
               onClick={() => setChatOpen(true)}
@@ -4042,6 +4220,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
 
           {/* AI Chat Panel */}
+          {!isPlaying && (
           <div style={{ height: chatOpen ? chatHeight : 0, boxShadow: themeVars.shadows.chatDock }} className="absolute bottom-0 left-0 w-full z-50 border-t border-overlay/30 bg-base/95 backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out overflow-hidden">
             {/* Resize Handle Chat */}
             <div 
@@ -4180,11 +4359,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               </div>
             </div>
           </div>
+          )}
         </div>
 
 
         {/* Code Pane */}
-        {showCodePane && (
+        {!isPlaying && showCodePane && (
           <div className="relative flex shrink-0">
             {/* Resize Handle Code */}
             <div 
@@ -4198,6 +4378,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               node={selectedNode}
               tree={tree}
               globalErrors={globalErrors}
+              globalWarnings={globalWarnings}
               notify={notify}
               width={codeWidth}
               onClose={() => setShowCodePane(false)}
@@ -4207,7 +4388,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
         {/* Right Panel: Local Data OR Properties */}
         {/* Right Panel: Errors OR Local Data OR Properties */}
-        {showErrorsPane ? (
+        {!isPlaying && (showErrorsPane ? (
           <div style={{ width: rightWidth, backgroundColor: themeVars.colors.panel }} className="shrink-0 border-l border-overlay/30 flex flex-col overflow-hidden relative">
             {/* Resize Handle Right */}
             <div 
@@ -4583,7 +4764,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               </div>
             )}
           </div>
-        ) : null}
+        ) : null)}
       </div>
       {isTourActive && (
         <TourOverlay 
