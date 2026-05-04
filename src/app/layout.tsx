@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import "./globals.css";
 import { themeCssVariables } from "@/theme/theme";
 import { AppShellProvider } from "@/features/app/AppShellProvider";
+import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
   title: "Velocity Canvas",
@@ -18,6 +19,7 @@ export default function RootLayout({
     <html lang="en" style={themeCssVariables as CSSProperties} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
         <AppShellProvider>{children}</AppShellProvider>
+        <Analytics />
       </body>
     </html>
   );
