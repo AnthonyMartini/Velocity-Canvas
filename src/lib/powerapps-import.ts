@@ -390,6 +390,74 @@ export function parsePowerAppsYaml(input: string) {
   };
 }
 
+const EXTERNAL_DATA_FUNCTION_NAMES = [
+  "Choices",
+  "Collect",
+  "ClearCollect",
+  "DataSourceInfo",
+  "Defaults",
+  "Filter",
+  "LookUp",
+  "Patch",
+  "Refresh",
+  "Remove",
+  "RemoveIf",
+  "Search",
+  "SortByColumns",
+  "SubmitForm",
+] as const;
+
+const CONNECTOR_REFERENCE_NAMES = [
+  "Office365Outlook",
+  "Office365Users",
+  "PowerBIIntegration",
+  "MicrosoftTeams",
+  "Planner",
+  "Approvals",
+  "AzureAD",
+] as const;
+
+function pushUnique(values: string[], value: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized || values.includes(normalized)) return;
+  values.push(normalized);
+}
+
+export function analyzePowerAppsImportRisk(input: string) {
+  const text = normalizeInput(input);
+  const externalReferences: string[] = [];
+  const matchedFunctions: string[] = [];
+  const matchedConnectors: string[] = [];
+
+  for (const match of text.matchAll(/\[@([^\]]+)\]/g)) {
+    pushUnique(externalReferences, `[@${match[1].trim()}]`);
+  }
+
+  for (const functionName of EXTERNAL_DATA_FUNCTION_NAMES) {
+    const regex = new RegExp(`\\b${functionName}\\s*\\(`, "i");
+    if (regex.test(text)) {
+      pushUnique(matchedFunctions, functionName);
+    }
+  }
+
+  for (const connectorName of CONNECTOR_REFERENCE_NAMES) {
+    const regex = new RegExp(`\\b${connectorName}\\b`, "i");
+    if (regex.test(text)) {
+      pushUnique(matchedConnectors, connectorName);
+    }
+  }
+
+  return {
+    externalReferences,
+    matchedFunctions,
+    matchedConnectors,
+    hasExternalDataRisk:
+      externalReferences.length > 0 ||
+      matchedFunctions.length > 0 ||
+      matchedConnectors.length > 0,
+  };
+}
+
 function formatPreservedYamlValue(key: string, value: unknown) {
   if (["X", "Y", "Width", "Height"].includes(key)) {
     const n = Number(value);

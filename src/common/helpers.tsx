@@ -1,7 +1,7 @@
 import React from 'react'
 import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
 import { isStoredDateValue } from '@/features/powerapps/date-values'
-import { ALL_ENUM_VALUES, FUNCTIONS } from '@/features/powerapps/functions'
+import { ALL_ENUM_VALUES, FUNCTIONS, coerceFormulaNumber, coerceFormulaText } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
 import powerAppsFormulaFunctions from '../../schemas/powerapps_formula_functions.json'
@@ -607,8 +607,8 @@ export function getPropertyValidationIssue(node, propDef, value, localVars, flat
     }
 
     if (expectedType === 'number') {
-      const n = Number(evaluated)
-      if (isNaN(n)) return { severity: 'error', message: 'Must evaluate to a number' }
+      const numeric = coerceFormulaNumber(evaluated)
+      if (numeric.status !== 'success') return { severity: 'error', message: 'Must evaluate to a number' }
     }
 
     if (expectedType === 'boolean') {
@@ -670,7 +670,8 @@ export function getPropertyValidationIssue(node, propDef, value, localVars, flat
       // Arrays come from Table() / [...] expressions — don't flag them as text errors.
       // They only appear in table-typed properties like Gallery.Items.
       if (Array.isArray(evaluated)) return null
-      if (evaluated !== null && evaluated !== undefined && typeof evaluated !== 'string') {
+      const textValue = coerceFormulaText(evaluated)
+      if (textValue.status !== 'success') {
         return { severity: 'error', message: 'Must evaluate to a text value' }
       }
     }

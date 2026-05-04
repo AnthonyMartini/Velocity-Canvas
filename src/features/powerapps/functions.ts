@@ -303,11 +303,78 @@ const numericValuesFromArgs = (...args) => {
     return { status: 'success', values }
 }
 
-const isBlankFormulaValue = (value) =>
+export const isBlankFormulaValue = (value) =>
     value === null || value === undefined || value === ''
 
-const toFormulaText = (value) =>
-    value === null || value === undefined ? '' : String(value)
+const formatImplicitTextDateValue = (value, locale) => {
+    const hasTime =
+        value.getHours() !== 0 ||
+        value.getMinutes() !== 0 ||
+        value.getSeconds() !== 0 ||
+        value.getMilliseconds() !== 0
+
+    if (hasTime) {
+        return value.toLocaleString(locale)
+    }
+
+    return value.toLocaleDateString(locale)
+}
+
+export const coerceFormulaText = (value, locale = undefined) => {
+    if (isBlankFormulaValue(value)) {
+        return { status: 'success', value: '' }
+    }
+
+    if (typeof value === 'string') {
+        return { status: 'success', value }
+    }
+
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) {
+            return { status: 'error', message: 'Value is not a valid number' }
+        }
+        return { status: 'success', value: String(value) }
+    }
+
+    if (typeof value === 'boolean') {
+        return { status: 'success', value: value ? 'true' : 'false' }
+    }
+
+    const dateValue = coerceTextDateValue(value)
+    if (dateValue) {
+        const resolvedLocale = resolveTextLocale(locale)
+        return { status: 'success', value: formatImplicitTextDateValue(dateValue, resolvedLocale) }
+    }
+
+    return { status: 'error', message: 'Value cannot be converted to text' }
+}
+
+export const coerceFormulaNumber = (value) => {
+    if (isBlankFormulaValue(value)) {
+        return { status: 'success', value: 0 }
+    }
+
+    if (typeof value === 'number') {
+        return Number.isFinite(value)
+            ? { status: 'success', value }
+            : { status: 'error', message: 'Value is not a valid number' }
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) {
+            return { status: 'success', value: Number(trimmed) }
+        }
+        return { status: 'error', message: 'Value is not a valid number' }
+    }
+
+    return { status: 'error', message: 'Value cannot be converted to a number' }
+}
+
+const toFormulaText = (value, locale = undefined) => {
+    const coerced = coerceFormulaText(value, locale)
+    return coerced.status === 'success' ? coerced.value : null
+}
 
 const toTextCount = (value, functionName) => {
     const count = toFiniteNumber(value)
@@ -406,7 +473,7 @@ const coerceTextNumberValue = (value) => {
     return null
 }
 
-const coerceTextDateValue = (value) => {
+export const coerceTextDateValue = (value) => {
     if (value instanceof Date) {
         return Number.isNaN(value.getTime()) ? null : new Date(value.getTime())
     }
@@ -734,11 +801,10 @@ const formatTextValue = (value, formatOrEnum, resultLanguageTag) => {
     const hasFormat = !isRuntimeContext(formatOrEnum) && formatOrEnum !== undefined
 
     if (!hasFormat) {
-        if (value === null || value === undefined) return { status: 'success', message: '' }
-        if (value instanceof Date && !Number.isNaN(value.getTime())) {
-            return formatDateTimeEnumValue(value, DateTimeFormat.ShortDateTime, resultLocale)
-        }
-        return { status: 'success', message: String(value) }
+        const textValue = coerceFormulaText(value, resultLocale)
+        return textValue.status === 'success'
+            ? { status: 'success', message: textValue.value }
+            : { status: 'error', message: textValue.message }
     }
 
     if (Object.values(DateTimeFormat).includes(formatOrEnum)) {
@@ -833,6 +899,14 @@ export const FUNCTIONS = [
         }
     },
     {
+        name: "Blank",
+        type: Type.ANY,
+        description: "Returns a blank value.",
+        example: 'Blank()',
+        args: [],
+        function: () => ({ status: "success", message: null })
+    },
+    {
         name: "Set",
         type: Type.EVENT,
         description: "Sets the value of a variable.",
@@ -885,16 +959,10 @@ export const FUNCTIONS = [
         example: 'Value("123")',
         args: [{ name: "value", type: Type.ANY }],
         function: (value)=>{
-            //Can we convert to number?
-            try{
-                const num = Number(value)
-                if (isNaN(num)) {
-                    return {status: "error", message: "Value is not a valid number"}
-                }
-                return {status: "success", message: num}
-            }catch(e){
-                return {status: "error", message: "Value cannot be converted to a number"}
-            }
+            const coerced = coerceFormulaNumber(value)
+            return coerced.status === "success"
+                ? {status: "success", message: coerced.value}
+                : {status: "error", message: coerced.message}
         }
     },
     {
@@ -992,6 +1060,14 @@ export const FUNCTIONS = [
         function: (value) => dateTimePart(value, "Minute", (d) => d.getMinutes())
     },
     {
+        name: "Hour",
+        type: Type.NUMBER,
+        description: "Returns the hour from a date/time value (0-23).",
+        example: 'Hour(Now())',
+        args: [{ name: "dateTime", type: Type.DATE }],
+        function: (value) => dateTimePart(value, "Hour", (d) => d.getHours())
+    },
+    {
         name: "Second",
         type: Type.NUMBER,
         description: "Returns the second from a date/time value (0–59).",
@@ -1081,7 +1157,11 @@ export const FUNCTIONS = [
         example: 'Upper("hello")',
         args: [{ name: "text", type: Type.TEXT }],
         function: (value) => {
-            return { status: "success", message: toFormulaText(value).toUpperCase() }
+            const text = toFormulaText(value)
+            if (text === null) {
+                return { status: "error", message: "Upper requires a text-compatible value" }
+            }
+            return { status: "success", message: text.toUpperCase() }
         }
     },
     {
@@ -1091,7 +1171,11 @@ export const FUNCTIONS = [
         example: 'Lower("HELLO")',
         args: [{ name: "text", type: Type.TEXT }],
         function: (value) => {
-            return { status: "success", message: toFormulaText(value).toLowerCase() }
+            const text = toFormulaText(value)
+            if (text === null) {
+                return { status: "error", message: "Lower requires a text-compatible value" }
+            }
+            return { status: "success", message: text.toLowerCase() }
         }
     },
     {
@@ -1100,10 +1184,16 @@ export const FUNCTIONS = [
         description: "Returns the number of characters in a text value.",
         example: 'Len("hello")',
         args: [{ name: "text", type: Type.TEXT }],
-        function: (value) => ({
-            status: "success",
-            message: toFormulaText(value).length
-        })
+        function: (value) => {
+            const text = toFormulaText(value)
+            if (text === null) {
+                return { status: "error", message: "Len requires a text-compatible value" }
+            }
+            return {
+                status: "success",
+                message: text.length
+            }
+        }
     },
     {
         name: "Left",
@@ -1117,10 +1207,14 @@ export const FUNCTIONS = [
         function: (value, count) => {
             const normalizedCount = toTextCount(count, "Left")
             if (normalizedCount.status === "error") return normalizedCount
+            const text = toFormulaText(value)
+            if (text === null) {
+                return { status: "error", message: "Left requires a text-compatible value" }
+            }
 
             return {
                 status: "success",
-                message: toFormulaText(value).slice(0, normalizedCount.value)
+                message: text.slice(0, normalizedCount.value)
             }
         }
     },
@@ -1138,6 +1232,9 @@ export const FUNCTIONS = [
             if (normalizedCount.status === "error") return normalizedCount
 
             const text = toFormulaText(value)
+            if (text === null) {
+                return { status: "error", message: "Right requires a text-compatible value" }
+            }
             return {
                 status: "success",
                 message: normalizedCount.value === 0 ? "" : text.slice(-normalizedCount.value)

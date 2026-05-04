@@ -171,7 +171,10 @@ export default function ModernTabListRenderer({
   const padRight = (comp.PaddingRight ?? 18) * tabSize.padScale
   const padBottom = (comp.PaddingBottom ?? 10) * tabSize.padScale
   const padLeft = (comp.PaddingLeft ?? 18) * tabSize.padScale
-  const tabMinHeight = Math.max(tabSize.minHeightFloor, (comp.Height || 60) - tabSize.heightTrim)
+  const isVertical = flexLayout.flexDirection === 'column'
+  const tabMinHeight = isVertical
+    ? tabSize.minHeightFloor
+    : Math.max(tabSize.minHeightFloor, (comp.Height || 60) - tabSize.heightTrim)
   /** Transparent: text only; a single 2px line sits under the selected tab (no fills). */
   const transparentUnderlineMode = isTransparent
 

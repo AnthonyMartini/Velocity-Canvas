@@ -313,3 +313,22 @@ export async function logTokenUsage(
     console.error('Error logging token usage:', error);
   }
 }
+
+/**
+ * Saves a user's interest in a plan.
+ */
+export async function savePlanInterest(uid: string, email: string, planId: string): Promise<{ success: boolean; error?: string }> {
+  if (!adminDb) return { success: false, error: 'Database uninitialized' };
+  try {
+    await adminDb.collection('plan_interests').add({
+      uid,
+      email,
+      planId,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving plan interest:', error);
+    return { success: false, error: 'Database error while saving interest' };
+  }
+}

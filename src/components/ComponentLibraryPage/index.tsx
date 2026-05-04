@@ -5,6 +5,7 @@ import { TYPE_ICONS, TYPE_COLORS } from '../../common/constants'
 import { PROP_TYPE_COLORS, SCHEMAS } from './constants'
 import { formatDefaultValue, formatPropertyType } from './helpers'
 import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, Overflow, Icon, DropShadow, TextMode, TextFormat } from '@/features/powerapps/functions'
+import { themeVars } from '@/theme/theme'
 
 
 
@@ -17,7 +18,15 @@ export default function DocumentationPage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-auto bg-base">
+    <div 
+      className="flex flex-col flex-1 overflow-auto"
+      style={{ 
+        backgroundColor: themeVars.colors.base,
+        backgroundImage: themeVars.gradients.canvasGrid,
+        backgroundSize: '20px 20px',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       <div className="max-w-5xl mx-auto w-full px-8 py-10">
         
         <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">

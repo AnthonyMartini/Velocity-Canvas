@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize } from '@/features/powerapps/functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize, coerceFormulaNumber, coerceFormulaText } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 
 /**
@@ -626,11 +626,46 @@ export function evaluateAST(
 
       let res: any = null
       switch (node.operator) {
-        case '+': res = Number(left) + Number(right); break
-        case '-': res = Number(left) - Number(right); break
-        case '*': res = Number(left) * Number(right); break
-        case '/': res = Number(left) / Number(right); break
-        case '&': res = String(left === null ? '' : left) + String(right === null ? '' : right); break
+        case '+': {
+          const leftNumber = coerceFormulaNumber(left)
+          if (leftNumber.status !== 'success') return handleError(leftNumber.message)
+          const rightNumber = coerceFormulaNumber(right)
+          if (rightNumber.status !== 'success') return handleError(rightNumber.message)
+          res = leftNumber.value + rightNumber.value
+          break
+        }
+        case '-': {
+          const leftNumber = coerceFormulaNumber(left)
+          if (leftNumber.status !== 'success') return handleError(leftNumber.message)
+          const rightNumber = coerceFormulaNumber(right)
+          if (rightNumber.status !== 'success') return handleError(rightNumber.message)
+          res = leftNumber.value - rightNumber.value
+          break
+        }
+        case '*': {
+          const leftNumber = coerceFormulaNumber(left)
+          if (leftNumber.status !== 'success') return handleError(leftNumber.message)
+          const rightNumber = coerceFormulaNumber(right)
+          if (rightNumber.status !== 'success') return handleError(rightNumber.message)
+          res = leftNumber.value * rightNumber.value
+          break
+        }
+        case '/': {
+          const leftNumber = coerceFormulaNumber(left)
+          if (leftNumber.status !== 'success') return handleError(leftNumber.message)
+          const rightNumber = coerceFormulaNumber(right)
+          if (rightNumber.status !== 'success') return handleError(rightNumber.message)
+          res = leftNumber.value / rightNumber.value
+          break
+        }
+        case '&': {
+          const leftText = coerceFormulaText(left)
+          if (leftText.status !== 'success') return handleError(leftText.message)
+          const rightText = coerceFormulaText(right)
+          if (rightText.status !== 'success') return handleError(rightText.message)
+          res = leftText.value + rightText.value
+          break
+        }
         case '=': res = left == right; break
         case '<>': res = left != right; break
         case '>': res = left > right; break
@@ -650,6 +685,9 @@ export function evaluateAST(
       if (arg instanceof Error) return arg
 
       if (node.operator === '!') {
+        if (typeof arg !== 'boolean') {
+          return handleError('Logical negation requires a boolean value')
+        }
         return !arg
       }
       return null

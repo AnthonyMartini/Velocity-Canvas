@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { FORMULA_BUILDER_MODEL_NAME, formulaBuilderModel } from "@/lib/gemini";
-import { verifyIdToken, checkAndDeductCredit, logTokenUsage } from "@/lib/firebase-admin";
+import { verifyIdToken, checkAndDeductCredit, logTokenUsage, checkUserIsAdmin } from "@/lib/firebase-admin";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -65,6 +65,11 @@ export async function POST(req: Request) {
 
     if (!uid) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
+    }
+
+    const isAdmin = await checkUserIsAdmin(uid);
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized: Admin access required" }, { status: 403 });
     }
 
     const creditResult = await checkAndDeductCredit(uid, "Formula Builder AI", 1);

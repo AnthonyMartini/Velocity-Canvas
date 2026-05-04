@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   deleteProjectById,
   listProjects,
@@ -9,6 +10,7 @@ import {
 } from '@/features/projects/api';
 import { DEFAULT_PROJECT_NAME, RECENT_PROJECTS_LIMIT } from './constants';
 import { getProjectDisplayName, getProjectUpdatedLabel } from './helpers';
+import { themeVars } from '@/theme/theme';
 
 export default function ProjectsDashboard({
   user,
@@ -26,6 +28,8 @@ export default function ProjectsDashboard({
   const [showAll, setShowAll] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState(DEFAULT_PROJECT_NAME);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectDocument | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -52,17 +56,25 @@ export default function ProjectsDashboard({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>, proj: ProjectDocument) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this project?')) return;
+    setProjectToDelete(proj);
+  };
+
+  const confirmDelete = async () => {
+    if (!projectToDelete || !projectToDelete.id || isDeleting) return;
+    
+    setIsDeleting(true);
     try {
-      setDeletingId(id);
-      await deleteProjectById(user, id);
-      setProjects(prev => prev.filter((p) => p.id !== id));
+      setDeletingId(projectToDelete.id);
+      await deleteProjectById(user, projectToDelete.id);
+      setProjects(prev => prev.filter((p) => p.id !== projectToDelete.id));
+      setProjectToDelete(null);
     } catch (err: any) {
       alert(`Delete failed: ${err.message}`);
     } finally {
       setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -96,7 +108,15 @@ export default function ProjectsDashboard({
   };
 
   return (
-    <div className="flex-1 bg-base min-h-0 flex flex-col p-8 overflow-y-auto">
+    <div 
+      className="flex-1 min-h-0 flex flex-col p-8 overflow-y-auto"
+      style={{ 
+        backgroundColor: themeVars.colors.base,
+        backgroundImage: themeVars.gradients.canvasGrid,
+        backgroundSize: '20px 20px',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       <div className="max-w-6xl mx-auto w-full">
         <div className="mb-12 animate-fade-in px-4">
           <h1 className="text-4xl font-black text-text tracking-tight mb-2">
@@ -194,7 +214,7 @@ export default function ProjectsDashboard({
                     <button
                       onClick={(e) => {
                         if (proj.id) {
-                          void handleDelete(e, proj.id);
+                          handleDeleteClick(e, proj);
                         }
                       }}
                       disabled={!proj.id || deletingId === proj.id}
@@ -333,6 +353,47 @@ export default function ProjectsDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Project Modal */}
+      {projectToDelete && createPortal(
+        <div className="fixed inset-0 z-[100002] flex items-center justify-center px-4">
+          <button
+            type="button"
+            aria-label="Close delete prompt"
+            disabled={isDeleting}
+            onClick={() => setProjectToDelete(null)}
+            className="absolute inset-0 bg-black/55 backdrop-blur-[1px] disabled:cursor-default"
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl border border-overlay/35 bg-surface p-5 shadow-2xl shadow-black/40 animate-pop-in">
+            <h3 className="text-base font-semibold text-text">Delete project?</h3>
+            <p className="mt-2 text-sm leading-relaxed text-subtext">
+              Are you sure you want to delete <span className="font-bold text-text">"{getProjectDisplayName(projectToDelete.name)}"</span>? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setProjectToDelete(null)}
+                disabled={isDeleting}
+                className="rounded-lg border border-overlay/30 bg-base px-3 py-1.5 text-xs font-medium text-subtext transition-colors hover:bg-overlay/10 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="flex min-w-[80px] items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-red/10 px-3 py-1.5 text-xs font-medium text-red transition-colors hover:bg-red/20 hover:text-red disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? (
+                  <div className="h-3 w-3 rounded-full border-2 border-red-400/50 border-t-red-400 animate-spin" />
+                ) : null}
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

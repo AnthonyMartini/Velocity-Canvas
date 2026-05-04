@@ -1,29 +1,15 @@
 export const PLANS = [
   {
-    id: "starter",
-    name: "Starter",
-    price: "$9",
-    credits: 1000,
-    features: ["1,000 AI Credits", "Standard Generation Speed", "Email Support"],
-    color: "emerald",
-    popular: false,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$29",
-    credits: 5000,
-    features: ["5,000 AI Credits", "Priority Generation", "Advanced Components", "Priority Support"],
+    id: "early-access",
+    name: "Velocity Canvas",
+    price: "$10",
+    credits: 500,
+    features: [
+      "Planned monthly access for early adopters",
+      "A simple credit bundle for regular use",
+      "Pricing is being kept intentionally low while we refine the experience",
+    ],
     color: "accent",
     popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "$99",
-    credits: 20000,
-    features: ["20,000 AI Credits", "Ultra-fast Generation", "Custom Component Training", "24/7 Dedicated Support"],
-    color: "indigo",
-    popular: false,
   },
 ];

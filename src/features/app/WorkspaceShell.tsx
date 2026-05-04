@@ -1,13 +1,15 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Brackets, Moon, Sun } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { useAppShell } from "./AppShellProvider";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const LIGHT_THEME_OVERRIDES: CSSProperties & Record<string, string> = {
   "--vc-color-base": "#e9edf4",
@@ -94,6 +96,8 @@ function isPathActive(pathname: string, href: string) {
   return pathname === href;
 }
 
+type FeedbackType = "bug" | "suggestion" | "other";
+
 export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -101,6 +105,54 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const [projectsHref, setProjectsHref] = useState("/projects");
   const { user, authLoading, credits, isAdmin, isDarkMode, isImmersiveMode, setIsDarkMode, signOutUser } =
     useAppShell();
+
+  // Feedback state
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("suggestion");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [wantsReply, setWantsReply] = useState(true);
+  const feedbackRef = useRef<HTMLDivElement>(null);
+
+  // Close feedback dropdown on outside click
+  useEffect(() => {
+    if (!feedbackOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (feedbackRef.current && !feedbackRef.current.contains(e.target as Node)) {
+        setFeedbackOpen(false);
+        setFeedbackSuccess(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [feedbackOpen]);
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackMessage.trim() || feedbackSubmitting) return;
+    setFeedbackSubmitting(true);
+    try {
+      await addDoc(collection(db, "feedback"), {
+        uid: user?.uid ?? null,
+        email: user?.email ?? null,
+        type: feedbackType,
+        message: feedbackMessage.trim(),
+        wantsReply: wantsReply && Boolean(user?.email),
+        createdAt: serverTimestamp(),
+        path: pathname ?? "/",
+      });
+      setFeedbackMessage("");
+      setFeedbackSuccess(true);
+      setTimeout(() => {
+        setFeedbackOpen(false);
+        setFeedbackSuccess(false);
+      }, 2200);
+    } catch (err) {
+      console.error("Feedback submit error:", err);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -142,7 +194,7 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const navItems = [
     { href: projectsHref, matchHref: "/projects", label: "Projects", Icon: ProjectsIcon },
     { href: "/docs", label: "Documentation", Icon: DocsIcon },
-    { href: "/formula-builder", label: "Formula builder", Icon: FormulaParserNavIcon },
+    ...(isAdmin ? [{ href: "/formula-builder", label: "Formula builder", Icon: FormulaParserNavIcon }] : []),
     ...(isAdmin ? [{ href: "/admin", matchHref: "/admin", label: "Admin", Icon: AdminIcon }] : []),
   ];
 
@@ -190,6 +242,134 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
             </nav>
 
             <div className="flex items-center gap-3">
+              {/* Feedback Button */}
+              <div ref={feedbackRef} className="relative">
+                <button
+                  type="button"
+                  id="feedback-trigger"
+                  onClick={() => { setFeedbackOpen((prev) => !prev); setFeedbackSuccess(false); }}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold shadow-sm transition-all duration-300 ${
+                    feedbackOpen
+                      ? "border-accent/50 bg-accent/15 text-accent shadow-inner"
+                      : "border-accent/40 bg-surface/80 text-accent hover:bg-accent/10 animate-soft-pulse"
+                  }`}
+                  title="Send feedback"
+                  aria-label="Send feedback"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                </button>
+
+                {feedbackOpen && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-overlay/30 shadow-[var(--vc-shadow-floating-panel)]"
+                    style={{ backgroundColor: "var(--vc-color-surface)" }}
+                  >
+                    {feedbackSuccess ? (
+                      <div className="flex flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15">
+                          <svg className="h-6 w-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-text">Thanks for the feedback!</p>
+                          <p className="mt-1 text-xs text-subtext">We really appreciate you taking the time.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="border-b border-overlay/20 px-4 py-3">
+                          <p className="text-sm font-semibold text-text">Send Feedback</p>
+                          <p className="mt-0.5 text-xs text-subtext">Help us improve Velocity Canvas</p>
+                        </div>
+
+                        <div className="px-4 py-3">
+                          {/* Feedback type pills */}
+                          <div className="mb-3 flex gap-1.5">
+                            {(["suggestion", "bug", "other"] as FeedbackType[]).map((t) => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => setFeedbackType(t)}
+                                className={`flex-1 rounded-lg py-1.5 text-[11px] font-semibold capitalize transition-all ${
+                                  feedbackType === t
+                                    ? t === "bug"
+                                      ? "bg-red/15 text-red border border-red/30"
+                                      : t === "suggestion"
+                                      ? "bg-accent/15 text-accent border border-accent/30"
+                                      : "bg-overlay/40 text-text border border-overlay/40"
+                                    : "border border-overlay/25 text-subtext hover:bg-overlay/20 hover:text-text"
+                                }`}
+                              >
+                                {t === "bug" ? "🐛 Bug" : t === "suggestion" ? "💡 Idea" : "💬 Other"}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Message textarea */}
+                          <textarea
+                            rows={4}
+                            value={feedbackMessage}
+                            onChange={(e) => setFeedbackMessage(e.target.value)}
+                            placeholder={feedbackType === "bug" ? "Describe what went wrong..." : feedbackType === "suggestion" ? "Share your idea or feature request..." : "What's on your mind?"}
+                            className="w-full resize-none rounded-xl border border-overlay/30 bg-base/80 px-3 py-2.5 text-sm text-text placeholder:text-subtext/50 focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/20 transition-all"
+                          />
+
+                          {/* Reply checkbox */}
+                          <label className="mt-2.5 flex cursor-pointer items-start gap-2.5">
+                            <div className="relative mt-0.5 shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={wantsReply}
+                                onChange={(e) => setWantsReply(e.target.checked)}
+                                className="peer sr-only"
+                                id="feedback-wants-reply"
+                              />
+                              <div className={`flex h-4 w-4 items-center justify-center rounded border transition-all ${
+                                wantsReply
+                                  ? "border-accent bg-accent"
+                                  : "border-overlay/50 bg-base/80 hover:border-overlay"
+                              }`}>
+                                {wantsReply && (
+                                  <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M20 6 9 17l-5-5" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                            <div className="leading-snug">
+                              <span className="text-xs font-medium text-text">Reply to my email</span>
+                              {user?.email && (
+                                <p className="mt-0.5 text-[10px] text-subtext/70 truncate max-w-[210px]">{user.email}</p>
+                              )}
+                            </div>
+                          </label>
+
+                          <button
+                            type="button"
+                            disabled={!feedbackMessage.trim() || feedbackSubmitting}
+                            onClick={handleFeedbackSubmit}
+                            className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {feedbackSubmitting ? (
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                            ) : (
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
+                              </svg>
+                            )}
+                            {feedbackSubmitting ? "Sending..." : "Send Feedback"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Dark mode toggle */}
               <button
                 type="button"
                 onClick={() => setIsDarkMode((prev) => !prev)}

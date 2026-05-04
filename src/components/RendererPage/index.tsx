@@ -59,8 +59,8 @@ const createInitialChatMessages = () => ([
   { role: 'assistant', content: 'Hi! Tell me what to add — e.g. "Add a container with a title label and a submit button inside it."', added: 0 }
 ])
 const RENDERER_CHAT_MODEL_OPTIONS = [
-  { value: 'gemini-3-flash-preview', label: '3-flash-preview - 5 credits' },
-  { value: 'gemini-3.1-pro-preview', label: '3.1-pro-preview - 10 credits' },
+  { value: 'gemini-3-flash-preview', label: 'Standard - 5 credits' },
+  { value: 'gemini-3.1-pro-preview', label: 'Pro - 10 credits' },
 ] as const
 const DEFAULT_RENDERER_CHAT_MODEL = RENDERER_CHAT_MODEL_OPTIONS[0].value
 const INTERNAL_COMPONENT_CLIPBOARD_PREFIX = '__VELOCITY_CANVAS_COMPONENTS__:'
@@ -729,6 +729,7 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
 // ── Code Pane ───────────────────────────────────────────────────────────────────
 function CodePane({ node, tree, globalErrors, globalWarnings, notify, width, onClose }) {
   const [copied, setCopied] = useState(false)
+  const isWholeApp = !node || node.type === 'App'
   
   // App nodes have no YAML preview. Screen nodes show a full Screens: document.
   const yaml = (() => {
@@ -740,6 +741,7 @@ function CodePane({ node, tree, globalErrors, globalWarnings, notify, width, onC
   })()
 
   const handleCopy = () => {
+    if (isWholeApp) return;
     // Prevent copying if there are validation errors in the selected node (or whole screen if none selected)
     const hasErrors = node 
       ? globalErrors.some(err => err.nodeId === node.id || isDescendant(tree, err.nodeId, node.id))
@@ -779,35 +781,37 @@ function CodePane({ node, tree, globalErrors, globalWarnings, notify, width, onC
           <span className="text-xs font-semibold text-text">PA YAML</span>
           {node
             ? <span className="text-[10px] text-subtext/50 bg-overlay/30 px-1.5 py-0.5 rounded-full">{node.type}</span>
-            : <span className="text-[10px] text-violet-300/80 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded-full">Screen</span>
+            : <span className="text-[10px] text-violet-300/80 bg-violet-500/10 border border-violet-500/20 px-1.5 py-0.5 rounded-full">App</span>
           }
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all duration-200 cursor-pointer
-              ${copied
-                ? 'bg-green/15 border-green/30 text-green'
-                : 'bg-base/60 border-overlay/40 text-subtext hover:border-accent/50 hover:text-accent'
-              }`}
-          >
-            {copied ? (
-              <>
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                  <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
-                </svg>
-                <span className="hidden sm:inline">Copied!</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
-                  <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
-                </svg>
-                <span className="hidden sm:inline">Copy</span>
-              </>
-            )}
-          </button>
+          {!isWholeApp && (
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all duration-200 cursor-pointer
+                ${copied
+                  ? 'bg-green/15 border-green/30 text-green'
+                  : 'bg-base/60 border-overlay/40 text-subtext hover:border-accent/50 hover:text-accent'
+                }`}
+            >
+              {copied ? (
+                <>
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                  </svg>
+                  <span className="hidden sm:inline">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z" />
+                    <path d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z" />
+                  </svg>
+                  <span className="hidden sm:inline">Copy</span>
+                </>
+              )}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="text-subtext/40 hover:text-subtext transition-colors duration-150 cursor-pointer p-1"
@@ -820,7 +824,7 @@ function CodePane({ node, tree, globalErrors, globalWarnings, notify, width, onC
       </div>
 
       {/* Code area */}
-      <div className="flex-1 overflow-auto pl-0 pr-1 py-4 font-mono text-[11px]">
+      <div className={`flex-1 overflow-auto pl-0 pr-1 py-4 font-mono text-[11px] ${isWholeApp ? 'select-none' : ''}`}>
         {highlighted ? (
           highlighted.map((lineElement, i) => (
             <div key={i} className="flex gap-3 group hover:bg-white/5 transition-colors">
@@ -4213,7 +4217,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               <svg className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="currentColor" style={{ filter: `drop-shadow(0 3px 8px ${appTheme.editor.askAi.iconGlow})` }}>
                 <path d="M5.75 4.5A2.75 2.75 0 0 0 3 7.25v6A2.75 2.75 0 0 0 5.75 16H7v3.2c0 .64.76.98 1.24.56L12.6 16h5.65A2.75 2.75 0 0 0 21 13.25v-6a2.75 2.75 0 0 0-2.75-2.75H5.75Zm2.5 4.25a1 1 0 1 0 0 2h7.5a1 1 0 1 0 0-2h-7.5Zm0 3.75a1 1 0 1 0 0 2h4.5a1 1 0 1 0 0-2h-4.5Z" />
               </svg>
-              Ask AI
+              Build With AI
               {chatLoading && <span className="w-2.5 h-2.5 rounded-full bg-white/95 animate-pulse" />}
             </button>
           )}

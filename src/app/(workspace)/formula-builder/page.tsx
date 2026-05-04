@@ -79,7 +79,7 @@ function collectFormulaDependencies(node: unknown): string[] {
 function inferEvaluatedType(value: unknown): string {
   if (value instanceof Error) return "error";
   if (value === "#CYCLE!") return "cycle";
-  if (value === null) return "null";
+  if (value === null) return "blank";
   if (value === undefined) return "undefined";
   if (value === "") return "blank";
   if (typeof value === "boolean") return "boolean";
@@ -109,7 +109,8 @@ function inferEvaluatedType(value: unknown): string {
 
 function formatEvaluatedPreview(value: unknown, maxLen = 240): string {
   if (value instanceof Error) return value.message;
-  if (value === null || value === undefined) return String(value);
+  if (value === null) return "";
+  if (value === undefined) return String(value);
   if (typeof value === "string") return value.length > maxLen ? `${value.slice(0, maxLen)}…` : value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (typeof value === "object" && value !== null) {
@@ -181,6 +182,11 @@ async function consumeFormulaBuilderStream(res: Response, onStatus?: (m: string)
 
 export default function FormulaBuilderPage() {
   const { user, isAdmin, refreshCredits } = useAppShell();
+
+  if (!isAdmin) {
+    return notFound();
+  }
+
   const [formula, setFormula] = useState('Concatenate("Hello", ", ", "world")');
   const [contextMode, setContextMode] = useState<"property" | "behavior">("property");
   const [userRequest, setUserRequest] = useState("");
