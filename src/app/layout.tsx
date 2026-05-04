@@ -4,6 +4,7 @@ import "./globals.css";
 import { themeCssVariables } from "@/theme/theme";
 import { AppShellProvider } from "@/features/app/AppShellProvider";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Velocity Canvas",
@@ -20,6 +21,7 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         <AppShellProvider>{children}</AppShellProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
