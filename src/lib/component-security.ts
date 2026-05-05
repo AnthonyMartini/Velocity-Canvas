@@ -16,6 +16,7 @@ const DEFAULT_CANVAS_HEIGHT = 768;
 const MIN_CANVAS_SIZE = 240;
 const MAX_CANVAS_SIZE = 8192;
 const UNKNOWN_POWERAPPS_TYPE = "UnknownPowerAppsObject";
+const MAX_PROJECT_SUMMARY_PREVIEW_NODES = 80;
 
 const ALLOWED_CHILD_CONTAINERS = new Set(["App", "Screen", "Container", "Gallery"]);
 const SCHEMA_TYPES = new Set(Object.keys(SCHEMAS));
@@ -516,6 +517,58 @@ export function sanitizeProjectRecord(project: any) {
     canvasW: clampCanvasSize(source.canvasW, DEFAULT_CANVAS_WIDTH),
     canvasH: clampCanvasSize(source.canvasH, DEFAULT_CANVAS_HEIGHT),
     canvasTheme: normalizeCanvasThemeState(source.canvasTheme),
+  };
+}
+
+function trimProjectPreviewTree(nodes: any[], remainingRef: { value: number }): any[] {
+  if (!Array.isArray(nodes) || remainingRef.value <= 0) return [];
+
+  const trimmed: any[] = [];
+
+  for (const node of nodes) {
+    if (!node || remainingRef.value <= 0) break;
+    remainingRef.value -= 1;
+
+    const nextNode = {
+      ...node,
+      children: trimProjectPreviewTree(node.children || [], remainingRef),
+    };
+
+    trimmed.push(nextNode);
+  }
+
+  return trimmed;
+}
+
+export function sanitizeProjectSummaryRecord(project: any) {
+  const sanitized = sanitizeProjectRecord(project);
+  const appRoot = Array.isArray(sanitized.tree) ? sanitized.tree[0] : null;
+  const firstScreen = Array.isArray(appRoot?.children)
+    ? appRoot.children.find((child: any) => child?.type === "Screen") ?? appRoot.children[0] ?? null
+    : null;
+  const remainingRef = { value: MAX_PROJECT_SUMMARY_PREVIEW_NODES };
+
+  const previewTree =
+    appRoot && firstScreen
+      ? trimProjectPreviewTree(
+          [
+            {
+              ...appRoot,
+              children: [firstScreen],
+            },
+          ],
+          remainingRef,
+        )
+      : sanitized.tree;
+
+  return {
+    id: project?.id ?? null,
+    name: sanitized.name,
+    canvasW: sanitized.canvasW,
+    canvasH: sanitized.canvasH,
+    canvasTheme: sanitized.canvasTheme,
+    updatedAt: project?.updatedAt ?? null,
+    tree: previewTree,
   };
 }
 

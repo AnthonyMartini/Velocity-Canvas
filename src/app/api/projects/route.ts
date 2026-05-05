@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyIdToken, getUserProjects, saveUserProject, deleteUserProject } from "@/lib/firebase-admin";
+import { verifyIdToken, getUserProjects, getUserProjectById, saveUserProject, deleteUserProject } from "@/lib/firebase-admin";
 
 export async function GET(req: Request) {
   try {
@@ -13,6 +13,19 @@ export async function GET(req: Request) {
     
     if (!uid) {
       return NextResponse.json({ error: "Unauthorized: Invalid ID Token" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const projectId = searchParams.get("id");
+
+    if (projectId) {
+      const project = await getUserProjectById(uid, projectId);
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+
+      return NextResponse.json({ project });
     }
 
     const projects = await getUserProjects(uid);

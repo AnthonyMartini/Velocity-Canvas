@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import { sanitizeProjectId, sanitizeProjectPayload, sanitizeProjectRecord } from '@/lib/component-security';
+import { sanitizeProjectId, sanitizeProjectPayload, sanitizeProjectRecord, sanitizeProjectSummaryRecord } from '@/lib/component-security';
 
 if (!admin.apps.length) {
   try {
@@ -129,7 +129,7 @@ export async function getUserProjects(uid: string): Promise<any[]> {
     const snap = await adminDb.collection('projects')
       .where('uid', '==', uid)
       .get();
-    const docs = snap.docs.map(doc => sanitizeProjectRecord({ id: doc.id, ...doc.data() }));
+    const docs = snap.docs.map(doc => sanitizeProjectSummaryRecord({ id: doc.id, ...doc.data() }));
     // Sort in-memory to avoid requiring a Firestore composite index
     docs.sort((a: any, b: any) => {
       const aTime = a.updatedAt?._seconds ?? 0;
@@ -140,6 +140,22 @@ export async function getUserProjects(uid: string): Promise<any[]> {
   } catch (error) {
     console.error('Error fetching user projects:', error);
     return [];
+  }
+}
+
+export async function getUserProjectById(uid: string, projectId: string): Promise<any | null> {
+  if (!adminDb) return null;
+  try {
+    const sanitizedProjectId = sanitizeProjectId(projectId);
+    if (!sanitizedProjectId) return null;
+
+    const doc = await adminDb.collection('projects').doc(sanitizedProjectId).get();
+    if (!doc.exists || doc.data()?.uid !== uid) return null;
+
+    return sanitizeProjectRecord({ id: doc.id, ...doc.data() });
+  } catch (error) {
+    console.error('Error fetching user project by id:', error);
+    return null;
   }
 }
 

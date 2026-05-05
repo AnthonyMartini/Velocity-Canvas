@@ -130,6 +130,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      setAuthLoading(false);
+
       try {
         await upsertUserProfile(firebaseUser);
       } catch (profileError) {
@@ -143,8 +145,6 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
           setIsAdmin(false);
         }),
       ]);
-
-      setAuthLoading(false);
     });
 
     return unsubscribe;

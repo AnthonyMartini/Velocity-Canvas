@@ -31,8 +31,20 @@ export async function loadProjectById(
   user: { getIdToken: () => Promise<string> },
   projectId: string,
 ): Promise<ProjectDocument | null> {
-  const projects = await listProjects(user);
-  return projects.find((project) => project.id === projectId) ?? null;
+  const res = await fetch(`/api/projects?id=${encodeURIComponent(projectId)}`, {
+    headers: await getAuthHeaders(user),
+  });
+  const data = await res.json();
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || "Failed to load project");
+  }
+
+  return data.project ?? null;
 }
 
 export async function saveProjectDocument(
