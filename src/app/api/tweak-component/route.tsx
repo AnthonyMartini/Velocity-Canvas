@@ -53,6 +53,7 @@ const ENGINE_COMPATIBILITY_PROMPT = [
   `- For Icon controls, Icon must be one of these exact enum strings: ${SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ")}.`,
   '- For Image controls, do not use URLs, media names, uploaded assets, custom SVG, or source properties. Images are fixed cloud placeholders in this renderer.',
   '- Use double quotes for string literals in component properties and formulas. Never emit single-quoted strings.',
+  '- Prefer locally previewable formulas when they are sufficient, but richer Power Apps functions such as With, Filter, LookUp, Search, SortByColumns, Collect, ClearCollect, and Patch are allowed when they materially improve export quality. Those formulas may be preview-limited locally.',
 ].join("\n");
 
 function compactNodeForAI(node, { summaryOnly = false, childLimit = 0 } = {}) {

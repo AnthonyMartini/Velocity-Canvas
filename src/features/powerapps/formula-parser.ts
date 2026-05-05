@@ -1,4 +1,4 @@
-import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize, coerceFormulaNumber, coerceFormulaText } from '@/features/powerapps/functions'
+import { FUNCTIONS, NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ALL_ENUM_VALUES, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize, SortOrder, coerceFormulaNumber, coerceFormulaText } from '@/features/powerapps/functions'
 import { SCHEMAS } from '@/features/powerapps/schema'
 
 /**
@@ -281,6 +281,7 @@ export function evaluateAST(
   }
 
   const findNodeByName = (name: string) => flatNodes.find(n => (n?.name || '').toLowerCase() === String(name || '').toLowerCase())
+  const FORMULA_ENUMS = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize, SortOrder]
   const getPropertyValue = (targetNode: any, propertyName: string) => {
     if (!targetNode || !propertyName) return undefined
     if (targetNode[propertyName] !== undefined) return targetNode[propertyName]
@@ -299,9 +300,143 @@ export function evaluateAST(
       return String(key || '').toLowerCase() === String(propertyName || '').toLowerCase()
     })
   }
+  const isFormulaTable = (value: any) => Array.isArray(value)
+  const ensureFormulaTable = (value: any, functionName: string) => {
+    if (!isFormulaTable(value)) {
+      return { status: 'error', message: `${functionName} requires a table argument` }
+    }
+    return { status: 'success', value }
+  }
+  const compareFormulaValues = (left: any, right: any) => {
+    if (left == null && right == null) return 0
+    if (left == null) return -1
+    if (right == null) return 1
+
+    const leftNumber = coerceFormulaNumber(left)
+    const rightNumber = coerceFormulaNumber(right)
+    if (leftNumber.status === 'success' && rightNumber.status === 'success') {
+      return leftNumber.value - rightNumber.value
+    }
+
+    const leftText = coerceFormulaText(left)
+    const rightText = coerceFormulaText(right)
+    if (leftText.status === 'success' && rightText.status === 'success') {
+      return leftText.value.localeCompare(rightText.value, undefined, { sensitivity: 'base', numeric: true })
+    }
+
+    return String(left).localeCompare(String(right), undefined, { sensitivity: 'base', numeric: true })
+  }
+  const resolveSortOrder = (value: any, functionName: string) => {
+    if (value == null || value === '') return { status: 'success', value: 1 }
+    if (typeof value === 'boolean') return { status: 'success', value: value ? 1 : -1 }
+    const raw = String(value).trim()
+    if (!raw) return { status: 'success', value: 1 }
+    if (raw === SortOrder.Ascending || /^ascending$/i.test(raw) || raw === '1') return { status: 'success', value: 1 }
+    if (raw === SortOrder.Descending || /^descending$/i.test(raw) || raw === '-1') return { status: 'success', value: -1 }
+    return { status: 'error', message: `${functionName} requires SortOrder.Ascending or SortOrder.Descending` }
+  }
+  const evaluateSortOrderNode = (argNode: any, functionName: string) => {
+    if (!argNode) return { status: 'success', value: 1 }
+    if (argNode.type === 'VariableAccess') {
+      const raw = String(argNode.name || '')
+      if (/^(Ascending|Descending)$/i.test(raw)) {
+        return resolveSortOrder(`SortOrder.${raw[0].toUpperCase()}${raw.slice(1).toLowerCase()}`, functionName)
+      }
+    }
+    if (argNode.type === 'PropertyAccess') {
+      const raw = String(argNode.value || '')
+      if (/^SortOrder\.(Ascending|Descending)$/i.test(raw)) {
+        return resolveSortOrder(raw, functionName)
+      }
+    }
+
+    const evaluated = evaluateAST(argNode, localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+    if (evaluated instanceof Error) return evaluated
+    return resolveSortOrder(evaluated, functionName)
+  }
+  const extractColumnNameArg = (argNode: any) => {
+    if (!argNode) return null
+    if (argNode.type === 'String') return String(argNode.value || '')
+    if (argNode.type === 'Literal' && typeof argNode.value === 'string') return String(argNode.value || '')
+    if (argNode.type === 'VariableAccess') return String(argNode.name || '')
+    if (argNode.type === 'PropertyAccess') {
+      const parts = String(argNode.value || '').split('.').filter(Boolean)
+      return parts.length ? parts[parts.length - 1] : null
+    }
+    return null
+  }
+  const evaluateInRecordScope = (exprNode: any, record: any) => {
+    const scopedLocalVars = {
+      ...localVars,
+      ...(record && typeof record === 'object' && !Array.isArray(record) ? record : {}),
+      ThisItem: record,
+      ThisRecord: record,
+    }
+    return evaluateAST(exprNode, scopedLocalVars, flatNodes, new Set<string>(), parentNode, selfNode, context, strict)
+  }
+  const getValueByColumnName = (record: any, columnName: string) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return undefined
+    if (record[columnName] !== undefined) return record[columnName]
+    const matchingKey = Object.keys(record).find(key => key.toLowerCase() === String(columnName || '').toLowerCase())
+    return matchingKey ? record[matchingKey] : undefined
+  }
+  const hasRecordShape = (value: any) =>
+    !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0
+  const inferFirstRecordFromTableAst = (astNode: any): any => {
+    if (!astNode || typeof astNode !== 'object') return null
+
+    if (astNode.type === 'RecordLiteral') {
+      const recordValue = evaluateAST(astNode, localVars, flatNodes, new Set<string>(), parentNode, selfNode, context, false)
+      return hasRecordShape(recordValue) ? recordValue : null
+    }
+
+    if (astNode.type === 'ArrayLiteral') {
+      return astNode.elements?.length ? inferFirstRecordFromTableAst(astNode.elements[0]) : null
+    }
+
+    if (astNode.type === 'FunctionCall') {
+      const name = String(astNode.name || '').toLowerCase()
+      if (name === 'table') {
+        return astNode.arguments?.length ? inferFirstRecordFromTableAst(astNode.arguments[0]) : null
+      }
+      if (['sort', 'sortbycolumns', 'filter', 'search', 'firstn', 'lastn'].includes(name)) {
+        return astNode.arguments?.length ? inferFirstRecordFromTableAst(astNode.arguments[0]) : null
+      }
+      if (name === 'first' || name === 'last' || name === 'lookup') {
+        return astNode.arguments?.length ? inferFirstRecordFromTableAst(astNode.arguments[0]) : null
+      }
+    }
+
+    return null
+  }
+  const resolveGalleryPreviewRecord = (galleryNode: any) => {
+    if (!galleryNode?.Items) return null
+
+    try {
+      const itemsAst = parseFormula(String(galleryNode.Items))
+      const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set<string>(), null, galleryNode, {}, false)
+      const firstRecord: any =
+        Array.isArray(itemsResult) && itemsResult.length > 0 ? itemsResult[0]
+        : hasRecordShape(itemsResult) ? itemsResult
+        : null
+
+      if (hasRecordShape(firstRecord)) {
+        return firstRecord
+      }
+
+      const inferredRecord = inferFirstRecordFromTableAst(itemsAst)
+      if (hasRecordShape(inferredRecord)) {
+        return inferredRecord
+      }
+    } catch {
+      // Fail gracefully and let callers decide how to handle missing preview rows.
+    }
+
+    return null
+  }
   const resolveCurrentItemRecord = () => {
     const item = localVars['ThisItem'] ?? localVars['ThisRecord']
-    if (item && typeof item === 'object' && !Array.isArray(item)) {
+    if (hasRecordShape(item)) {
       return item
     }
 
@@ -312,22 +447,8 @@ export function evaluateAST(
       parentNode?.type === 'Gallery' ? parentNode
       : flatNodes.find(n => n.type === 'Gallery' && hasDescendant(n.children, selfNode?.id))
 
-    if (galleryNode?.Items) {
-      try {
-        const itemsAst = parseFormula(String(galleryNode.Items))
-        const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set<string>(), null, galleryNode, {}, false)
-        const firstRecord: any =
-          Array.isArray(itemsResult) && itemsResult.length > 0 ? itemsResult[0]
-          : (itemsResult && typeof itemsResult === 'object' && !Array.isArray(itemsResult)) ? itemsResult
-          : null
-
-        if (firstRecord && typeof firstRecord === 'object') {
-          return firstRecord
-        }
-      } catch {
-        // Fail gracefully and fall through to blank.
-      }
-    }
+    const previewRecord = resolveGalleryPreviewRecord(galleryNode)
+    if (previewRecord) return previewRecord
 
     return null
   }
@@ -381,57 +502,27 @@ export function evaluateAST(
     else if (compName === 'TextMode') targetNode = TextMode
     else if (compName === 'TextFormat') targetNode = TextFormat
     else if (compName === 'Layout') targetNode = Layout
+    else if (compName === 'SortOrder') targetNode = SortOrder
     else if (compName === 'ThisItem' || compName === 'ThisRecord') {
       const itemRecord = resolveCurrentItemRecord()
-      if (itemRecord) {
+      if (itemRecord && typeof itemRecord === 'object' && !Array.isArray(itemRecord)) {
         const itemValue = getValueFromPath(itemRecord, remainingParts)
         if (itemValue !== undefined) return itemValue
-      }
-    }
-    else if (compName === 'ThisItem' || compName === 'ThisRecord') {
-      const item = localVars['ThisItem']
 
-      // ── Runtime: GalleryRenderer injected ThisItem for this row ───────────
-      if (item && typeof item === 'object' && !Array.isArray(item)) {
-        const itemValue = getValueFromPath(item, remainingParts)
-        return itemValue !== undefined ? itemValue : ''
-      }
-
-      // ── Validation time: ThisItem not in localVars yet.
-      //    Find the nearest Gallery ancestor and evaluate its Items formula so we
-      //    know which columns actually exist.
-      const hasDescendant = (children, targetId) =>
-        !!children?.some(c => c.id === targetId || hasDescendant(c.children, targetId))
-
-      const galleryNode =
-        parentNode?.type === 'Gallery' ? parentNode
-        : flatNodes.find(n => n.type === 'Gallery' && hasDescendant(n.children, selfNode?.id))
-
-      if (galleryNode?.Items) {
-        try {
-          // Evaluate Items non-strictly so partial formulas fail gracefully
-          const itemsAst = parseFormula(String(galleryNode.Items))
-        const itemsResult = evaluateAST(itemsAst, localVars, flatNodes, new Set<string>(), null, galleryNode, {}, false)
-          const firstRecord: any =
-            Array.isArray(itemsResult) && itemsResult.length > 0 ? itemsResult[0]
-            : (itemsResult && typeof itemsResult === 'object' && !Array.isArray(itemsResult)) ? itemsResult
-            : null
-
-          if (firstRecord && typeof firstRecord === 'object') {
-            if (propName in firstRecord) {
-              // Known column — return its value as a type hint for validation
-              return firstRecord[propName] !== undefined ? firstRecord[propName] : ''
-            }
-            const cols = Object.keys(firstRecord).join(', ')
-            return handleError(`"${propName}" is not a column in ThisItem. Available: ${cols || '(none)'}`)
-          }
-        } catch {
-          // Items formula failed to evaluate — fall through to placeholder
+        const matchingKey = Object.keys(itemRecord).find(
+          key => key.toLowerCase() === String(propName || '').toLowerCase()
+        )
+        if (matchingKey) {
+          return itemRecord[matchingKey]
         }
+
+        const cols = Object.keys(itemRecord).join(', ')
+        return handleError(`"${propName}" is not a column in ThisItem. Available: ${cols || '(none)'}`)
       }
 
-      // No gallery context found — return placeholder (safe, no error)
-      return ''
+      // No gallery row record could be resolved yet. Return blank in runtime mode and
+      // surface a validation error only in strict mode when we truly know the column is absent.
+      return strict ? handleError(`Unresolved property: ${path}`) : ''
     }
 
     // Allow other localVars entries that are plain objects. If the variable exists
@@ -510,7 +601,7 @@ export function evaluateAST(
 
       if (rawVal !== undefined) {
         // If resolving from an enum, return literal value and don't re-evaluate
-        const isEnum = [NotificationType, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, Icon, DropShadow, TextMode, TextFormat, Layout, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize].includes(targetNode)
+        const isEnum = FORMULA_ENUMS.includes(targetNode)
         if (isEnum) return rawVal
 
         // If the property itself is a formula, parse and evaluate it
@@ -569,7 +660,7 @@ export function evaluateAST(
       if (compNode && !strict) return node.name
 
       // Implicitly resolve known enum keys (e.g. typing "Add" instead of "Icon.Add")
-      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize]
+      const implicitEnums = [Icon, Align, VerticalAlign, FontWeight, BorderStyle, DisplayMode, DateTimeFormat, Overflow, DropShadow, TextMode, TextFormat, Layout, NotificationType, ModernButtonAppearance, ModernButtonLayout, ModernButtonIconStyle, TabListAlignment, LayoutDirection, TabListAppearance, TabSize, SortOrder]
       for (const enumObj of implicitEnums) {
           if (enumObj[node.name] !== undefined) return enumObj[node.name]
       }
@@ -694,6 +785,160 @@ export function evaluateAST(
     }
 
     case 'FunctionCall': {
+      const functionNameLower = String(node.name || '').toLowerCase()
+
+      if (functionNameLower === 'with') {
+        if (node.arguments.length < 2) {
+          return handleError('With requires a record and a formula')
+        }
+        const scopeRecord = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (scopeRecord instanceof Error) return scopeRecord
+        if (!scopeRecord || typeof scopeRecord !== 'object' || Array.isArray(scopeRecord)) {
+          return handleError('With requires a record as its first argument')
+        }
+
+        const scopedLocalVars = {
+          ...localVars,
+          ...scopeRecord,
+          ThisRecord: scopeRecord,
+          ThisItem: scopeRecord,
+        }
+        return evaluateAST(node.arguments[1], scopedLocalVars, flatNodes, visited, parentNode, selfNode, context, strict)
+      }
+
+      if (functionNameLower === 'filter') {
+        if (node.arguments.length < 2) {
+          return handleError('Filter requires a table and at least one formula')
+        }
+        const tableValue = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (tableValue instanceof Error) return tableValue
+        const normalizedTable = ensureFormulaTable(tableValue, 'Filter')
+        if (normalizedTable.status === 'error') return handleError(normalizedTable.message)
+
+        const filteredRows = normalizedTable.value.filter((record: any) => {
+          for (const predicateNode of node.arguments.slice(1)) {
+            const predicateResult = evaluateInRecordScope(predicateNode, record)
+            if (predicateResult instanceof Error) return false
+            if (typeof predicateResult !== 'boolean') return false
+            if (!predicateResult) return false
+          }
+          return true
+        })
+        return filteredRows
+      }
+
+      if (functionNameLower === 'lookup') {
+        if (node.arguments.length < 2) {
+          return handleError('LookUp requires a table and a formula')
+        }
+        const tableValue = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (tableValue instanceof Error) return tableValue
+        const normalizedTable = ensureFormulaTable(tableValue, 'LookUp')
+        if (normalizedTable.status === 'error') return handleError(normalizedTable.message)
+
+        const match = normalizedTable.value.find((record: any) => {
+          const predicateResult = evaluateInRecordScope(node.arguments[1], record)
+          return !(predicateResult instanceof Error) && predicateResult === true
+        })
+        if (!match) return null
+        if (node.arguments.length < 3) return match
+        return evaluateInRecordScope(node.arguments[2], match)
+      }
+
+      if (functionNameLower === 'search') {
+        if (node.arguments.length < 3) {
+          return handleError('Search requires a table, search text, and at least one column name')
+        }
+        const tableValue = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (tableValue instanceof Error) return tableValue
+        const normalizedTable = ensureFormulaTable(tableValue, 'Search')
+        if (normalizedTable.status === 'error') return handleError(normalizedTable.message)
+
+        const searchTextValue = evaluateAST(node.arguments[1], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (searchTextValue instanceof Error) return searchTextValue
+        const searchText = coerceFormulaText(searchTextValue)
+        if (searchText.status !== 'success') return handleError('Search requires text-compatible search text')
+        const needle = searchText.value.toLowerCase()
+        if (!needle) return normalizedTable.value
+
+        const columnNames = node.arguments.slice(2).map(extractColumnNameArg).filter(Boolean) as string[]
+        if (!columnNames.length) return handleError('Search requires at least one valid column name')
+
+        return normalizedTable.value.filter((record: any) =>
+          columnNames.some((columnName) => {
+            const cellValue = getValueByColumnName(record, columnName)
+            const cellText = coerceFormulaText(cellValue)
+            return cellText.status === 'success' && cellText.value.toLowerCase().includes(needle)
+          })
+        )
+      }
+
+      if (functionNameLower === 'sort') {
+        if (node.arguments.length < 2) {
+          return handleError('Sort requires a table and a formula')
+        }
+        const tableValue = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (tableValue instanceof Error) return tableValue
+        const normalizedTable = ensureFormulaTable(tableValue, 'Sort')
+        if (normalizedTable.status === 'error') return handleError(normalizedTable.message)
+
+        const direction = node.arguments[2]
+          ? evaluateSortOrderNode(node.arguments[2], 'Sort')
+          : { status: 'success', value: 1 }
+        if (direction instanceof Error) return direction
+        if (direction.status === 'error') return handleError(direction.message)
+
+        const sorted = [...normalizedTable.value].sort((leftRecord: any, rightRecord: any) => {
+          const leftValue = evaluateInRecordScope(node.arguments[1], leftRecord)
+          const rightValue = evaluateInRecordScope(node.arguments[1], rightRecord)
+          if (leftValue instanceof Error || rightValue instanceof Error) return 0
+          return compareFormulaValues(leftValue, rightValue) * direction.value
+        })
+        return sorted
+      }
+
+      if (functionNameLower === 'sortbycolumns') {
+        if (node.arguments.length < 2) {
+          return handleError('SortByColumns requires a table and at least one column name')
+        }
+        const tableValue = evaluateAST(node.arguments[0], localVars, flatNodes, visited, parentNode, selfNode, context, strict)
+        if (tableValue instanceof Error) return tableValue
+        const normalizedTable = ensureFormulaTable(tableValue, 'SortByColumns')
+        if (normalizedTable.status === 'error') return handleError(normalizedTable.message)
+
+        const sortSpecs: Array<{ columnName: string; direction: number }> = []
+        let argIndex = 1
+        while (argIndex < node.arguments.length) {
+          const columnName = extractColumnNameArg(node.arguments[argIndex])
+          if (!columnName) return handleError('SortByColumns requires valid column names')
+
+          let directionValue = 1
+          const nextArg = node.arguments[argIndex + 1]
+          const direction = nextArg ? evaluateSortOrderNode(nextArg, 'SortByColumns') : { status: 'success', value: 1 }
+          if (direction instanceof Error) return direction
+          if (nextArg && direction.status === 'success') {
+            directionValue = direction.value
+            argIndex += 2
+          } else {
+            argIndex += 1
+          }
+
+          sortSpecs.push({ columnName, direction: directionValue })
+        }
+
+        const sorted = [...normalizedTable.value].sort((leftRecord: any, rightRecord: any) => {
+          for (const spec of sortSpecs) {
+            const comparison = compareFormulaValues(
+              getValueByColumnName(leftRecord, spec.columnName),
+              getValueByColumnName(rightRecord, spec.columnName),
+            )
+            if (comparison !== 0) return comparison * spec.direction
+          }
+          return 0
+        })
+        return sorted
+      }
+
       const funcDef = FUNCTIONS.find(f => f.name.toLowerCase() === node.name.toLowerCase())
       
       // If it's a native JS Math function for instance

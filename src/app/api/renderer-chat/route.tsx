@@ -26,6 +26,23 @@ const RENDERER_CHAT_MODEL_CREDIT_COST = {
   "gemini-3.1-pro-preview": 10,
 };
 
+type OtherScreenSummary = {
+  screenId?: string;
+  screenName?: string;
+  topLevelControlCounts?: Record<string, number>;
+  notablePatterns?: string[];
+  variables?: string[];
+  navigationTargets?: string[];
+  collections?: Array<{
+    controlId?: string;
+    controlName?: string;
+    kind?: string;
+    fields?: string[];
+    itemsPreview?: string;
+  }>;
+  notableFormulas?: string[];
+};
+
 function estimateBase64Bytes(base64 = "") {
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
@@ -78,6 +95,59 @@ function summarizeItemsForPrompt(items) {
   return undefined;
 }
 
+function summarizeCountsForPrompt(counts: Record<string, number> | undefined) {
+  const entries = Object.entries(counts || {}).sort((left, right) => right[1] - left[1]);
+  if (entries.length === 0) return "none";
+  return entries
+    .slice(0, 8)
+    .map(([type, count]) => `${type}=${count}`)
+    .join(", ");
+}
+
+function buildOtherScreenSummaryLines(summaries: OtherScreenSummary[] = []) {
+  if (!Array.isArray(summaries) || summaries.length === 0) {
+    return "";
+  }
+
+  const lines = [
+    "Other screens are provided as read-only context only. Do not edit them, move components onto them, or create new screens unless the user explicitly asks.",
+    "Other screen summaries:",
+  ];
+
+  summaries.slice(0, 8).forEach((summary, index) => {
+    lines.push(
+      `${index + 1}. ${summary.screenName || summary.screenId || "Screen"} (id="${summary.screenId || "unknown"}")`
+    );
+    lines.push(`   - top-level controls: ${summarizeCountsForPrompt(summary.topLevelControlCounts)}`);
+    if (summary.notablePatterns?.length) {
+      lines.push(`   - patterns: ${summary.notablePatterns.join(", ")}`);
+    }
+    if (summary.variables?.length) {
+      lines.push(`   - variables: ${summary.variables.join(", ")}`);
+    }
+    if (summary.navigationTargets?.length) {
+      lines.push(`   - navigation targets: ${summary.navigationTargets.join(", ")}`);
+    }
+    if (summary.collections?.length) {
+      summary.collections.slice(0, 2).forEach((collection) => {
+        lines.push(
+          `   - ${collection.kind || "collection"} ${collection.controlName || collection.controlId || "unnamed"} fields: ${(collection.fields || []).join(", ") || "unknown"}`
+        );
+        if (collection.itemsPreview) {
+          lines.push(`     items: ${collection.itemsPreview}`);
+        }
+      });
+    }
+    if (summary.notableFormulas?.length) {
+      summary.notableFormulas.slice(0, 3).forEach((formula) => {
+        lines.push(`   - formula: ${formula}`);
+      });
+    }
+  });
+
+  return lines.join("\n");
+}
+
 const ENGINE_COMPATIBILITY_PROMPT = [
   "Engine compatibility constraints:",
   AI_PROMPT_COMPONENT_RULES_TEXT,
@@ -95,6 +165,10 @@ const ENGINE_COMPATIBILITY_PROMPT = [
   `- For Icon controls, Icon must be one of these exact enum strings: ${SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ")}.`,
   '- For Image controls, do not use URLs, media names, uploaded assets, custom SVG, or source properties. Images are fixed cloud placeholders in this renderer.',
   '- Use double quotes for string literals in component properties and formulas. Never emit single-quoted strings.',
+  '- When referencing another control in a formula, use that control\'s exact existing "name" from the canvas context. Never invent aliases, abbreviations, or renamed references.',
+  '- If you create a control and need to reference it in the same response, set an explicit stable "name" on that control first and then use that exact same name in every formula reference.',
+  '- Prefer locally previewable formulas when they are sufficient, but richer Power Apps functions such as With, Filter, LookUp, Search, SortByColumns, Collect, ClearCollect, and Patch are allowed when they materially improve export quality. Those formulas may be preview-limited locally.',
+  '- If the user asks to put one control above or below another, that is a z-order change. Use a reorder patch rather than trying to fake layering with position edits alone.',
 ].join("\n");
 
 function buildComponentPromptLine(component, { indent = "", siblingIndex = 0, parentId = "screen" } = {}) {
@@ -137,6 +211,12 @@ function emitLegacyResultAsPatchEvents(legacyPayload, emitOperation, send) {
   for (const item of legacyPayload?.components_to_reparent || []) {
     if (item?.id && item?.newParentId) {
       emitOperation({ op: "reparent", id: item.id, newParentId: item.newParentId });
+    }
+  }
+
+  for (const item of legacyPayload?.components_to_reorder || []) {
+    if (item?.id && item?.position) {
+      emitOperation({ op: "reorder", id: item.id, position: item.position });
     }
   }
 
@@ -263,7 +343,7 @@ export async function POST(req) {
       );
     }
 
-    const { message, canvas_components, active_screen_id, canvas_width, canvas_height, image_data, image_mime_type, chat_history, model } =
+    const { message, canvas_components, active_screen_id, active_screen_name, other_screen_summaries, canvas_width, canvas_height, image_data, image_mime_type, chat_history, model } =
       body || {};
 
     const requestedModel = ALLOWED_RENDERER_CHAT_MODELS.has(model) ? model : RENDERER_CHAT_MODEL_NAME;
@@ -313,7 +393,11 @@ export async function POST(req) {
       },
     ]);
     let canvas_ctx = `Canvas size: ${canvas_width} x ${canvas_height} px.\n`;
-    canvas_ctx += `Active screen id: "${screenParentId}". Put new top-level components on this screen unless the user explicitly asks for a different screen.\n`;
+    canvas_ctx += `Active screen id: "${screenParentId}".`;
+    if (active_screen_name) {
+      canvas_ctx += ` Active screen name: "${active_screen_name}".`;
+    }
+    canvas_ctx += ` Only edit the active screen unless the user explicitly names another existing screen. Do not create new screens, modify navigation, or move components across screens unless the user explicitly asks.\n`;
     if (canvas_components && canvas_components.length > 0) {
       const comp_lines: string[] = [];
       const processComponent = (c, indent = "", siblingIndex = 0, parentId = screenParentId) => {
@@ -327,6 +411,13 @@ export async function POST(req) {
         "Current components (higher siblingIndex renders in front within the same parent; each parent branch layers as one grouped stack against its siblings):\n" + comp_lines.join("\n");
     } else {
       canvas_ctx += `The active screen "${screenParentId}" is currently empty.`;
+    }
+
+    const otherScreenContext = buildOtherScreenSummaryLines(
+      Array.isArray(other_screen_summaries) ? other_screen_summaries : []
+    );
+    if (otherScreenContext) {
+      canvas_ctx += `\n\n${otherScreenContext}`;
     }
 
     const full_prompt = `${canvas_ctx}\n\n${ENGINE_COMPATIBILITY_PROMPT}\n\n${TEXT_SIZING_RUNTIME_GUIDE}\n\nUser prompt: ${message.trim()}`;
@@ -377,7 +468,7 @@ export async function POST(req) {
               return;
             }
 
-            if (op.op === "add" || op.op === "update" || op.op === "remove" || op.op === "reparent") {
+            if (op.op === "add" || op.op === "update" || op.op === "remove" || op.op === "reparent" || op.op === "reorder") {
               const sanitizedPatch = sanitizeRendererPatch(op, nodeLookup);
               if (!sanitizedPatch) return;
               send("patch", sanitizedPatch);

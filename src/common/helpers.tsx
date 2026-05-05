@@ -2,16 +2,12 @@ import React from 'react'
 import { parseFormula, evaluateAST } from '@/features/powerapps/formula-parser'
 import { isStoredDateValue } from '@/features/powerapps/date-values'
 import { ALL_ENUM_VALUES, FUNCTIONS, coerceFormulaNumber, coerceFormulaText } from '@/features/powerapps/functions'
+import { isExportSafePreviewLimitedFunction, normalizePowerAppsFunctionName } from '@/features/powerapps/formula-support'
 import { SCHEMAS } from '@/features/powerapps/schema'
 import { mergePreservedPowerAppsYaml } from '@/lib/powerapps-import'
 import powerAppsFormulaFunctions from '../../schemas/powerapps_formula_functions.json'
 
 const PROPERTY_DEF_CACHE = new Map()
-const normalizePowerAppsFunctionName = (value: any) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-
 const OFFICIAL_POWER_APPS_FUNCTIONS = new Set(
   ((powerAppsFormulaFunctions as any)?.functions || []).map((func: any) =>
     normalizePowerAppsFunctionName(func?.name)
@@ -173,6 +169,19 @@ function getRecognizedUnsupportedPowerAppsFunctions(ast: any) {
 
 function buildUnsupportedPowerAppsFunctionWarning(functionNames: string[]) {
   if (!Array.isArray(functionNames) || functionNames.length === 0) return null
+
+  const previewLimited = functionNames.filter(name => isExportSafePreviewLimitedFunction(name))
+  const unsupported = functionNames.filter(name => !isExportSafePreviewLimitedFunction(name))
+
+  if (unsupported.length === 0) {
+    if (previewLimited.length === 1) {
+      return `Uses Power Apps function "${previewLimited[0]}". Velocity Canvas will preserve it for export, but local preview and validation are limited.`
+    }
+
+    const preview = previewLimited.slice(0, 2).map((name) => `"${name}"`).join(', ')
+    const remainder = previewLimited.length > 2 ? ` and ${previewLimited.length - 2} more` : ''
+    return `Uses preview-limited Power Apps functions ${preview}${remainder}. Velocity Canvas will preserve them for export, but local preview and validation are limited.`
+  }
 
   if (functionNames.length === 1) {
     return `Uses Power Apps function "${functionNames[0]}", which Velocity Canvas does not parse yet. We'll preserve the formula when you copy or export.`
@@ -586,9 +595,10 @@ export function getPropertyValidationIssue(node, propDef, value, localVars, flat
     const ast = parseFormula(valStr, true)
     const unsupportedFunctions = getRecognizedUnsupportedPowerAppsFunctions(ast)
     if (unsupportedFunctions.length > 0) {
+      const previewLimitedOnly = unsupportedFunctions.every((name) => isExportSafePreviewLimitedFunction(name))
       return {
         severity: 'warning',
-        code: 'unsupported-official-powerapps-function',
+        code: previewLimitedOnly ? 'preview-limited-powerapps-function' : 'unsupported-official-powerapps-function',
         message: buildUnsupportedPowerAppsFunctionWarning(unsupportedFunctions),
       }
     }

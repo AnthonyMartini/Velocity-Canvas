@@ -3,6 +3,7 @@ import { AI_ADDABLE_COMPONENT_TYPE_SET } from "@/features/powerapps/ai-constrain
 import { autoSizeTextComponents, getAutoSizedComponentChanges } from "@/features/powerapps/text-sizing";
 import { sanitizeHtmlFragment, sanitizeSvgFragment } from "@/lib/content-sanitizer";
 import { normalizeCanvasThemeState } from "@/theme/canvasTheme";
+import { ALL_ENUM_VALUES, FUNCTIONS } from "@/features/powerapps/functions";
 
 const DEFAULT_SCREEN_FILL = "RGBA(255, 255, 255, 1)";
 const MAX_COMPONENT_DEPTH = 12;
@@ -28,6 +29,26 @@ const TEXT_LITERAL_PROPERTY_EXCLUSIONS = new Set([
   "SelectedItems",
   "SelectedItemsText",
 ]);
+const RESERVED_FORMULA_ROOTS = new Set(["Parent", "Self", "ThisItem", "ThisRecord", "App"]);
+const ENUM_ROOTS = new Set(
+  Array.from(ALL_ENUM_VALUES || [])
+    .map((value: any) => String(value || "").split(".")[0])
+    .filter(Boolean),
+);
+const FUNCTION_NAMES = new Set((FUNCTIONS || []).map((func: any) => String(func?.name || "")));
+const CONTROL_OUTPUT_REFERENCE_HINTS = [
+  ".Selected",
+  ".SelectedItems",
+  ".SelectedDate",
+  ".Text",
+  ".Value",
+  ".Visible",
+  ".Width",
+  ".Height",
+  ".X",
+  ".Y",
+  ".Checked",
+];
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -42,6 +63,16 @@ function sanitizeString(value: unknown, maxLength = MAX_STRING_LENGTH) {
 function sanitizeDocumentId(value: unknown) {
   const trimmed = sanitizeString(value, 200).trim();
   return trimmed && !trimmed.includes("/") ? trimmed : null;
+}
+
+function walkNodes(nodes: any[], visitor: (node: any) => void) {
+  for (const node of nodes || []) {
+    if (!node || typeof node !== "object") continue;
+    visitor(node);
+    if (Array.isArray(node.children) && node.children.length) {
+      walkNodes(node.children, visitor);
+    }
+  }
 }
 
 function getPropertyOptionValues(propertyDef: any) {
@@ -123,6 +154,44 @@ function looksLikePowerFxExpression(value: string) {
   }
 
   return trimmed.includes("&") || trimmed.includes(";");
+}
+
+function collectKnownNodeNames(lookup: Map<string, any>, extraNodes: any[] = []) {
+  const names = new Set<string>();
+
+  for (const node of lookup.values()) {
+    const nodeName = String(node?.name || "").trim();
+    if (nodeName) names.add(nodeName);
+  }
+
+  walkNodes(extraNodes, (node) => {
+    const nodeName = String(node?.name || "").trim();
+    if (nodeName) names.add(nodeName);
+  });
+
+  return names;
+}
+
+function getSuspiciousUnknownControlReferences(formula: string, knownNames: Set<string>) {
+  const suspiciousRoots = new Set<string>();
+  const normalized = String(formula || "");
+  const pathMatches = normalized.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\.[A-Za-z_][A-Za-z0-9_]*/g);
+
+  for (const match of pathMatches) {
+    const rootName = String(match[1] || "").trim();
+    if (!rootName) continue;
+    if (RESERVED_FORMULA_ROOTS.has(rootName)) continue;
+    if (ENUM_ROOTS.has(rootName)) continue;
+    if (FUNCTION_NAMES.has(rootName)) continue;
+    if (knownNames.has(rootName)) continue;
+
+    const pathText = String(match[0] || "");
+    if (!CONTROL_OUTPUT_REFERENCE_HINTS.some((hint) => pathText.includes(hint))) continue;
+
+    suspiciousRoots.add(rootName);
+  }
+
+  return [...suspiciousRoots];
 }
 
 function normalizeTextLiteralProperty(propertyKey: string, value: string, propertyDef?: any) {
@@ -342,6 +411,37 @@ function sanitizeComponentChanges(type: string, changes: unknown, existingNode?:
   return sanitizedChanges;
 }
 
+function hasInvalidControlNameReferences(
+  nodeType: string,
+  changes: Record<string, any>,
+  lookup: Map<string, any>,
+  extraNodes: any[] = [],
+) {
+  const propertyMap = getPropertyMapForType(nodeType);
+  const knownNames = collectKnownNodeNames(lookup, extraNodes);
+
+  for (const [key, value] of Object.entries(changes || {})) {
+    if (typeof value !== "string") continue;
+    if (!looksLikePowerFxExpression(value)) continue;
+    if (key === "name") continue;
+
+    const propertyDef = propertyMap.get(key);
+    const isEventLike =
+      propertyDef?.propertyType === "Event" ||
+      propertyDef?.type === "event" ||
+      key.startsWith("On");
+    const isTextFormula = value.trim().startsWith("=") || isEventLike || /[()&+\-*/<>=;[\]{}]/.test(value);
+    if (!isTextFormula) continue;
+
+    const suspiciousRoots = getSuspiciousUnknownControlReferences(value, knownNames);
+    if (suspiciousRoots.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function indexTree(nodes: any[], map: Map<string, any>) {
   for (const node of nodes || []) {
     map.set(node.id, node);
@@ -419,6 +519,7 @@ export function sanitizeRendererPatch(operation: unknown, lookup: Map<string, an
     const component = sanitizeComponentNode(operation.component);
     if (!component) return null;
     if (!isAiAddableComponentSubtree(component)) return null;
+    if (hasInvalidControlNameReferences(component.type, component, lookup, [component])) return null;
     autoSizeTextComponents(component);
 
     return {
@@ -435,6 +536,7 @@ export function sanitizeRendererPatch(operation: unknown, lookup: Map<string, an
 
     const changes = sanitizeComponentChanges(existing.type, operation.changes, existing);
     if (!changes) return null;
+    if (hasInvalidControlNameReferences(existing.type, changes, lookup)) return null;
 
     return {
       op: "update",
@@ -460,6 +562,27 @@ export function sanitizeRendererPatch(operation: unknown, lookup: Map<string, an
       op: "reparent",
       id,
       newParentId,
+    };
+  }
+
+  if (operation.op === "reorder") {
+    const id = sanitizeNodeId(operation.id, "");
+    const rawPosition = sanitizeString(operation.position, 20).trim().toLowerCase();
+    const positionMap: Record<string, string> = {
+      front: "front",
+      back: "back",
+      forward: "up",
+      backward: "down",
+      up: "up",
+      down: "down",
+    };
+    const position = positionMap[rawPosition];
+    if (!id || !position || !lookup.has(id)) return null;
+
+    return {
+      op: "reorder",
+      id,
+      position,
     };
   }
 

@@ -38,6 +38,8 @@ export default function ContainerRenderer({
   updateProp, onMouseDown, onClick, onChildMouseDown, onChildClick,
   onDropInto, dragOverId, setDragOverId, canvasTheme, renderZIndex = 1
 }) {
+  if (comp?.Visible === false) return null
+
   const shadowMap = {
     'DropShadow.None': 'none',
     'DropShadow.Light': '0 2px 4px rgba(0,0,0,0.1)',
@@ -53,7 +55,6 @@ export default function ContainerRenderer({
       ? `${comp.BorderThickness}pt ${CSS_BORDER_STYLE[comp.BorderStyle] || 'solid'} ${comp.BorderColor}`
       : 'none',
     borderRadius: `${comp.RadiusTopLeft || 0}pt ${comp.RadiusTopRight || 0}pt ${comp.RadiusBottomRight || 0}pt ${comp.RadiusBottomLeft || 0}pt`,
-    opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',
     ...getSelectionStyles(selected, 'default', shadowMap[comp.DropShadow] || 'none'),
@@ -106,6 +107,7 @@ export default function ContainerRenderer({
       {(comp.children || []).map((rawChild, childIndex) => {
         const isChildSelected = selectedIds.includes(rawChild.id)
         const child = resolveProperties(rawChild, localVars, flatNodes, comp)
+        if (child?.Visible === false) return null
         const childProps = {
           comp: child,
           selected: isChildSelected,

@@ -154,6 +154,11 @@ export const StartOfWeek = {
     Saturday: "StartOfWeek.Saturday"
 }
 
+export const SortOrder = {
+    Ascending: "SortOrder.Ascending",
+    Descending: "SortOrder.Descending"
+}
+
 export const Icon = {
     Add: "Icon.Add",
     Cancel: "Icon.Cancel",
@@ -242,6 +247,7 @@ export const ALL_ENUM_VALUES = new Set([
     ...Object.values(TextFormat),
     ...Object.values(Layout),
     ...Object.values(StartOfWeek),
+    ...Object.values(SortOrder),
     ...Object.values(Icon)
 ])
 
@@ -1900,5 +1906,53 @@ export const FUNCTIONS = [
                 })
             return { status: "success", message: rows }
         }
+    },
+    {
+        name: "With",
+        type: Type.ANY,
+        description: "Evaluates a formula in the context of a temporary record scope.",
+        example: 'With({subtotal: 12}, subtotal * 2)',
+        args: [],
+        function: () => ({ status: "error", message: "With is evaluated directly by the formula engine." })
+    },
+    {
+        name: "Filter",
+        type: Type.ANY,
+        description: "Returns the records of a table that satisfy one or more formulas.",
+        example: 'Filter(Table({Status:"Open"}), Status = "Open")',
+        args: [],
+        function: () => ({ status: "error", message: "Filter is evaluated directly by the formula engine." })
+    },
+    {
+        name: "Search",
+        type: Type.ANY,
+        description: "Searches for text across one or more text columns in a table.",
+        example: 'Search(Table({Title:"Alpha"}), "alp", "Title")',
+        args: [],
+        function: () => ({ status: "error", message: "Search is evaluated directly by the formula engine." })
+    },
+    {
+        name: "LookUp",
+        type: Type.ANY,
+        description: "Finds the first record in a table that satisfies a formula, optionally reducing it to a value.",
+        example: 'LookUp(Table({Id:1,Title:"Alpha"}), Id = 1, Title)',
+        args: [],
+        function: () => ({ status: "error", message: "LookUp is evaluated directly by the formula engine." })
+    },
+    {
+        name: "Sort",
+        type: Type.ANY,
+        description: "Sorts a table by a formula or column expression.",
+        example: 'Sort(Table({Title:"B"},{Title:"A"}), Title, SortOrder.Ascending)',
+        args: [],
+        function: () => ({ status: "error", message: "Sort is evaluated directly by the formula engine." })
+    },
+    {
+        name: "SortByColumns",
+        type: Type.ANY,
+        description: "Sorts a table by one or more named columns.",
+        example: 'SortByColumns(Table({Title:"B"},{Title:"A"}), "Title", SortOrder.Ascending)',
+        args: [],
+        function: () => ({ status: "error", message: "SortByColumns is evaluated directly by the formula engine." })
     }
 ]

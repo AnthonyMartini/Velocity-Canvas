@@ -47,6 +47,7 @@ import { createDefaultCanvasThemeState, getActiveCanvasThemeDefinition, normaliz
 import { looksLikePowerAppsYaml, parsePowerAppsYaml } from '@/lib/powerapps-import'
 import { clearProjectSession, writeProjectSession } from '@/features/projects/session'
 import { useAppShell } from '@/features/app/AppShellProvider'
+import { summarizeOtherScreens } from '@/features/powerapps/screen-summary'
 const DEFAULT_AI_LOADING_MESSAGE = 'Generating your layout changes...'
 const CANVAS_ZOOM_BASE = 0.9
 const MIN_CANVAS_ZOOM = 0.25
@@ -257,7 +258,7 @@ async function consumeAIResponse(res, options: any = {}) {
       } else if (payload.op === 'update') {
         streamed.mods += 1
         streamed.lastId = payload?.id || streamed.lastId
-      } else if (payload.op === 'remove' || payload.op === 'reparent') {
+      } else if (payload.op === 'remove' || payload.op === 'reparent' || payload.op === 'reorder') {
         streamed.mods += 1
         streamed.lastId = payload?.id || streamed.lastId
       }
@@ -521,6 +522,7 @@ function ErrorsPane({ errors, onSelectNode, width = 320, onClose }) {
 }
 
 function RendererSwitch({ comp, sharedProps }) {
+  if (comp?.Visible === false) return null
   if (comp.type === 'Button') return <ButtonRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernButton') return <ModernButtonRenderer key={comp.id} {...sharedProps} />
   if (comp.type === 'ModernDropdown') return <ModernDropdownRenderer key={comp.id} {...sharedProps} />
@@ -2014,6 +2016,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
 
   // Always re-derive the node from the tree so name/fill changes are reflected live
   const activeScreenNode = findNode(tree, activeScreenId)
+  const otherScreenSummaries = useMemo(() => summarizeOtherScreens(tree, activeScreenId), [tree, activeScreenId])
   const visibleCanvasErrors = useMemo(() => {
     if (!activeScreenId) return []
     return globalErrors.filter(err => getScreenIdForNode(err.nodeId) === activeScreenId)
@@ -2284,6 +2287,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         nextTree = removeNode(nextTree, patch.id)[0]
       } else if (patch.op === 'reparent' && patch.id && patch.newParentId) {
         nextTree = handleDropLogic(nextTree, patch.id, patch.newParentId)
+      } else if (patch.op === 'reorder' && patch.id && patch.position) {
+        nextTree = reorderNode(nextTree, patch.id, patch.position)
       } else if (patch.op === 'update' && patch.id && patch.changes) {
         const changes = resolveSampleTextDeep({ ...patch.changes })
         if (changes.name) {
@@ -3189,6 +3194,8 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       chat_history: chatMessages.slice(-10).map(m => ({ role: m.role, content: m.content })),
       canvas_components: activeScreenNode?.children || [],
       active_screen_id: activeScreenNode?.id || activeScreenIdRef.current,
+      active_screen_name: activeScreenNode?.name || activeScreenNode?.id || null,
+      other_screen_summaries: otherScreenSummaries,
       canvas_width: canvasW,
       canvas_height: canvasH,
       model: chatModel,
@@ -3241,7 +3248,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       if (response.mode === 'legacy') {
         const data = response.data
 
-        if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length || data.components_to_reparent?.length) {
+        if (data.components_to_add?.length || data.components_to_update?.length || data.components_to_remove?.length || data.components_to_reparent?.length || data.components_to_reorder?.length) {
           setTree(prev => {
             let nextTree = prev
             if (data.components_to_remove?.length) {
@@ -3254,6 +3261,13 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               data.components_to_reparent.forEach(r => {
                 if (r.id && r.newParentId) {
                   nextTree = handleDropLogic(nextTree, r.id, r.newParentId)
+                }
+              })
+            }
+            if (data.components_to_reorder?.length) {
+              data.components_to_reorder.forEach(r => {
+                if (r.id && r.position) {
+                  nextTree = reorderNode(nextTree, r.id, r.position)
                 }
               })
             }
@@ -3305,7 +3319,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         if (lastId) setTimeout(() => setSelectedIds([lastId]), 10)
 
         const addsCount = (data.components_to_add || []).length
-        const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length + (data.components_to_reparent || []).length
+        const modsCount = (data.components_to_update || []).length + (data.components_to_remove || []).length + (data.components_to_reparent || []).length + (data.components_to_reorder || []).length
 
         setChatMessages(prev => [...prev, {
           role: 'assistant',
@@ -3340,7 +3354,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
       setAiLoadingMessage(DEFAULT_AI_LOADING_MESSAGE)
       chatAbortControllerRef.current = null
     }
-  }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, onCreditDeduction, user, chatMessages, applyRendererChatPatch, chatModel])
+  }, [chatInput, chatImage, chatLoading, canvasW, canvasH, saveHistory, activeScreenNode, otherScreenSummaries, onCreditDeduction, user, chatMessages, applyRendererChatPatch, chatModel])
 
   // ── Shared child event handlers ────────────────────────────────────────────────
   const handleChildMouseDown = useCallback((e, id) => handleMouseDown(e, id), [handleMouseDown])

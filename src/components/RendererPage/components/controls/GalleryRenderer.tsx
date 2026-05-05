@@ -50,12 +50,13 @@ export default function GalleryRenderer({
   updateProp, parentNode, onMouseDown, onClick, onChildMouseDown, onChildClick,
   onDropInto, dragOverId, setDragOverId, canvasTheme, renderZIndex = 1
 }) {
+  if (comp?.Visible === false) return null
+
   const style: any = {
     position: 'absolute',
     left: `${comp.X}pt`, top: `${comp.Y}pt`, width: `${comp.Width}pt`, height: `${comp.Height}pt`,
     backgroundColor: comp.Fill === 'rgba(0,0,0,0)' || comp.Fill === 'transparent' ? 'rgba(0,0,0,0)' : comp.Fill,
     border: `2px dashed ${themeVars.colors.gallerySelectionSoft}`,
-    opacity: comp.Visible ? 1 : 0.3,
     cursor: isPlaying ? 'default' : 'move', userSelect: 'none',
     boxSizing: 'border-box',
     ...getSelectionStyles(selected, 'gallery'),
@@ -114,6 +115,7 @@ export default function GalleryRenderer({
     return (comp.children || []).map((rawChild, childIndex) => {
       // Resolve formula properties for this row
       const child = resolveProperties(rawChild, rowLocalVars, flatNodes, comp)
+      if (child?.Visible === false) return null
       const childProps: any = {
         comp: child,
         selected: selectedIds.includes(child.id),

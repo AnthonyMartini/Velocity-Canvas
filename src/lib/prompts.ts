@@ -1,20 +1,35 @@
 import { AI_ADDABLE_COMPONENT_TYPES, CLASSIC_AI_COMPONENT_TYPES, SUPPORTED_ICON_ENUM_VALUES } from "@/features/powerapps/ai-constraints";
 import { AI_PROMPT_COMPONENT_CATALOG_TEXT, AI_PROMPT_COMPONENT_RULES_TEXT } from "@/features/powerapps/ai-prompt-access";
+import { EXPORT_SAFE_PREVIEW_LIMITED_FUNCTIONS } from "@/features/powerapps/formula-support";
 import { TEXT_SIZING_PROMPT_GUIDE } from "@/features/powerapps/text-sizing";
 
 const CLASSIC_COMPONENT_TYPES_TEXT = CLASSIC_AI_COMPONENT_TYPES.join(", ");
 const AI_ADDABLE_COMPONENT_TYPES_TEXT = AI_ADDABLE_COMPONENT_TYPES.join(", ");
 const SUPPORTED_ICON_ENUMS_TEXT = SUPPORTED_ICON_ENUM_VALUES.map((value) => `"${value}"`).join(", ");
+const EXPORT_SAFE_PREVIEW_LIMITED_FUNCTIONS_TEXT = EXPORT_SAFE_PREVIEW_LIMITED_FUNCTIONS.join(", ");
 
 /** Shared across renderer AI, tweak AI, and the formula builder. */
 export const SUPPORTED_FUNCTIONS_TEXT = `
-Supported functions only:
-Set(Variable, Value), Navigate(ScreenName), Notify(Message, NotificationType), If(Condition, TrueResult, FalseResult), Coalesce(Value1, Value2, ...), RGBA(r, g, b, a), RGB(r, g, b), Text(Value [, DateTimeFormatEnumOrCustomFormat [, ResultLanguageTag ]]), Value(String), Table(...)
+Locally previewable functions:
+Set(Variable, Value), Navigate(ScreenName), Notify(Message, NotificationType), If(Condition, TrueResult, FalseResult), Coalesce(Value1, Value2, ...), RGBA(r, g, b, a), RGB(r, g, b), Text(Value [, DateTimeFormatEnumOrCustomFormat [, ResultLanguageTag ]]), Value(String), Table(...), With(Record, Formula), Filter(Table, Formula), Search(Table, SearchString, ColumnName, ...), LookUp(Table, Formula [, ReductionFormula]), Sort(Table, Formula [, SortOrder]), SortByColumns(Table, ColumnName, SortOrder, ...)
 Date and time:
 Now(), Today(), Day(DateTime), Month(DateTime), Minute(DateTime), Second(DateTime), Year(DateTime), WeekNum(DateTime [, StartOfWeek]), Weekday(DateTime [, StartOfWeek])
 Math:
 Abs, Acos, Acot, Asin, Atan, Atan2, Average, Cos, Cot, Count, CountA, Degrees, Exp, Int, Ln, Log, Max, Min, Mod, Pi, Power, Radians, Rand, RandBetween, Round, RoundDown, RoundUp, Sequence, Sin, Sqrt, StdevP, Sum, Tan, Trunc, VarP
-Do NOT use unsupported functions such as UpdateContext, Patch, Filter, SortByColumns, LookUp, With, Collect, ClearCollect, Concurrent, or SetProperty.
+Export-safe, preview-limited functions:
+${EXPORT_SAFE_PREVIEW_LIMITED_FUNCTIONS_TEXT}
+Use preview-limited functions only when they materially improve the real Power Apps output. Velocity Canvas will preserve them for export, but local preview and validation may be limited.
+Still do NOT use unsupported functions such as UpdateContext, Concurrent, SetProperty, Defaults, Choices, DataSourceInfo, Refresh, Remove, RemoveIf, or SubmitForm unless they are already present in provided context.
+`.trim();
+
+export const POWER_APPS_AUTHORING_STYLE_TEXT = `
+Power Apps authoring style:
+- Prefer clear, deterministic formulas over clever but fragile expressions.
+- When a formula is long, keep its structure readable and favor With(...) for named intermediate values in export-safe formulas.
+- Use double quotes for all string literals and JSON-escape them when needed inside component JSON.
+- For multiline or complex formulas, prefer shapes that export cleanly to YAML and avoid ambiguous record syntax unless it is quoted correctly.
+- Reuse exact existing control names when referencing other controls. Never invent aliases.
+- If no live data source is provided and the UI implies repeated business records, create realistic sample data with stable field names.
 `.trim();
 
 export const SUPPORTED_ENUMS_TEXT = `
@@ -34,6 +49,7 @@ Supported enum values:
 - TextMode: "TextMode.SingleLine", "TextMode.Multiline", "TextMode.Password"
 - TextFormat: "TextFormat.Text", "TextFormat.Number"
 - NotificationType: "NotificationType.Information", "NotificationType.Warning", "NotificationType.Success", "NotificationType.Error"
+- SortOrder: "SortOrder.Ascending", "SortOrder.Descending"
 - Icon: ${SUPPORTED_ICON_ENUMS_TEXT}
 Only use enum values from this list or values already present on the provided component JSON/schema context.
 `.trim();
@@ -68,6 +84,8 @@ FORMULAS AND REFERENCES:
 ${SUPPORTED_FUNCTIONS_TEXT}
 
 ${SUPPORTED_ENUMS_TEXT}
+
+${POWER_APPS_AUTHORING_STYLE_TEXT}
 
 ICON RULES:
 - For Icon controls, the Icon property MUST be one of these exact values: ${SUPPORTED_ICON_ENUMS_TEXT}
@@ -117,6 +135,8 @@ ${SUPPORTED_FUNCTIONS_TEXT}
 
 ${SUPPORTED_ENUMS_TEXT}
 
+${POWER_APPS_AUTHORING_STYLE_TEXT}
+
 ICON RULES:
 - Icon controls must use the Icon property with one of these exact values: ${SUPPORTED_ICON_ENUMS_TEXT}
 - Do not invent icon names or use icons from any other icon set.
@@ -132,18 +152,22 @@ LAYOUT RULES:
 - Use an 8px grid and standard spacing values such as 8, 16, 24, 32, or 40.
 - To place something below another component, compute Y as Target.Y + Target.Height + Padding.
 - Centering formula example: "(Parent.Width - 200) / 2"
+- Only edit the active screen unless the user explicitly asks for another screen.
 
 GALLERY RULES:
 - Use a Gallery whenever the UI shows repeated rows, repeated cards, repeated tiles, records, inventory items, products, or search results.
 - Put repeated child controls inside gallery.children.
 - Bind repeated fields with ThisItem.FieldName only.
 - Prefer Gallery over manually cloning repeated controls.
+- If no live data source is provided, synthesize realistic sample Items with stable business field names such as Title, Status, Owner, DueDate, Amount, or Quantity when appropriate to the request.
+- Keep gallery field names consistent across Items, labels, badges, visibility rules, and action formulas.
 
 DESIGN DEFAULTS:
 - Default to a clean light canvas.
 - Use subtle borders and readable contrast.
 - Primary action buttons should generally use Fill "RGBA(0, 120, 212, 1)" and white text.
 - For card-like surfaces, prefer Container or Rectangle rather than unsupported styling hacks.
+- Keep text hierarchy intentional: strong titles, subdued metadata, clear action emphasis, and enough whitespace to separate sections.
 
 OUTPUT FORMAT (STRICT JSONL PATCHES):
 Respond ONLY with newline-delimited minified JSON objects. No markdown fences. No commentary.
@@ -154,6 +178,7 @@ Line 1:
 Then patch lines in execution order:
 {"op":"remove","id":"old_id"}
 {"op":"reparent","id":"child_id","newParentId":"container_id"}
+{"op":"reorder","id":"text_id","position":"front"}
 {"op":"update","id":"comp_id","changes":{"X":40,"Y":80}}
 {"op":"add","parentId":"ACTIVE_SCREEN_ID","component":{"type":"Button","id":"btn_1","X":40,"Y":40,"Width":120,"Height":40}}
 
@@ -165,6 +190,7 @@ PATCH RULES:
 - For "add", include the full new component spec inside "component".
 - For top-level additions, use the exact active screen id from runtime context.
 - For new containers or galleries, include their initial children inside component.children.
+- Use {"op":"reorder","id":"...","position":"front"} or "back" when the user asks to bring something above or below sibling controls. Use "forward" or "backward" for a single z-order step.
 - Keep every line minified on a single line.
 `.trim();
 
@@ -195,8 +221,10 @@ ${SUPPORTED_FUNCTIONS_TEXT}
 
 ${SUPPORTED_ENUMS_TEXT}
 
+${POWER_APPS_AUTHORING_STYLE_TEXT}
+
 QUALITY:
-- Prefer Coalesce, If, Text, Value, and math helpers over unsupported data verbs.
+- Prefer locally previewable functions when they are sufficient, but use preview-limited functions when the request genuinely needs richer Power Fx for export.
 - Use NotificationType.* exactly as listed when calling Notify.
 - Keep formulas readable; avoid unnecessary nesting.
 `.trim();
