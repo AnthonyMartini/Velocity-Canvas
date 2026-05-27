@@ -114,6 +114,22 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
   const [wantsReply, setWantsReply] = useState(true);
   const feedbackRef = useRef<HTMLDivElement>(null);
 
+  // Profile dropdown state
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [profileMenuOpen]);
+
   // Close feedback dropdown on outside click
   useEffect(() => {
     if (!feedbackOpen) return;
@@ -426,29 +442,85 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                 </Link>
               )}
 
-              <div className="flex items-center gap-2 text-xs text-subtext">
-                {user.photoURL && (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName ?? "User"}
-                    className="h-7 w-7 rounded-full mr-1"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <Link href="/terms" className="transition-colors hover:text-text">
-                  Terms
-                </Link>
-                <span>•</span>
-                <Link href="/privacy" className="transition-colors hover:text-text">
-                  Privacy
-                </Link>
-                <span>•</span>
+              <div ref={profileMenuRef} className="relative flex items-center">
                 <button
-                  onClick={() => void signOutUser()}
-                  className="cursor-pointer transition-colors hover:text-text"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-overlay/40 bg-surface/50 p-0.5 shadow-sm transition-all hover:border-accent/40 hover:scale-105 active:scale-95 cursor-pointer"
+                  title="User profile menu"
+                  aria-label="User profile menu"
                 >
-                  Sign out
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName ?? "User"}
+                      className="h-full w-full rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-accent text-xs font-black text-white uppercase">
+                      {user.displayName ? user.displayName[0] : (user.email ? user.email[0] : 'U')}
+                    </div>
+                  )}
                 </button>
+
+                {profileMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-overlay/30 bg-surface p-1.5 shadow-[var(--vc-shadow-floating-panel)] animate-fade-in flex flex-col gap-0.5"
+                    style={{ backgroundColor: "var(--vc-color-surface)" }}
+                  >
+                    {/* User profile details */}
+                    <div className="px-3 py-2.5 flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-text truncate leading-tight">
+                        {user.displayName ?? "User Account"}
+                      </span>
+                      <span className="text-[10px] text-subtext truncate leading-normal mt-0.5">
+                        {user.email}
+                      </span>
+                    </div>
+
+                    <div className="h-px bg-overlay/20 my-1 mx-1.5" />
+
+                    <Link
+                      href="/terms"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-subtext hover:bg-overlay/40 hover:text-text transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      Terms of Service
+                    </Link>
+
+                    <Link
+                      href="/privacy"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-subtext hover:bg-overlay/40 hover:text-text transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                      Privacy Policy
+                    </Link>
+
+                    <div className="h-px bg-overlay/20 my-1 mx-1.5" />
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        void signOutUser();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-colors text-left cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
