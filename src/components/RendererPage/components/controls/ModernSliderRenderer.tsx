@@ -20,9 +20,13 @@ export default function ModernSliderRenderer({
   onClick,
   renderZIndex = 1,
 }) {
-  const min = Number(comp.Min ?? 0)
-  const max = Number(comp.Max ?? 100)
-  const initialValue = clamp(Number(comp.Value ?? min), min, Math.max(min, max))
+  const min = Number.isFinite(Number(comp.Min)) ? Number(comp.Min) : 0
+  const max = Number.isFinite(Number(comp.Max)) ? Number(comp.Max) : 100
+  const initialValue = clamp(
+    Number.isFinite(Number(comp.Value)) ? Number(comp.Value) : min,
+    min,
+    Math.max(min, max)
+  )
   const [value, setValue] = useState(initialValue)
   const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled'
   const isViewMode = comp.DisplayMode === 'DisplayMode.View'

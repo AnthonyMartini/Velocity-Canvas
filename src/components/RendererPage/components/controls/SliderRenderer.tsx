@@ -9,10 +9,14 @@ function clamp(value, min, max) {
 }
 
 export default function SliderRenderer({ comp, selected, isPlaying, localVars, setLocalVars, notify, navigate, updateProp, flatNodes, parentNode, onMouseDown, onClick, renderZIndex = 1 }) {
-  const min = Number(comp.Min ?? 0)
-  const max = Number(comp.Max ?? 100)
-  const step = Number(comp.Step ?? 1) || 1
-  const initialValue = clamp(Number(comp.Value ?? comp.Default ?? min), min, max)
+  const min = Number.isFinite(Number(comp.Min)) ? Number(comp.Min) : 0
+  const max = Number.isFinite(Number(comp.Max)) ? Number(comp.Max) : 100
+  const step = Number.isFinite(Number(comp.Step)) && Number(comp.Step) > 0 ? Number(comp.Step) : 1
+  const initialValue = clamp(
+    Number.isFinite(Number(comp.Value ?? comp.Default)) ? Number(comp.Value ?? comp.Default) : min,
+    min,
+    max
+  )
   const [value, setValue] = useState(initialValue)
 
   useEffect(() => {

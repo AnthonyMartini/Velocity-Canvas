@@ -28,8 +28,10 @@ export default function ModernProgressBarRenderer({
 }) {
   const isDisabledMode = comp.DisplayMode === 'DisplayMode.Disabled'
   const { palette, lighter30 } = resolveModernPalette(comp, canvasTheme)
-  const max = Math.max(1, Number(comp.Max ?? 100))
-  const value = clamp(Number(comp.Value ?? 0), 0, max)
+  const rawMax = Number(comp.Max ?? 100)
+  const max = Number.isFinite(rawMax) ? Math.max(1, rawMax) : 100
+  const rawValue = Number(comp.Value ?? 0)
+  const value = clamp(Number.isFinite(rawValue) ? rawValue : 0, 0, max)
   const percent = (value / max) * 100
   const shape = normalizeLiteralString(comp.Shape, 'rounded').toLowerCase()
   const thickness = normalizeLiteralString(comp.Thickness, 'medium').toLowerCase()
