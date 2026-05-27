@@ -79,6 +79,34 @@ export default function RootLayout({
     <html lang="en" style={themeCssVariables as CSSProperties} suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
         <AppShellProvider>{children}</AppShellProvider>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "Velocity Canvas",
+              "operatingSystem": "Windows, macOS, Linux",
+              "applicationCategory": "DeveloperApplication",
+              "offers": {
+                "@type": "Offer",
+                "price": "0.00",
+                "priceCurrency": "USD",
+                "priceSpecification": {
+                  "@type": "UnitPriceSpecification",
+                  "price": "10.00",
+                  "priceCurrency": "USD",
+                  "referenceQuantity": {
+                    "@type": "QuantitativeValue",
+                    "value": "1",
+                    "unitCode": "MON"
+                  }
+                }
+              },
+              "description": "Generate beautiful, modern Power Apps layouts instantly with AI. Auto-layout container grids, and copy-paste designs directly to Power Apps Studio."
+            })
+          }}
+        />
         <Analytics />
         <SpeedInsights />
       </body>
