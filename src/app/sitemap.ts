@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://velocitycanvas.app';
+  const baseUrl = 'https://www.velocitycanvas.com';
 
   // Static routes we want search engines to index
   return [

@@ -24,13 +24,13 @@ export const metadata: Metadata = {
     "low-code AI",
   ],
   authors: [{ name: "Anthony Martini" }],
-  metadataBase: new URL("https://velocitycanvas.app"),
+  metadataBase: new URL("https://www.velocitycanvas.com"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
-    url: "https://velocitycanvas.app",
+    url: "https://www.velocitycanvas.com",
     title: "Velocity Canvas — AI Power Apps UI Generator",
     description:
       "Build Power Apps canvas layouts at the speed of thought. AI-powered YAML generation, live canvas preview, and seamless export to Power Apps Studio.",

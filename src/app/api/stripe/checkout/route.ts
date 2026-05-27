@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const origin = req.headers.get("origin") ?? "https://velocitycanvas.app";
+    const origin = req.headers.get("origin") ?? "https://www.velocitycanvas.com";
 
     const stripe = getStripe();
 
