@@ -2,6 +2,11 @@ import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+export const metadata = {
+  title: 'Privacy Policy — Velocity Canvas',
+  description: 'Privacy policy for Velocity Canvas. Learn how we handle your personal information.',
+};
+
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-[#00D1FF]/30">

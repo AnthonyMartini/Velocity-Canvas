@@ -57,7 +57,7 @@
     "propertyName": "DropShadow",
     "propertyType": "Input",
     "dataType": "Enum",
-    "options": ["DropShadow.None", "DropShadow.Light", "DropShadow.Medium", "DropShadow.Heavy"]
+    "options": ["DropShadow.Light", "DropShadow.None", "DropShadow.Regular", "DropShadow.Semibold", "DropShadow.Semilight", "DropShadow.Bold", "DropShadow.ExtraBold"]
   },
   {
     "propertyName": "Fill",

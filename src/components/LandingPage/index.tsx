@@ -548,40 +548,40 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
               </button>
             </div>
 
-            {/* Early Access / Pro */}
-            <div className="relative flex flex-col rounded-3xl border border-white/5 bg-[#0A0A0A] p-8 transition-all">
-              <div className="absolute -top-4 left-8 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#6f7a92]">
-                Coming Soon
+            {/* Pro Plan */}
+            <div className="relative flex flex-col rounded-3xl border border-[#00D1FF]/20 bg-[#0A0A0A] p-8 transition-all hover:border-[#00D1FF]/40">
+              <div className="absolute -top-4 left-8 rounded-full bg-[#00D1FF]/10 border border-[#00D1FF]/35 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#00D1FF]">
+                Pro Plan
               </div>
               <div>
-                <h3 className="text-lg font-medium text-white">Early Access</h3>
+                <h3 className="text-lg font-medium text-white">Early Access Pro</h3>
                 <p className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold tracking-tight text-white/50">$10</span>
+                  <span className="text-4xl font-bold tracking-tight text-white">$10</span>
                   <span className="text-sm font-semibold text-[#6f7a92]">/month</span>
                 </p>
                 <p className="mt-6 text-sm leading-6 text-[#94a0b8]">
                   For power users who need high-volume AI generations every month.
                 </p>
-                <ul className="mt-8 space-y-4 text-sm leading-6 text-[#b3bfd4]/50">
+                <ul className="mt-8 space-y-4 text-sm leading-6 text-[#b3bfd4]">
                   <li className="flex gap-3">
-                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
                     Everything in Starter
                   </li>
                   <li className="flex gap-3">
-                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
                     500 credits per month
                   </li>
                   <li className="flex gap-3">
-                    <Check className="h-5 w-5 flex-none text-[#00D1FF]/30" />
+                    <Check className="h-5 w-5 flex-none text-[#00D1FF]" />
                     Priority access to models
                   </li>
                 </ul>
               </div>
               <button 
-                disabled
-                className="mt-10 block w-full rounded-2xl bg-white/5 py-4 px-4 text-center text-sm font-bold text-[#6f7a92] cursor-not-allowed border border-white/5"
+                onClick={handleGoogleSignIn}
+                className="mt-10 block w-full rounded-2xl border border-white/10 bg-white/5 py-4 px-4 text-center text-sm font-bold text-white transition hover:bg-white/10 active:scale-[0.98] cursor-pointer"
               >
-                Upgrade
+                Upgrade to Pro
               </button>
             </div>
           </div>
@@ -596,6 +596,12 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
             </p>
             
             <div className="flex items-center gap-8">
+              <a 
+                href="/terms" 
+                className="text-sm text-[#6f7a92] transition-colors hover:text-white"
+              >
+                Terms of Service
+              </a>
               <a 
                 href="/privacy" 
                 className="text-sm text-[#6f7a92] transition-colors hover:text-white"

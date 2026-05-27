@@ -123,8 +123,11 @@ export const Overflow = {
 export const DropShadow = {
     None: "DropShadow.None",
     Light: "DropShadow.Light",
-    Medium: "DropShadow.Medium",
-    Heavy: "DropShadow.Heavy"
+    Regular: "DropShadow.Regular",
+    Semibold: "DropShadow.Semibold",
+    Semilight: "DropShadow.Semilight",
+    Bold: "DropShadow.Bold",
+    ExtraBold: "DropShadow.ExtraBold"
 }
 
 export const TextMode = {

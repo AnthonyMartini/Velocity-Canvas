@@ -447,6 +447,26 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
         </header>
       )}
 
+      {/* Low-credit warning banner */}
+      {typeof credits === 'number' && credits > 0 && credits <= 5 && !isImmersiveMode && (
+        <div className="flex items-center justify-between gap-3 px-5 py-2 bg-amber-500/10 border-b border-amber-500/25 shrink-0">
+          <div className="flex items-center gap-2 text-xs text-amber-300">
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
+            </svg>
+            <span>
+              You have <strong>{credits} credit{credits === 1 ? '' : 's'}</strong> remaining.
+            </span>
+          </div>
+          <Link
+            href="/plans"
+            className="shrink-0 rounded-lg bg-amber-500 px-3 py-1 text-[11px] font-bold text-black transition-all hover:bg-amber-400 active:scale-95"
+          >
+            Upgrade — $10/mo →
+          </Link>
+        </div>
+      )}
+
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
     </div>
   );

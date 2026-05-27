@@ -636,7 +636,7 @@ function AppLoadingOverlay({ isVisible, onCancel, message }) {
   )
 }
 
-function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, handleReorder, deleteSelected }) {
+function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTweakInput, handleTweakSubmit, tweakLoading, handleReorder, deleteSelected, credits }) {
   if (!node) return null;
 
   return (
@@ -669,28 +669,40 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
           </svg>
         </button>
 
-        <button 
-          onClick={() => setIsTweaking(!isTweaking)}
-          style={isTweaking ? {
-            backgroundImage: themeVars.gradients.askAi,
-            boxShadow: `0 12px 28px ${appTheme.editor.askAi.glow}, inset 0 1px 0 ${appTheme.editor.askAi.insetHighlight}, inset 0 -1px 0 ${appTheme.editor.askAi.insetShadow}`,
-          } : undefined}
-          className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
-            isTweaking 
-              ? 'text-white border-white/10 ring-2 ring-accent/25' 
-              : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:text-white hover:border-accent/30 active:scale-95'
-          }`}
-        >
-          <span className="text-sm">✨</span>
-          Tweak with AI - 1 credit
-        </button>
+        {typeof credits === 'number' && credits <= 0 ? (
+          <a
+            href="/plans"
+            className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-all cursor-pointer active:scale-95"
+          >
+            <span className="text-sm">⚠️</span>
+            Out of credits — Upgrade →
+          </a>
+        ) : (
+          <button 
+            onClick={() => setIsTweaking(!isTweaking)}
+            style={isTweaking ? {
+              backgroundImage: themeVars.gradients.askAi,
+              boxShadow: `0 12px 28px ${appTheme.editor.askAi.glow}, inset 0 1px 0 ${appTheme.editor.askAi.insetHighlight}, inset 0 -1px 0 ${appTheme.editor.askAi.insetShadow}`,
+            } : undefined}
+            className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all duration-300 border shadow-sm cursor-pointer ${
+              isTweaking 
+                ? 'text-white border-white/10 ring-2 ring-accent/25' 
+                : 'bg-surface/60 text-subtext/90 border-overlay/40 hover:text-white hover:border-accent/30 active:scale-95'
+            }`}
+          >
+            <span className="text-sm">✨</span>
+            Tweak with AI - 1 credit
+          </button>
+        )}
       </div>
 
       {isTweaking && (
         <div className="pointer-events-auto w-[320px] backdrop-blur-2xl border border-violet-500/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300" style={{ backgroundColor: 'color-mix(in srgb, var(--vc-color-panel) 90%, transparent)' }}>
           <div className="p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">AI Styling Tweak - 1 credit</span>
+              <span className="text-[11px] font-bold text-violet-300 uppercase tracking-wider">
+                {typeof credits === 'number' && credits <= 0 ? 'Out of credits' : 'AI Styling Tweak - 1 credit'}
+              </span>
               <button onClick={() => setIsTweaking(false)} className="text-subtext/40 hover:text-subtext transition-colors cursor-pointer">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path fillRule="evenodd" d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" /></svg>
               </button>
@@ -700,18 +712,19 @@ function FloatingTweakBar({ node, isTweaking, setIsTweaking, tweakInput, setTwea
                 type="text" 
                 value={tweakInput}
                 onChange={e => setTweakInput(e.target.value)}
+                disabled={typeof credits === 'number' && credits <= 0}
                 onKeyDown={e => {
                   e.stopPropagation()
                   if (e.key === 'Enter') handleTweakSubmit()
                   if (e.key === 'Escape') setIsTweaking(false)
                 }}
                 autoFocus
-                placeholder="e.g. bold red text with soft shadow"
+                placeholder={typeof credits === 'number' && credits <= 0 ? "Out of credits. Upgrade to continue." : "e.g. bold red text with soft shadow"}
                 className="flex-1 bg-surface border border-violet-500/20 rounded-xl px-3 py-2 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 transition-all"
               />
               <button 
                 onClick={handleTweakSubmit}
-                disabled={tweakLoading || !tweakInput.trim()}
+                disabled={tweakLoading || !tweakInput.trim() || (typeof credits === 'number' && credits <= 0)}
                 className="w-9 h-9 rounded-xl bg-violet-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 shadow-lg shadow-violet-500/25 hover:bg-violet-600 transition-colors cursor-pointer"
               >
                 {tweakLoading ? (
@@ -1027,7 +1040,7 @@ function TourOverlay({ step, onNext, onBack, onFinish }) {
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
 export default function RendererPage({ user, onCreditDeduction, activeProject, projectSessionKey, setActiveProject }: { user: any, onCreditDeduction?: () => void, activeProject: any, projectSessionKey: string, setActiveProject: (p: any) => void }) {
-  const { setIsImmersiveMode } = useAppShell()
+  const { setIsImmersiveMode, credits, refreshCredits } = useAppShell()
   const [isSaving, setIsSaving] = useState(false)
   const [showExitPrompt, setShowExitPrompt] = useState(false)
   const [lastSavedState, setLastSavedState] = useState('')
@@ -3232,7 +3245,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         signal: chatAbortControllerRef.current.signal
       })
       if (!res.ok) { 
-        const e = await res.json().catch(() => ({})); 
+        const e = await res.json().catch(() => ({}))
+        if (res.status === 403 && (e.error?.toLowerCase().includes('credit') || e.error?.toLowerCase().includes('insufficient'))) {
+          await refreshCredits()
+          setChatMessages(prev => [...prev, { role: 'assistant', content: '__CREDITS_EMPTY__', added: 0 }])
+          return
+        }
         throw new Error(e.error || `Error ${res.status}`) 
       }
       
@@ -3348,6 +3366,12 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
         setTree(preStreamTree)
       }
       if (err.name === 'AbortError') return
+      const isCreditsError = err.message?.toLowerCase().includes('credit') || err.message?.toLowerCase().includes('insufficient')
+      if (isCreditsError) {
+        void refreshCredits()
+        setChatMessages(prev => [...prev, { role: 'assistant', content: '__CREDITS_EMPTY__', added: 0 }])
+        return
+      }
       setChatMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}`, added: 0 }])
     } finally {
       setChatLoading(false)
@@ -3899,6 +3923,7 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
               tweakLoading={tweakLoading}
               handleReorder={handleReorder}
               deleteSelected={deleteSelected}
+              credits={credits}
             />
           )}
 
@@ -4360,9 +4385,11 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                 <div className="flex-1 relative flex items-center">
                   <input ref={chatInputRef} type="text" value={chatInput}
                     maxLength={1000}
+                    disabled={typeof credits === 'number' && credits <= 0}
                     onChange={e => setChatInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
                     onPaste={e => {
+                      if (typeof credits === 'number' && credits <= 0) return
                       const items = e.clipboardData?.items
                       if (!items) return
                       for (const item of items) {
@@ -4377,18 +4404,27 @@ export default function RendererPage({ user, onCreditDeduction, activeProject, p
                         }
                       }
                     }}
-                    placeholder="Describe what to build — or paste a screenshot"
+                    placeholder={typeof credits === 'number' && credits <= 0 ? "Out of credits. Upgrade to continue." : "Describe what to build — or paste a screenshot"}
                     className="w-full bg-base border border-overlay/40 rounded-xl px-4 pr-12 h-9 text-xs text-text placeholder:text-subtext/40 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 transition-all shadow-sm" />
                   <span className={`absolute right-3 text-[9px] font-bold transition-colors ${chatInput.length >= 900 ? 'text-amber-500' : 'text-subtext/30'}`}>
                     {chatInput.length}/1000
                   </span>
                 </div>
-                <button onClick={handleChatSubmit} disabled={(!chatInput.trim() && !chatImage) || chatLoading}
-                  className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center shrink-0 shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
-                  </svg>
-                </button>
+                {typeof credits === 'number' && credits <= 0 ? (
+                  <a href="/plans" className="px-3 h-9 rounded-xl bg-amber-500 hover:bg-amber-400 text-black flex items-center gap-1 text-[11px] font-bold shadow-md transition-all active:scale-95 shrink-0 pointer-events-auto">
+                    Upgrade
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.72 7.72a.75.75 0 0 1 1.06 0l3.75 3.75a.75.75 0 0 1 0 1.06l-3.75 3.75a.75.75 0 1 1-1.06-1.06l2.47-2.47H3a.75.75 0 0 1 0-1.5h16.19l-2.47-2.47a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                    </svg>
+                  </a>
+                ) : (
+                  <button onClick={handleChatSubmit} disabled={(!chatInput.trim() && !chatImage) || chatLoading}
+                    className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center shrink-0 shadow-md shadow-violet-500/25 hover:shadow-violet-500/40 hover:scale-105 active:scale-95 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 cursor-pointer">
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3.478 2.405a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           </div>

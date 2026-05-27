@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types'
+import Link from 'next/link'
 
 function formatResponseDuration(responseMs) {
   if (typeof responseMs !== 'number' || Number.isNaN(responseMs) || responseMs < 0) return null
@@ -7,9 +8,36 @@ function formatResponseDuration(responseMs) {
   return seconds >= 10 ? `${seconds.toFixed(1)}s` : `${seconds.toFixed(2)}s`
 }
 
+function CreditsEmptyCard() {
+  return (
+    <div className="flex w-full justify-start">
+      <div className="max-w-[88%] rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-xs leading-relaxed">
+        <p className="font-semibold text-amber-300 mb-1.5">⚠️ You&apos;re out of credits</p>
+        <p className="text-subtext/80 mb-2.5">
+          Upgrade to Pro for 500 credits/month and keep building.
+        </p>
+        <Link
+          href="/plans"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-black transition-all hover:bg-amber-400 active:scale-95"
+        >
+          Upgrade — $10/mo
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+            <path fillRule="evenodd" d="M16.72 7.72a.75.75 0 0 1 1.06 0l3.75 3.75a.75.75 0 0 1 0 1.06l-3.75 3.75a.75.75 0 1 1-1.06-1.06l2.47-2.47H3a.75.75 0 0 1 0-1.5h16.19l-2.47-2.47a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+          </svg>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default function ChatMessage({ msg }) {
   const isUser = msg.role === 'user'
   const responseDuration = !isUser ? formatResponseDuration(msg.responseMs) : null
+
+  if (!isUser && msg.content === '__CREDITS_EMPTY__') {
+    return <CreditsEmptyCard />
+  }
+
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`flex items-start gap-2 ${isUser ? 'max-w-[80%]' : 'max-w-[88%]'}`}>
@@ -66,3 +94,4 @@ ChatMessage.propTypes = {
     responseMs: PropTypes.number,
   }).isRequired,
 }
+

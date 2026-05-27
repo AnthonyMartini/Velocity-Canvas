@@ -43,7 +43,13 @@ export default function ContainerRenderer({
   const shadowMap = {
     'DropShadow.None': 'none',
     'DropShadow.Light': '0 2px 4px rgba(0,0,0,0.1)',
-    'DropShadow.Medium': '0 4px 8px rgba(0,0,0,0.15)',
+    'DropShadow.Semilight': '0 3px 6px rgba(0,0,0,0.12)',
+    'DropShadow.Regular': '0 4px 8px rgba(0,0,0,0.14)',
+    'DropShadow.Semibold': '0 6px 12px rgba(0,0,0,0.16)',
+    'DropShadow.Bold': '0 8px 16px rgba(0,0,0,0.2)',
+    'DropShadow.ExtraBold': '0 12px 24px rgba(0,0,0,0.24)',
+    // Legacy values kept for backward-compatible rendering of older saved data.
+    'DropShadow.Medium': '0 4px 8px rgba(0,0,0,0.14)',
     'DropShadow.Heavy': '0 8px 16px rgba(0,0,0,0.2)'
   }
 

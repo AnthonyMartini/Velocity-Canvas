@@ -31,7 +31,7 @@
     { "key": "RadiusTopRight",    "label": "Radius TR",         "type": "number",  "propertyType": "Input" },
     { "key": "RadiusBottomLeft",  "label": "Radius BL",         "type": "number",  "propertyType": "Input" },
     { "key": "RadiusBottomRight", "label": "Radius BR",         "type": "number",  "propertyType": "Input" },
-    { "key": "DropShadow",      "label": "Drop Shadow",      "type": "select", "options": ["DropShadow.None", "DropShadow.Light", "DropShadow.Medium", "DropShadow.Heavy"], "propertyType": "Input" },
+    { "key": "DropShadow",      "label": "Drop Shadow",      "type": "select", "options": ["DropShadow.Light", "DropShadow.None", "DropShadow.Regular", "DropShadow.Semibold", "DropShadow.Semilight", "DropShadow.Bold", "DropShadow.ExtraBold"], "propertyType": "Input" },
     { "key": "Visible",         "label": "Visible",         "type": "boolean", "propertyType": "Input" }
   ]
 }
