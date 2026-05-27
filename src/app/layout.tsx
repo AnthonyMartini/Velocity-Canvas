@@ -8,20 +8,23 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: {
-    default: "Velocity Canvas — AI Power Apps UI Generator",
+    default: "Velocity Canvas — Modern Power Apps Layout & Design Generator",
     template: "%s — Velocity Canvas",
   },
   description:
-    "Build Power Apps canvas layouts at the speed of thought. Describe your UI in plain English and get production-ready Power Apps YAML in seconds. Free to start.",
+    "Generate beautiful, modern Power Apps layouts instantly with AI. Solve responsive container spacing, design professional screens, and copy-paste directly to Power Apps Studio. Free to start.",
   keywords: [
-    "Power Apps",
-    "Power Apps generator",
-    "Power Apps YAML",
-    "Power Apps UI builder",
-    "Power Apps AI",
-    "canvas app builder",
-    "Power Platform",
-    "low-code AI",
+    "make power apps look modern",
+    "power apps modern UI templates",
+    "power apps layout generator",
+    "power apps design templates",
+    "how to make power apps responsive",
+    "AI layout generator for power apps",
+    "power apps container spacing",
+    "power apps dashboard design",
+    "power apps login screen template",
+    "power platform auto layout",
+    "power apps UI kit",
   ],
   authors: [{ name: "Anthony Martini" }],
   metadataBase: new URL("https://www.velocitycanvas.com"),
@@ -31,24 +34,24 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "https://www.velocitycanvas.com",
-    title: "Velocity Canvas — AI Power Apps UI Generator",
+    title: "Velocity Canvas — Modern Power Apps Layout & Design Generator",
     description:
-      "Build Power Apps canvas layouts at the speed of thought. AI-powered YAML generation, live canvas preview, and seamless export to Power Apps Studio.",
+      "Create modern, responsive Power Apps layout templates instantly with AI. Solve container auto-layout grids and copy-paste designs directly to Power Apps Studio.",
     siteName: "Velocity Canvas",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Velocity Canvas — AI Power Apps UI Generator",
+        alt: "Velocity Canvas — Modern Power Apps Layout & Design Generator",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Velocity Canvas — AI Power Apps UI Generator",
+    title: "Velocity Canvas — Modern Power Apps Layout & Design Generator",
     description:
-      "Describe your UI in plain English. Get Power Apps YAML in seconds. Free to start.",
+      "Create beautiful, responsive Power Apps screen designs instantly with AI. Auto-layout container grids and copy-paste directly to your app.",
     images: ["/og-image.png"],
   },
   robots: {
