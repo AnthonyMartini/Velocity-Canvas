@@ -426,18 +426,26 @@ export default function WorkspaceShell({ children }: { children: ReactNode }) {
                 </Link>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-xs text-subtext">
                 {user.photoURL && (
                   <img
                     src={user.photoURL}
                     alt={user.displayName ?? "User"}
-                    className="h-7 w-7 rounded-full"
+                    className="h-7 w-7 rounded-full mr-1"
                     referrerPolicy="no-referrer"
                   />
                 )}
+                <Link href="/terms" className="transition-colors hover:text-text">
+                  Terms
+                </Link>
+                <span>•</span>
+                <Link href="/privacy" className="transition-colors hover:text-text">
+                  Privacy
+                </Link>
+                <span>•</span>
                 <button
                   onClick={() => void signOutUser()}
-                  className="cursor-pointer text-xs text-subtext transition-colors hover:text-text"
+                  className="cursor-pointer transition-colors hover:text-text"
                 >
                   Sign out
                 </button>
