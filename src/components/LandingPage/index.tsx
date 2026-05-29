@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import logo from "@/assets/logo.png";
 import { auth, googleProvider, upsertUserProfile } from "@/lib/firebase";
 import {
@@ -348,7 +349,7 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
         >
           <div className="mx-auto flex max-w-7xl items-center justify-between px-1 py-2">
             <div className="flex items-center gap-3">
-              <img src={logo.src} alt="Velocity Canvas logo" className="h-9 w-9 rounded-2xl" />
+              <Image src={logo} alt="Velocity Canvas logo" width={36} height={36} className="rounded-2xl" priority />
               <span className="text-base font-semibold tracking-[-0.02em] text-white">Velocity Canvas</span>
             </div>
 
@@ -376,7 +377,7 @@ export default function LandingPage({ onAuthenticated }: { onAuthenticated: (sig
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.78, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
               className="max-w-5xl text-balance text-[3rem] font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-[4.7rem] lg:text-[6.25rem]"
-              style={{ fontFamily: "Inter, Segoe UI, Helvetica Neue, Arial, sans-serif" }}
+              style={{ fontFamily: "Selawik, Segoe UI, Helvetica Neue, Arial, sans-serif" }}
             >
               Build Power Apps at the speed of thought.
             </motion.h1>

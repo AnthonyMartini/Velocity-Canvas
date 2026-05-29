@@ -17,7 +17,7 @@ const deepClone = (value) => JSON.parse(JSON.stringify(value))
 
 export const appTheme = {
   fonts: {
-    sans: `'Selawik', 'Inter', system-ui, sans-serif`,
+    sans: `'Selawik', system-ui, sans-serif`,
     mono: `'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace`,
   },
   colors: {
